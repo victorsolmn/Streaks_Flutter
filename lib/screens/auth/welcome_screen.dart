@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../utils/app_theme.dart';
 import 'signin_screen.dart';
 import 'signup_screen.dart';
@@ -19,27 +20,15 @@ class WelcomeScreen extends StatelessWidget {
               // Logo and title
               Column(
                 children: [
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppTheme.accentOrange,
-                          Color(0xFFFF8F00),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: const Icon(
-                      Icons.fitness_center,
-                      color: AppTheme.textPrimary,
-                      size: 60,
+                  SizedBox(
+                    width: 150,
+                    height: 150,
+                    child: SvgPicture.asset(
+                      'assets/images/streaker_logo.svg',
+                      fit: BoxFit.contain,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  SizedBox(height: 24),
                   
                   Text(
                     'Streaker',
@@ -48,13 +37,13 @@ class WelcomeScreen extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   
                   Text(
                     'Track your fitness journey,\nbuild lasting habits',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
                       fontWeight: FontWeight.normal,
                       height: 1.4,
                     ),
@@ -72,14 +61,14 @@ class WelcomeScreen extends StatelessWidget {
                     title: 'Track Progress',
                     subtitle: 'Monitor your daily fitness and nutrition goals',
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   
                   _FeatureItem(
                     icon: Icons.camera_alt,
                     title: 'Smart Nutrition',
                     subtitle: 'Scan food with AI-powered recognition',
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   
                   _FeatureItem(
                     icon: Icons.local_fire_department,
@@ -104,10 +93,10 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                         );
                       },
-                      child: const Text('Get Started'),
+                      child: Text('Get Started'),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   
                   SizedBox(
                     width: double.infinity,
@@ -119,13 +108,13 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                         );
                       },
-                      child: const Text('Sign In'),
+                      child: Text('Sign In'),
                     ),
                   ),
                 ],
               ),
               
-              const SizedBox(height: 32),
+              SizedBox(height: 32),
             ],
           ),
         ),
@@ -159,11 +148,11 @@ class _FeatureItem extends StatelessWidget {
           ),
           child: Icon(
             icon,
-            color: AppTheme.accentOrange,
+            color: AppTheme.primaryAccent,
             size: 28,
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: 16),
         
         Expanded(
           child: Column(
@@ -173,11 +162,11 @@ class _FeatureItem extends StatelessWidget {
                 title,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(
                 subtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
                 ),
               ),
             ],

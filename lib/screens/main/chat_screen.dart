@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/nutrition_provider.dart';
+import '../../providers/health_provider.dart';
+import '../../services/grok_service.dart';
+import '../../services/user_context_builder.dart';
 import '../../utils/app_theme.dart';
 
 class ChatMessage {
@@ -29,6 +33,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
+  final GrokService _grokService = GrokService();
   bool _isTyping = false;
 
   @override
@@ -45,10 +50,42 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _initializeChat() {
+    // Get user context for personalized welcome
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final profile = userProvider.profile;
+    final streakData = userProvider.streakData;
+    
+    String welcomeText = "Hi";
+    if (profile?.name != null) {
+      welcomeText += " ${profile!.name}";
+    }
+    welcomeText += "! I'm Streaker, your personalized AI fitness coach. ";
+    
+    if (streakData != null && streakData.currentStreak > 0) {
+      welcomeText += "Amazing job on your ${streakData.currentStreak} day streak! 🔥 ";
+    }
+    
+    if (profile?.goal != null) {
+      String goal = profile!.goal.toString().split('.').last;
+      if (goal == 'weightLoss') {
+        welcomeText += "I'm here to help you with your weight loss journey. ";
+      } else if (goal == 'muscleGain') {
+        welcomeText += "Let's work together on building muscle and strength. ";
+      } else if (goal == 'endurance') {
+        welcomeText += "I'll help you boost your endurance and stamina. ";
+      } else {
+        welcomeText += "I'm here to help you maintain your fitness. ";
+      }
+    } else {
+      welcomeText += "I'm here to help you reach your fitness goals! ";
+    }
+    
+    welcomeText += "I have access to all your health metrics, nutrition data, and workout history, so I can provide personalized advice just for you.";
+    
     // Welcome message
     final welcomeMessage = ChatMessage(
       id: 'welcome_${DateTime.now().millisecondsSinceEpoch}',
-      message: "Hi! I'm your AI fitness coach. I'm here to help you reach your fitness goals! Feel free to ask me about nutrition, workouts, or any fitness-related questions.",
+      message: welcomeText,
       isUser: false,
       timestamp: DateTime.now(),
     );
@@ -125,81 +162,38 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<String> _generateAIResponse(String userMessage) async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
+    // Build comprehensive user context
+    final comprehensiveContext = UserContextBuilder.buildComprehensiveContext(context);
     
-    final profile = userProvider.profile;
-    final todayNutrition = nutritionProvider.todayNutrition;
-    final streakData = userProvider.streakData;
+    // Generate personalized system prompt
+    final personalizedPrompt = UserContextBuilder.generatePersonalizedSystemPrompt(comprehensiveContext);
     
-    final lowerMessage = userMessage.toLowerCase();
+    // Build conversation history (last 10 messages for context)
+    final conversationHistory = <Map<String, String>>[];
+    final startIndex = _messages.length > 10 ? _messages.length - 10 : 0;
     
-    // Greeting responses
-    if (lowerMessage.contains('hi') || lowerMessage.contains('hello') || lowerMessage.contains('hey')) {
-      return "Hello! Great to see you today! How can I help you with your fitness journey?";
+    for (int i = startIndex; i < _messages.length; i++) {
+      final msg = _messages[i];
+      conversationHistory.add({
+        'role': msg.isUser ? 'user' : 'assistant',
+        'content': msg.message,
+      });
     }
     
-    // Progress-related questions
-    if (lowerMessage.contains('progress') || lowerMessage.contains('how am i doing')) {
-      final currentStreak = streakData?.currentStreak ?? 0;
-      final calories = todayNutrition.totalCalories;
-      return "You're doing great! You have a $currentStreak-day streak going and have logged $calories calories today. Keep up the excellent work! 💪";
+    // Call GROK API with personalized context
+    try {
+      final response = await _grokService.sendMessage(
+        userMessage: userMessage,
+        conversationHistory: conversationHistory,
+        personalizedSystemPrompt: personalizedPrompt,
+      );
+      
+      return response;
+    } catch (e) {
+      print('Error generating AI response: $e');
+      // Fallback to a friendly error message
+      return "I'm having trouble connecting right now, but I'm still here to help! Feel free to ask me about nutrition, workouts, or any fitness questions. I'll do my best to assist you! 💪";
     }
-    
-    // Diet and nutrition questions
-    if (lowerMessage.contains('diet') || lowerMessage.contains('nutrition') || lowerMessage.contains('eat')) {
-      final goal = profile?.goal;
-      switch (goal) {
-        case FitnessGoal.weightLoss:
-          return "For weight loss, focus on:\n\n• Eat in a moderate calorie deficit\n• Prioritize protein (aim for ${nutritionProvider.proteinGoal.round()}g daily)\n• Include plenty of vegetables\n• Stay hydrated\n• Eat whole, unprocessed foods\n\nYou're currently at ${todayNutrition.totalCalories} calories today!";
-        case FitnessGoal.muscleGain:
-          return "For muscle gain, try these nutrition tips:\n\n• Eat in a slight calorie surplus\n• Get ${nutritionProvider.proteinGoal.round()}g+ protein daily\n• Time protein around workouts\n• Don't forget complex carbs\n• Stay consistent with meals\n\nYour protein today: ${todayNutrition.totalProtein.round()}g";
-        default:
-          return "Here are some general nutrition tips:\n\n• Focus on whole foods\n• Balance your macronutrients\n• Eat regular meals\n• Stay hydrated\n• Listen to your body\n\nYour current intake: ${todayNutrition.totalCalories} calories, ${todayNutrition.totalProtein.round()}g protein.";
-      }
-    }
-    
-    // Exercise questions
-    if (lowerMessage.contains('exercise') || lowerMessage.contains('workout') || lowerMessage.contains('train')) {
-      final goal = profile?.goal;
-      switch (goal) {
-        case FitnessGoal.weightLoss:
-          return "For weight loss, I recommend:\n\n• 3-4 strength training sessions per week\n• 150+ minutes of moderate cardio\n• Daily walks (10,000+ steps)\n• HIIT workouts 1-2x per week\n• Stay active throughout the day\n\nRemember: nutrition is 70% of weight loss!";
-        case FitnessGoal.muscleGain:
-          return "For muscle gain, focus on:\n\n• 4-5 strength training sessions per week\n• Progressive overload\n• Compound movements (squats, deadlifts, bench)\n• 8-12 reps for hypertrophy\n• Adequate rest between sessions\n• Don't neglect cardio (2-3x per week)";
-        case FitnessGoal.endurance:
-          return "For endurance improvement:\n\n• Gradually increase training volume\n• Mix steady-state and interval training\n• Include strength training 2x per week\n• Focus on proper form\n• Allow for recovery days\n• Stay consistent!";
-        default:
-          return "Here's a balanced workout approach:\n\n• 3-4 strength training sessions\n• 2-3 cardio sessions\n• 1-2 rest days\n• Mix compound and isolation exercises\n• Progressive overload\n• Listen to your body!";
-      }
-    }
-    
-    // Motivation questions
-    if (lowerMessage.contains('motivat') || lowerMessage.contains('give up') || lowerMessage.contains('discourag')) {
-      final currentStreak = streakData?.currentStreak ?? 0;
-      return "I believe in you! 🌟 You've already built a $currentStreak-day streak, which shows your dedication.\n\nRemember:\n• Progress isn't always linear\n• Small consistent actions compound\n• You're stronger than you think\n• Every day is a new opportunity\n• Focus on how you feel, not just numbers\n\nYou've got this! Keep pushing forward! 💪";
-    }
-    
-    // Sleep questions
-    if (lowerMessage.contains('sleep') || lowerMessage.contains('rest') || lowerMessage.contains('recover')) {
-      return "Sleep is crucial for fitness! Here are some tips:\n\n• Aim for 7-9 hours per night\n• Keep a consistent sleep schedule\n• Create a dark, cool environment\n• Avoid screens 1 hour before bed\n• Try magnesium or melatonin\n• No caffeine 6+ hours before bed\n\nGood sleep = better recovery, mood, and results!";
-    }
-    
-    // Water/hydration questions
-    if (lowerMessage.contains('water') || lowerMessage.contains('hydrat')) {
-      return "Staying hydrated is essential! 💧\n\n• Aim for 8-10 glasses daily\n• Drink more if you're active\n• Start your day with water\n• Carry a water bottle\n• Eat water-rich foods\n• Monitor urine color (pale yellow = good)\n\nProper hydration improves energy, recovery, and performance!";
-    }
-    
-    // Generic motivational responses
-    final motivationalResponses = [
-      "That's a great question! Fitness is a journey, and every step counts. What specific area would you like to focus on?",
-      "I'm here to help you succeed! Your consistency with tracking shows you're serious about your goals. Keep it up!",
-      "Remember, sustainable progress is better than quick fixes. You're building habits that will last a lifetime!",
-      "Every expert was once a beginner. You're doing amazing by taking control of your health!",
-      "Small daily improvements lead to stunning yearly results. Keep pushing forward!"
-    ];
-    
-    return motivationalResponses[DateTime.now().millisecond % motivationalResponses.length];
   }
 
   @override
@@ -211,25 +205,28 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               width: 32,
               height: 32,
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [AppTheme.accentOrange, Color(0xFFFF8F00)],
+                  colors: [AppTheme.primaryAccent, Color(0xFFFF8F00)],
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.smart_toy,
-                color: AppTheme.textPrimary,
-                size: 18,
+              child: SvgPicture.asset(
+                'assets/images/streaker_logo.svg',
+                colorFilter: const ColorFilter.mode(
+                  Colors.white,
+                  BlendMode.srcIn,
+                ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'AI Fitness Coach',
+                    'Streaker',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   Text(
@@ -298,33 +295,36 @@ class _ChatScreenState extends State<ChatScreen> {
                   Container(
                     width: 32,
                     height: 32,
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [AppTheme.accentOrange, Color(0xFFFF8F00)],
+                        colors: [AppTheme.primaryAccent, Color(0xFFFF8F00)],
                       ),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(
-                      Icons.smart_toy,
-                      color: AppTheme.textPrimary,
-                      size: 16,
+                    child: SvgPicture.asset(
+                      'assets/images/streaker_logo.svg',
+                      colorFilter: const ColorFilter.mode(
+                        Colors.white,
+                        BlendMode.srcIn,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTheme.secondaryBackground,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.borderColor),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         _TypingIndicator(),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                       ],
                     ),
                   ),
@@ -335,9 +335,10 @@ class _ChatScreenState extends State<ChatScreen> {
           // Message input
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
               border: Border(
-                top: BorderSide(color: AppTheme.borderColor),
+                top: BorderSide(color: Theme.of(context).dividerColor),
               ),
             ),
             child: Row(
@@ -360,14 +361,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     maxLines: null,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 
                 Container(
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [AppTheme.accentOrange, Color(0xFFFF8F00)],
+                      colors: [AppTheme.primaryAccent, Color(0xFFFF8F00)],
                     ),
                     borderRadius: BorderRadius.circular(24),
                   ),
@@ -375,7 +376,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     onPressed: _isTyping ? null : _sendMessage,
                     icon: const Icon(
                       Icons.send,
-                      color: AppTheme.textPrimary,
+                      color: Colors.white,
                       size: 20,
                     ),
                   ),
@@ -392,13 +393,13 @@ class _ChatScreenState extends State<ChatScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.secondaryBackground,
-        title: const Text('Clear Chat'),
-        content: const Text('Are you sure you want to clear all messages?'),
+        backgroundColor: Theme.of(context).cardColor,
+        title: Text('Clear Chat'),
+        content: Text('Are you sure you want to clear all messages?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
@@ -411,7 +412,7 @@ class _ChatScreenState extends State<ChatScreen> {
             style: TextButton.styleFrom(
               foregroundColor: AppTheme.errorRed,
             ),
-            child: const Text('Clear'),
+            child: Text('Clear'),
           ),
         ],
       ),
@@ -421,7 +422,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showSuggestions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.secondaryBackground,
+      backgroundColor: Theme.of(context).cardColor,
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -434,7 +435,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             
             ...[
               'How can I improve my diet?',
@@ -446,7 +447,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ].map((question) => ListTile(
               leading: Icon(
                 Icons.help_outline,
-                color: AppTheme.accentOrange,
+                color: AppTheme.primaryAccent,
               ),
               title: Text(question),
               onTap: () {
@@ -478,19 +479,22 @@ class _ChatBubble extends StatelessWidget {
             Container(
               width: 32,
               height: 32,
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [AppTheme.accentOrange, Color(0xFFFF8F00)],
+                  colors: [AppTheme.primaryAccent, Color(0xFFFF8F00)],
                 ),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(
-                Icons.smart_toy,
-                color: AppTheme.textPrimary,
-                size: 16,
+              child: SvgPicture.asset(
+                'assets/images/streaker_logo.svg',
+                colorFilter: ColorFilter.mode(
+                  Colors.white,
+                  BlendMode.srcIn,
+                ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
           ],
           
           Expanded(
@@ -503,31 +507,31 @@ class _ChatBubble extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: message.isUser 
-                        ? AppTheme.accentOrange
-                        : AppTheme.secondaryBackground,
+                        ? AppTheme.primaryAccent
+                        : Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16).copyWith(
                       topLeft: message.isUser ? const Radius.circular(16) : Radius.zero,
                       topRight: message.isUser ? Radius.zero : const Radius.circular(16),
                     ),
                     border: message.isUser 
                         ? null 
-                        : Border.all(color: AppTheme.borderColor),
+                        : Border.all(color: Theme.of(context).dividerColor),
                   ),
                   child: Text(
                     message.message,
                     style: TextStyle(
                       color: message.isUser 
-                          ? AppTheme.textPrimary
-                          : AppTheme.textPrimary,
+                          ? Colors.white
+                          : Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 
                 Text(
                   _formatTime(message.timestamp),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
                   ),
                 ),
               ],
@@ -535,17 +539,17 @@ class _ChatBubble extends StatelessWidget {
           ),
           
           if (message.isUser) ...[
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Container(
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: AppTheme.borderColor,
+                color: Theme.of(context).dividerColor.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.person,
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
                 size: 16,
               ),
             ),
@@ -616,7 +620,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
               width: 6,
               height: 6,
               decoration: BoxDecoration(
-                color: AppTheme.textSecondary.withOpacity(opacity),
+                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(opacity) ?? Colors.grey.withOpacity(opacity),
                 shape: BoxShape.circle,
               ),
             );

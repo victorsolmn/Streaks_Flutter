@@ -40,7 +40,7 @@ class NutritionOverviewCard extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.restaurant,
-                    color: AppTheme.accentOrange,
+                    color: AppTheme.primaryAccent,
                     size: 24,
                   ),
                   const SizedBox(width: 12),
@@ -138,9 +138,9 @@ class NutritionOverviewCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryBackground,
+                  color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.borderColor),
+                  border: Border.all(color: Colors.grey[700]!),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -257,12 +257,12 @@ class NutritionEntryCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: AppTheme.accentOrange.withOpacity(0.1),
+                color: AppTheme.primaryAccent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 Icons.restaurant,
-                color: AppTheme.accentOrange,
+                color: AppTheme.primaryAccent,
                 size: 24,
               ),
             ),

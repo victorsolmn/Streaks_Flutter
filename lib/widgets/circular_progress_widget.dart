@@ -17,7 +17,7 @@ class CircularProgressWidget extends StatefulWidget {
     required this.progress,
     this.size = 120.0,
     this.strokeWidth = 8.0,
-    this.progressColor = AppTheme.accentOrange,
+    this.progressColor = AppTheme.primaryAccent,
     this.backgroundColor = AppTheme.borderColor,
     this.child,
     this.animate = true,
@@ -200,7 +200,7 @@ class CircularProgressIndicatorWithLabel extends StatelessWidget {
     required this.value,
     this.unit,
     this.size = 120.0,
-    this.progressColor = AppTheme.accentOrange,
+    this.progressColor = AppTheme.primaryAccent,
   }) : super(key: key);
 
   @override
@@ -253,7 +253,7 @@ class MiniCircularProgress extends StatelessWidget {
   const MiniCircularProgress({
     Key? key,
     required this.progress,
-    this.color = AppTheme.accentOrange,
+    this.color = AppTheme.primaryAccent,
     this.size = 24.0,
   }) : super(key: key);
 

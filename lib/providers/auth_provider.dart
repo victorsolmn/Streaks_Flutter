@@ -8,6 +8,9 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _currentUserId;
   String? _error;
+  
+  // Mock database to store registered users
+  static const String _registeredUsersKey = 'registered_users';
 
   AuthProvider(this._prefs) {
     _loadAuthState();
@@ -47,24 +50,36 @@ class AuthProvider with ChangeNotifier {
       // Simulate API call
       await Future.delayed(const Duration(seconds: 1));
       
-      // Mock validation
-      if (email.isNotEmpty && password.isNotEmpty) {
-        final userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
-        final token = 'mock_token_${DateTime.now().millisecondsSinceEpoch}';
-        
-        await _prefs.setString('auth_token', token);
-        await _prefs.setString('user_id', userId);
-        await _prefs.setString('user_email', email);
-        
-        _isAuthenticated = true;
-        _currentUserId = userId;
-        
-        _setLoading(false);
-        notifyListeners();
-        return true;
-      } else {
-        throw Exception('Invalid email or password');
+      // Check if user exists in our mock database
+      final registeredUsers = await _getRegisteredUsers();
+      final existingUser = registeredUsers.firstWhere(
+        (user) => user['email'] == email,
+        orElse: () => <String, dynamic>{},
+      );
+      
+      if (existingUser.isEmpty) {
+        throw Exception('No account found with this email. Please sign up first.');
       }
+      
+      // Mock password validation (in real app, this would be hashed)
+      if (existingUser['password'] != password) {
+        throw Exception('Incorrect password. Please try again.');
+      }
+      
+      // Valid existing user - sign them in
+      final userId = existingUser['userId'];
+      final token = 'mock_token_${DateTime.now().millisecondsSinceEpoch}';
+      
+      await _prefs.setString('auth_token', token);
+      await _prefs.setString('user_id', userId);
+      await _prefs.setString('user_email', email);
+      
+      _isAuthenticated = true;
+      _currentUserId = userId;
+      
+      _setLoading(false);
+      notifyListeners();
+      return true;
     } catch (e) {
       _setError(e.toString());
       _setLoading(false);
@@ -80,25 +95,44 @@ class AuthProvider with ChangeNotifier {
       // Simulate API call
       await Future.delayed(const Duration(seconds: 1));
       
-      // Mock validation
-      if (name.isNotEmpty && email.isNotEmpty && password.isNotEmpty) {
-        final userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
-        final token = 'mock_token_${DateTime.now().millisecondsSinceEpoch}';
-        
-        await _prefs.setString('auth_token', token);
-        await _prefs.setString('user_id', userId);
-        await _prefs.setString('user_email', email);
-        await _prefs.setString('user_name', name);
-        
-        _isAuthenticated = true;
-        _currentUserId = userId;
-        
-        _setLoading(false);
-        notifyListeners();
-        return true;
-      } else {
+      // Check if all fields are provided
+      if (name.isEmpty || email.isEmpty || password.isEmpty) {
         throw Exception('All fields are required');
       }
+      
+      // Check if user already exists
+      final registeredUsers = await _getRegisteredUsers();
+      final existingUser = registeredUsers.any((user) => user['email'] == email);
+      
+      if (existingUser) {
+        throw Exception('An account with this email already exists. Please sign in instead.');
+      }
+      
+      // Create new user
+      final userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
+      final token = 'mock_token_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Add user to mock database
+      await _addRegisteredUser({
+        'userId': userId,
+        'name': name,
+        'email': email,
+        'password': password, // In real app, this would be hashed
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+      
+      // Set authentication state
+      await _prefs.setString('auth_token', token);
+      await _prefs.setString('user_id', userId);
+      await _prefs.setString('user_email', email);
+      await _prefs.setString('user_name', name);
+      
+      _isAuthenticated = true;
+      _currentUserId = userId;
+      
+      _setLoading(false);
+      notifyListeners();
+      return true;
     } catch (e) {
       _setError(e.toString());
       _setLoading(false);
@@ -110,13 +144,21 @@ class AuthProvider with ChangeNotifier {
     _setLoading(true);
     
     try {
+      // Clear authentication data
       await _prefs.remove('auth_token');
       await _prefs.remove('user_id');
       await _prefs.remove('user_email');
       await _prefs.remove('user_name');
       
+      // Clear user profile data
+      await _prefs.remove('user_profile');
+      
+      // Clear any other session-specific data
+      await _prefs.remove('onboarding_completed');
+      
       _isAuthenticated = false;
       _currentUserId = null;
+      _error = null;
       
       _setLoading(false);
       notifyListeners();
@@ -129,5 +171,26 @@ class AuthProvider with ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+  
+  // Mock database methods for user management
+  Future<List<Map<String, dynamic>>> _getRegisteredUsers() async {
+    final usersJson = _prefs.getString(_registeredUsersKey);
+    if (usersJson == null) return [];
+    
+    final List<dynamic> usersList = jsonDecode(usersJson);
+    return usersList.cast<Map<String, dynamic>>();
+  }
+  
+  Future<void> _addRegisteredUser(Map<String, dynamic> user) async {
+    final users = await _getRegisteredUsers();
+    users.add(user);
+    await _prefs.setString(_registeredUsersKey, jsonEncode(users));
+  }
+  
+  // Helper method to check if email exists (can be used by UI)
+  Future<bool> checkEmailExists(String email) async {
+    final users = await _getRegisteredUsers();
+    return users.any((user) => user['email'] == email);
   }
 }

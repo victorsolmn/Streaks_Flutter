@@ -42,12 +42,12 @@ class MetricCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: (color ?? AppTheme.accentOrange).withOpacity(0.1),
+                    color: (color ?? AppTheme.primaryAccent).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     icon,
-                    color: color ?? AppTheme.accentOrange,
+                    color: color ?? AppTheme.primaryAccent,
                     size: 24,
                   ),
                 ),
@@ -107,7 +107,7 @@ class MetricCard extends StatelessWidget {
                 const SizedBox(width: 16),
                 MiniCircularProgress(
                   progress: progress!,
-                  color: color ?? AppTheme.accentOrange,
+                  color: color ?? AppTheme.primaryAccent,
                 ),
               ] else if (trailing != null) ...[
                 const SizedBox(width: 16),
@@ -137,7 +137,7 @@ class ProgressMetricCard extends StatelessWidget {
     required this.target,
     required this.unit,
     required this.icon,
-    this.color = AppTheme.accentOrange,
+    this.color = AppTheme.primaryAccent,
     this.onTap,
   }) : super(key: key);
 
@@ -251,7 +251,7 @@ class StatCard extends StatelessWidget {
     required this.value,
     this.subtitle,
     required this.icon,
-    this.color = AppTheme.accentOrange,
+    this.color = AppTheme.primaryAccent,
   }) : super(key: key);
 
   @override
@@ -259,9 +259,9 @@ class StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.secondaryBackground,
+        color: Colors.grey[800],
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
+        border: Border.all(color: Colors.grey[700]!),
       ),
       child: Column(
         children: [
@@ -327,7 +327,7 @@ class QuickActionCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
-    this.color = AppTheme.accentOrange,
+    this.color = AppTheme.primaryAccent,
     required this.onTap,
   }) : super(key: key);
 

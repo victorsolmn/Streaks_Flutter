@@ -249,4 +249,29 @@ class NutritionProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  Future<void> clearNutritionData() async {
+    try {
+      // Clear nutrition data from preferences
+      await _prefs.remove('nutrition_entries');
+      await _prefs.remove('calorie_goal');
+      await _prefs.remove('protein_goal');
+      await _prefs.remove('carb_goal');
+      await _prefs.remove('fat_goal');
+      
+      // Reset state to defaults
+      _entries.clear();
+      _calorieGoal = 2000;
+      _proteinGoal = 150.0;
+      _carbGoal = 250.0;
+      _fatGoal = 67.0;
+      _error = null;
+      _isLoading = false;
+      
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to clear nutrition data';
+      notifyListeners();
+    }
+  }
 }

@@ -81,18 +81,18 @@ class _NutritionScreenState extends State<NutritionScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.secondaryBackground,
-        title: const Text('Select Image Source'),
+        title: Text('Select Image Source'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.camera_alt, color: AppTheme.accentOrange),
-              title: const Text('Camera'),
+              leading: Icon(Icons.camera_alt, color: AppTheme.primaryAccent),
+              title: Text('Camera'),
               onTap: () => Navigator.of(context).pop(ImageSource.camera),
             ),
             ListTile(
-              leading: Icon(Icons.photo_library, color: AppTheme.accentOrange),
-              title: const Text('Gallery'),
+              leading: Icon(Icons.photo_library, color: AppTheme.primaryAccent),
+              title: Text('Gallery'),
               onTap: () => Navigator.of(context).pop(ImageSource.gallery),
             ),
           ],
@@ -100,7 +100,7 @@ class _NutritionScreenState extends State<NutritionScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
         ],
       ),
@@ -112,7 +112,7 @@ class _NutritionScreenState extends State<NutritionScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.secondaryBackground,
-        title: const Text('Confirm Food Entry'),
+        title: Text('Confirm Food Entry'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,7 +123,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             
             _NutritionDetailRow(label: 'Calories', value: '${entry.calories}', unit: 'cal'),
             _NutritionDetailRow(label: 'Protein', value: '${entry.protein.round()}', unit: 'g'),
@@ -134,11 +134,11 @@ class _NutritionScreenState extends State<NutritionScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Add to Log'),
+            child: Text('Add to Log'),
           ),
         ],
       ),
@@ -151,12 +151,12 @@ class _NutritionScreenState extends State<NutritionScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.secondaryBackground,
-        title: const Text('Error'),
+        title: Text('Error'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: Text('OK'),
           ),
         ],
       ),
@@ -175,7 +175,7 @@ class _NutritionScreenState extends State<NutritionScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.secondaryBackground,
-        title: const Text('Add Food Manually'),
+        title: Text('Add Food Manually'),
         content: Form(
           key: formKey,
           child: SingleChildScrollView(
@@ -187,7 +187,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                   decoration: const InputDecoration(labelText: 'Food Name'),
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 TextFormField(
                   controller: caloriesController,
@@ -195,7 +195,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                   keyboardType: TextInputType.number,
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 TextFormField(
                   controller: proteinController,
@@ -203,7 +203,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 TextFormField(
                   controller: carbsController,
@@ -211,7 +211,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 TextFormField(
                   controller: fatController,
@@ -226,7 +226,7 @@ class _NutritionScreenState extends State<NutritionScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -253,7 +253,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                 );
               }
             },
-            child: const Text('Add'),
+            child: Text('Add'),
           ),
         ],
       ),
@@ -264,11 +264,11 @@ class _NutritionScreenState extends State<NutritionScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nutrition'),
+        title: Text('Nutrition'),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: AppTheme.accentOrange,
-          labelColor: AppTheme.accentOrange,
+          indicatorColor: AppTheme.primaryAccent,
+          labelColor: AppTheme.primaryAccent,
           unselectedLabelColor: AppTheme.textSecondary,
           tabs: const [
             Tab(text: 'Today'),
@@ -317,17 +317,17 @@ class _NutritionScreenState extends State<NutritionScreen>
         onPressed: _isScanning ? null : _scanFood,
         backgroundColor: _isScanning 
             ? AppTheme.borderColor 
-            : AppTheme.accentOrange,
+            : AppTheme.primaryAccent,
         child: _isScanning
-            ? const SizedBox(
+            ? SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: AppTheme.textSecondary,
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
                 ),
               )
-            : const Icon(Icons.camera_alt),
+            : Icon(Icons.camera_alt),
       ),
     );
   }
@@ -356,11 +356,11 @@ class _NutritionScreenState extends State<NutritionScreen>
                   carbGoal: nutritionProvider.carbGoal,
                   fatGoal: nutritionProvider.fatGoal,
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 
                 // Macro breakdown
                 MacroBreakdownCard(dailyNutrition: todayNutrition),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 
                 // Today's meals
                 Row(
@@ -375,12 +375,12 @@ class _NutritionScreenState extends State<NutritionScreen>
                     Text(
                       '${todayNutrition.entries.length} meals',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 if (todayNutrition.entries.isEmpty)
                   _buildEmptyState()
@@ -397,7 +397,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                     ),
                   ),
                 
-                const SizedBox(height: 80), // Space for FAB
+                SizedBox(height: 80), // Space for FAB
               ],
             ),
           ),
@@ -428,7 +428,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 ...weeklyNutrition.map((dailyNutrition) {
                   final dayName = _getDayName(dailyNutrition.date);
@@ -448,21 +448,21 @@ class _NutritionScreenState extends State<NutritionScreen>
                                   dayName,
                                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                     fontWeight: FontWeight.w600,
-                                    color: isToday ? AppTheme.accentOrange : null,
+                                    color: isToday ? AppTheme.primaryAccent : null,
                                   ),
                                 ),
                                 if (isToday) ...[
-                                  const SizedBox(width: 8),
+                                  SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.accentOrange.withOpacity(0.1),
+                                      color: AppTheme.primaryAccent.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
                                       'Today',
                                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: AppTheme.accentOrange,
+                                        color: AppTheme.primaryAccent,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -477,35 +477,35 @@ class _NutritionScreenState extends State<NutritionScreen>
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: 8),
                             
                             Row(
                               children: [
                                 Text(
                                   'P: ${dailyNutrition.totalProtein.round()}g',
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.textSecondary,
+                                    color: Theme.of(context).textTheme.bodyMedium?.color,
                                   ),
                                 ),
-                                const SizedBox(width: 16),
+                                SizedBox(width: 16),
                                 Text(
                                   'C: ${dailyNutrition.totalCarbs.round()}g',
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.textSecondary,
+                                    color: Theme.of(context).textTheme.bodyMedium?.color,
                                   ),
                                 ),
-                                const SizedBox(width: 16),
+                                SizedBox(width: 16),
                                 Text(
                                   'F: ${dailyNutrition.totalFat.round()}g',
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.textSecondary,
+                                    color: Theme.of(context).textTheme.bodyMedium?.color,
                                   ),
                                 ),
                                 const Spacer(),
                                 Text(
                                   '${dailyNutrition.entries.length} meals',
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.textSecondary,
+                                    color: Theme.of(context).textTheme.bodyMedium?.color,
                                   ),
                                 ),
                               ],
@@ -517,7 +517,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                   );
                 }),
                 
-                const SizedBox(height: 80), // Space for FAB
+                SizedBox(height: 80), // Space for FAB
               ],
             ),
           ),
@@ -531,29 +531,29 @@ class _NutritionScreenState extends State<NutritionScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: AppTheme.secondaryBackground,
+        color: Colors.grey[800],
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
+        border: Border.all(color: Colors.grey[700]!),
       ),
       child: Column(
         children: [
           Icon(
             Icons.camera_alt_outlined,
-            color: AppTheme.textSecondary,
+            color: Theme.of(context).textTheme.bodyMedium?.color,
             size: 64,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             'No meals logged today',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).textTheme.bodyMedium?.color,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             'Tap the camera button to scan your first meal',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).textTheme.bodyMedium?.color,
             ),
             textAlign: TextAlign.center,
           ),
@@ -567,19 +567,19 @@ class _NutritionScreenState extends State<NutritionScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.secondaryBackground,
-        title: const Text('Delete Entry'),
-        content: const Text('Are you sure you want to delete this nutrition entry?'),
+        title: Text('Delete Entry'),
+        content: Text('Are you sure you want to delete this nutrition entry?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(
               foregroundColor: AppTheme.errorRed,
             ),
-            child: const Text('Delete'),
+            child: Text('Delete'),
           ),
         ],
       ),
@@ -621,7 +621,7 @@ class _NutritionDetailRow extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).textTheme.bodyMedium?.color,
             ),
           ),
           Text(

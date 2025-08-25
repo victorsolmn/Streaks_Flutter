@@ -1,1051 +1,1138 @@
-# Frontend Architecture & Design - Streaks Flutter
+# Frontend Architecture & UI Design System
+## Streaks Flutter Application
 
-## Architecture Overview
+## Table of Contents
+1. [Design System Overview](#design-system-overview)
+2. [Color Palette & Theming](#color-palette--theming)
+3. [Typography System](#typography-system)
+4. [Component Architecture](#component-architecture)
+5. [Screen Layouts](#screen-layouts)
+6. [Navigation Architecture](#navigation-architecture)
+7. [State Management Patterns](#state-management-patterns)
+8. [Animation & Interaction Design](#animation--interaction-design)
+9. [Responsive Design](#responsive-design)
+10. [Performance Optimization](#performance-optimization)
 
-### **Design Philosophy**
-The Streaks Flutter app follows a **modular, scalable architecture** with clear separation of concerns, consistent design patterns, and maintainable code structure.
+---
 
-**Core Principles:**
-- **Single Responsibility:** Each component has one clear purpose
-- **Composition over Inheritance:** Build complex UIs from simple components
-- **Declarative UI:** Describe what the UI should look like, not how to achieve it
-- **State Isolation:** Keep state management predictable and testable
+## Design System Overview
 
-## Frontend Architecture Layers
+### Design Principles
+- **Clarity**: Clear visual hierarchy with distinct primary, secondary, and tertiary information levels
+- **Consistency**: Unified design language across all screens and components
+- **Accessibility**: High contrast ratios, adequate touch targets, semantic labeling
+- **Performance**: Optimized animations and efficient rendering patterns
+- **Modularity**: Reusable components with consistent APIs
 
-### **1. Presentation Layer**
-```
-lib/screens/
-├── auth/                    # Authentication screens
-├── main/                    # Core application screens  
-├── onboarding/             # First-time user experience
-└── shared/                 # Reusable screen components
-```
+### Visual Language
+- **Card-based Layout**: Primary content organization pattern
+- **Rounded Corners**: Consistent 12-20px radius for modern, friendly appearance
+- **Subtle Shadows**: Light elevation effects (opacity 0.05-0.06)
+- **Gradient Accents**: Strategic use of gradients for emphasis
+- **White Space**: Generous padding for visual breathing room
 
-**Responsibilities:**
-- User interface rendering
-- User interaction handling
-- Navigation flow management
-- Screen-level state coordination
+---
 
-### **2. Component Layer**
-```
-lib/widgets/
-├── common/                 # Generic reusable components
-├── forms/                  # Form-specific components
-├── cards/                  # Data display components
-├── charts/                 # Data visualization components
-└── overlays/               # Modal and popup components
-```
+## Color Palette & Theming
 
-**Responsibilities:**
-- Reusable UI components
-- Component-level state management
-- Props/parameter validation
-- Component composition patterns
-
-### **3. State Management Layer**
-```
-lib/providers/
-├── auth_provider.dart      # Authentication state
-├── user_provider.dart      # User profile state
-├── nutrition_provider.dart # Nutrition tracking state
-├── progress_provider.dart  # Progress tracking state
-└── chat_provider.dart      # Chat interface state
+### Brand Colors (Updated August 2024)
+```dart
+// Core Brand Color - Orange Theme
+primaryAccent: Color(0xFFFF6B1A)       // Vibrant Orange (Main Brand)
 ```
 
-**Responsibilities:**
-- Global state management
-- Business logic coordination
-- Data flow orchestration
-- State persistence coordination
+### Theme-Specific Colors
 
-### **4. Data Layer**
-```
-lib/services/
-├── storage_service.dart    # Local storage abstraction
-├── api_service.dart        # Remote API communication
-├── image_service.dart      # Image processing
-└── notification_service.dart # Push notifications
+#### Dark Theme
+```dart
+// Backgrounds
+primaryBackground: Color(0xFF121212)    // Pure Dark Background
+secondaryBackground: Color(0xFF1C1C1E)  // Elevated Surface
+cardBackground: Color(0xFF1C1C1E)       // Card Surface
+
+// Text Colors
+textPrimary: Colors.white               // Primary Text
+textSecondary: Color(0xFF9CA3AF)        // Secondary Text
+
+// UI Elements
+borderColor: Color(0xFF2C2C2E)          // Borders
+dividerColor: Color(0xFF2C2C2E)         // Dividers
+
+// Special Card Backgrounds (Progress/Nutrition)
+statCardBackground: Colors.grey[800]    // Grey background for stat cards
+statCardBorder: Colors.grey[700]        // Border for stat cards
 ```
 
-**Responsibilities:**
-- Data persistence and retrieval
-- External service integration
-- Data transformation and validation
-- Error handling and recovery
+#### Light Theme
+```dart
+// Backgrounds  
+primaryBackground: Colors.white         // Clean White Background
+secondaryBackground: Color(0xFFF8F9FA)  // Light Grey Background
+cardBackground: Color(0xFFF8F9FA)       // Card Surface
+
+// Text Colors
+textPrimary: Color(0xFF111111)          // Near Black for contrast
+textSecondary: Color(0xFF6B7280)        // Medium Grey
+
+// UI Elements
+borderColor: Color(0xFFE5E7EB)          // Light borders
+dividerColor: Color(0xFFE5E7EB)         // Light dividers
+```
+
+### Functional Colors (Theme-Independent)
+```dart
+// Status Colors
+successGreen: Color(0xFF4CAF50)        // Success/Protein
+infoBlue: Color(0xFF2196F3)            // Info/Carbs  
+warningAmber: Color(0xFFFFA726)        // Warning/Activity
+errorRed: Color(0xFFE74C3C)            // Errors
+purpleFat: Colors.purple               // Fat macro
+
+// Icon Colors (Preserved in Dark Theme)
+iconGreen: Color(0xFF4CAF50)           // Health metrics
+iconBlue: Color(0xFF2196F3)            // Water/Sleep
+iconAmber: Color(0xFFFFA726)           // Activity
+iconOrange: Color(0xFFFF6B1A)          // Calories/Streaks
+```
+
+### Theme Implementation Patterns
+```dart
+// Always use Theme.of(context) for dynamic theming
+color: Theme.of(context).colorScheme.surface
+color: Theme.of(context).textTheme.bodyLarge?.color
+
+// Never use const with Theme.of(context)
+// Bad:  const Card(color: Theme.of(context)...)
+// Good: Card(color: Theme.of(context)...)
+```
+
+### Theme Provider Implementation
+- Dynamic theme switching (Light/Dark)
+- System theme detection
+- Persistent theme preferences
+- Material 3 compliance
+- Proper text contrast for accessibility
+
+---
+
+## Typography System
+
+### Type Scale
+```dart
+Display Large:   34px, Weight: 700    // Main Headings
+Display Medium:  28px, Weight: 600    // Section Headers
+Display Small:   24px, Weight: 600    // Subsection Headers
+
+Headline Large:  20px, Weight: 600    // Card Titles
+Headline Medium: 18px, Weight: 500    // List Headers
+Headline Small:  16px, Weight: 500    // Inline Headers
+
+Body Large:      16px, Weight: 400    // Primary Content
+Body Medium:     14px, Weight: 400    // Standard Text
+Body Small:      12px, Weight: 400    // Secondary Text
+
+Label Large:     14px, Weight: 500    // Button Text
+Label Medium:    12px, Weight: 500    // Tab Labels
+Label Small:     10px, Weight: 500    // Caption Text
+```
+
+### Font Family
+- **Primary**: System Default (San Francisco on iOS, Roboto on Android)
+- **Numeric**: Monospace for metric displays
+
+---
 
 ## Component Architecture
 
-### **Component Hierarchy**
-```
-MyApp (Root)
-├── AuthenticationWrapper
-│   ├── WelcomeScreen
-│   ├── SignInScreen
-│   └── SignUpScreen
-└── MainApp
-    ├── MainScreen (BottomNavigation)
-    │   ├── HomeScreen
-    │   │   ├── StreakCard
-    │   │   ├── QuickActionCard[]
-    │   │   └── NutritionOverviewCard
-    │   ├── ProgressScreen
-    │   │   ├── ProgressMetricCard[]
-    │   │   ├── AchievementBadge[]
-    │   │   └── ProgressChart
-    │   ├── NutritionScreen
-    │   │   ├── DailyNutritionCard
-    │   │   ├── NutritionEntryCard[]
-    │   │   └── AddFoodModal
-    │   ├── ChatScreen
-    │   │   ├── MessageBubble[]
-    │   │   ├── ChatInput
-    │   │   └── TypingIndicator
-    │   └── ProfileScreen
-    │       ├── ProfileHeader
-    │       ├── SettingsCard[]
-    │       └── GoalsConfiguration
-    └── OnboardingScreen
-        ├── OnboardingSlide[]
-        └── OnboardingNavigation
-```
+### Core Widget Library
 
-### **Component Design Patterns**
-
-#### **1. Container-Presentational Pattern**
+#### 1. Metric Cards
 ```dart
-// Container Component (Smart)
-class NutritionScreenContainer extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<NutritionProvider>(
-      builder: (context, nutrition, child) {
-        return NutritionScreenView(
-          entries: nutrition.todaysEntries,
-          dailyGoals: nutrition.dailyGoals,
-          onAddFood: nutrition.addFoodEntry,
-          onDeleteEntry: nutrition.deleteEntry,
-        );
-      },
-    );
-  }
-}
-
-// Presentational Component (Dumb)
-class NutritionScreenView extends StatelessWidget {
-  final List<NutritionEntry> entries;
-  final DailyGoals dailyGoals;
-  final Function(NutritionEntry) onAddFood;
-  final Function(String) onDeleteEntry;
-
-  const NutritionScreenView({
-    required this.entries,
-    required this.dailyGoals,
-    required this.onAddFood,
-    required this.onDeleteEntry,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      // Pure UI rendering logic
-    );
-  }
-}
+DashboardMetricCard
+├── Container (with gradient/shadow)
+├── Icon (leading visual)
+├── Text Elements (title, value, unit)
+└── Optional Chart Widget
 ```
 
-#### **2. Composition Pattern**
+**Variants:**
+- Standard Metric Card
+- Progress Metric Card (with progress bars)
+- Stat Card (grey background with colored icons)
+- Nutrition Overview Card (with macro breakdowns)
+- Interactive Metric Card
+
+**UI Standardization (August 2024):**
+- Stat cards use grey[800] backgrounds in dark theme
+- Icons retain original colors (green, blue, amber, orange)
+- Cards have grey[700] borders for definition
+- Uniform design across Progress and Nutrition screens
+
+#### 2. Progress Indicators
 ```dart
-class MetricCard extends StatelessWidget {
-  final String title;
-  final Widget content;
-  final Widget? trailing;
-  final VoidCallback? onTap;
+CircularProgressWidget
+├── CustomPaint (circular progress)
+├── AnimationController
+├── Center Text (percentage/value)
+└── Gradient Effect
+```
 
-  // Flexible composition through widgets
-  const MetricCard({
-    required this.title,
-    required this.content,
-    this.trailing,
-    this.onTap,
-  });
+**Types:**
+- Full Circle Progress
+- Semi-Circular Progress
+- Linear Progress Bar
+- Segmented Progress
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Text(title),
-              content, // Flexible content composition
-              if (trailing != null) trailing!,
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+#### 3. Chart Components
+```dart
+MiniChart
+├── CustomPainter/FL_Chart
+├── Data Points
+├── Axis Configuration
+└── Touch Interactions
+```
 
-// Usage Examples
-MetricCard(
-  title: "Calories",
-  content: CircularProgressWidget(
-    progress: calorieProgress,
-    child: Text('${calories}'),
+**Chart Types:**
+- Line Charts (trends)
+- Bar Charts (comparisons)
+- Pie Charts (distributions)
+- Area Charts (cumulative)
+
+#### 4. Input Components
+```dart
+CustomTextField
+├── Decoration (borders, labels)
+├── Validation Logic
+├── Error Display
+└── Helper Text
+```
+
+**Input Types:**
+- Text Fields
+- Number Inputs
+- Date/Time Pickers
+- Dropdown Selects
+- Toggle Switches
+
+#### 5. Navigation Components
+```dart
+BottomNavigationBar
+├── Icon + Label Items
+├── Active State Indicators
+├── Badge Support
+└── Haptic Feedback
+```
+
+### Widget Composition Patterns
+
+#### Container Pattern
+```dart
+StandardContainer(
+  child: Widget,
+  padding: EdgeInsets,
+  decoration: BoxDecoration,
+  constraints: BoxConstraints,
+)
+```
+
+#### List Item Pattern
+```dart
+ListTile(
+  leading: Icon/Avatar,
+  title: Text,
+  subtitle: Text,
+  trailing: Action/Value,
+  onTap: Function,
+)
+```
+
+#### Card Pattern
+```dart
+Card(
+  elevation: double,
+  shape: RoundedRectangleBorder,
+  child: Padding(
+    child: Content,
   ),
-  trailing: Text('${remaining} left'),
-);
-
-MetricCard(
-  title: "Streak",
-  content: Text('${streakDays} days'),
-  trailing: Icon(Icons.local_fire_department),
-);
-```
-
-#### **3. Builder Pattern for Complex Widgets**
-```dart
-class ProgressChartBuilder {
-  List<ProgressDataPoint> _dataPoints = [];
-  Color _primaryColor = AppTheme.accentOrange;
-  Duration _animationDuration = Duration(milliseconds: 1000);
-  
-  ProgressChartBuilder setData(List<ProgressDataPoint> data) {
-    _dataPoints = data;
-    return this;
-  }
-  
-  ProgressChartBuilder setColor(Color color) {
-    _primaryColor = color;
-    return this;
-  }
-  
-  ProgressChartBuilder setAnimationDuration(Duration duration) {
-    _animationDuration = duration;
-    return this;
-  }
-  
-  Widget build() {
-    return ProgressChart(
-      dataPoints: _dataPoints,
-      color: _primaryColor,
-      animationDuration: _animationDuration,
-    );
-  }
-}
-
-// Usage
-Widget chart = ProgressChartBuilder()
-  .setData(weeklyData)
-  .setColor(AppTheme.successGreen)
-  .setAnimationDuration(Duration(milliseconds: 1500))
-  .build();
-```
-
-## State Management Architecture
-
-### **Provider Pattern Implementation**
-
-#### **1. Provider Structure**
-```dart
-// Base Provider Class
-abstract class BaseProvider extends ChangeNotifier {
-  bool _isLoading = false;
-  String? _error;
-  
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-  
-  void setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
-  }
-  
-  void setError(String? error) {
-    _error = error;
-    notifyListeners();
-  }
-  
-  void clearError() => setError(null);
-}
-
-// Implementation Example
-class NutritionProvider extends BaseProvider {
-  List<NutritionEntry> _entries = [];
-  DailyGoals _goals = DailyGoals.defaultGoals();
-  
-  List<NutritionEntry> get entries => _entries;
-  DailyGoals get goals => _goals;
-  
-  // Computed properties
-  int get totalCalories => _entries.fold(0, (sum, entry) => sum + entry.calories);
-  double get calorieProgress => goals.calorieGoal > 0 
-    ? (totalCalories / goals.calorieGoal).clamp(0.0, 1.0) 
-    : 0.0;
-  
-  Future<void> addEntry(NutritionEntry entry) async {
-    try {
-      setLoading(true);
-      clearError();
-      
-      _entries.add(entry);
-      await _saveToStorage();
-      
-      notifyListeners();
-    } catch (e) {
-      setError('Failed to add nutrition entry: $e');
-    } finally {
-      setLoading(false);
-    }
-  }
-}
-```
-
-#### **2. State Flow Architecture**
-```
-User Action → Provider Method → State Update → UI Rebuild
-     ↓              ↓              ↓            ↓
-  onTap()  →  addFoodEntry()  →  _entries++  → Consumer
-```
-
-#### **3. Provider Composition**
-```dart
-class MultiProviderSetup extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        // Core providers
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => UserProvider()),
-        
-        // Feature providers (depend on core providers)
-        ChangeNotifierProxyProvider<UserProvider, NutritionProvider>(
-          create: (_) => NutritionProvider(),
-          update: (_, userProvider, nutritionProvider) {
-            return nutritionProvider!..updateUser(userProvider.currentUser);
-          },
-        ),
-        
-        // Service providers
-        Provider(create: (_) => StorageService()),
-        Provider(create: (_) => ImageService()),
-      ],
-      child: MyApp(),
-    );
-  }
-}
-```
-
-## Design System Architecture
-
-### **Theme Architecture**
-```dart
-class AppTheme {
-  // Color System
-  static const ColorScheme _colorScheme = ColorScheme.dark(
-    primary: _accentOrange,
-    secondary: _accentOrange,
-    surface: _secondaryBackground,
-    background: _primaryBackground,
-    error: _errorRed,
-    onPrimary: _textPrimary,
-    onSecondary: _textPrimary,
-    onSurface: _textPrimary,
-    onBackground: _textPrimary,
-    onError: _textPrimary,
-  );
-  
-  // Typography System
-  static const TextTheme _textTheme = TextTheme(
-    displayLarge: TextStyle(
-      fontSize: 57,
-      fontWeight: FontWeight.bold,
-      letterSpacing: -0.25,
-      color: _textPrimary,
-    ),
-    headlineLarge: TextStyle(
-      fontSize: 32,
-      fontWeight: FontWeight.bold,
-      letterSpacing: 1.2,
-      color: _textPrimary,
-    ),
-    // ... complete type scale
-  );
-  
-  // Component Themes
-  static final ThemeData darkTheme = ThemeData(
-    useMaterial3: true,
-    colorScheme: _colorScheme,
-    textTheme: _textTheme,
-    
-    // Component customizations
-    elevatedButtonTheme: _elevatedButtonTheme,
-    cardTheme: _cardTheme,
-    inputDecorationTheme: _inputDecorationTheme,
-    appBarTheme: _appBarTheme,
-    bottomNavigationBarTheme: _bottomNavTheme,
-  );
-}
-```
-
-### **Component Styling Strategy**
-
-#### **1. Design Tokens**
-```dart
-class DesignTokens {
-  // Spacing Scale
-  static const double space0 = 0;
-  static const double space1 = 4;
-  static const double space2 = 8;
-  static const double space3 = 12;
-  static const double space4 = 16;
-  static const double space5 = 20;
-  static const double space6 = 24;
-  static const double space8 = 32;
-  
-  // Border Radius Scale
-  static const double radiusXs = 4;
-  static const double radiusSm = 8;
-  static const double radiusMd = 12;
-  static const double radiusLg = 16;
-  static const double radiusXl = 24;
-  
-  // Shadow Elevations
-  static const double elevation0 = 0;
-  static const double elevation1 = 1;
-  static const double elevation2 = 2;
-  static const double elevation4 = 4;
-  static const double elevation8 = 8;
-}
-```
-
-#### **2. Styled Components Pattern**
-```dart
-class StyledCard extends StatelessWidget {
-  final Widget child;
-  final EdgeInsets? padding;
-  final VoidCallback? onTap;
-  final bool elevated;
-  
-  const StyledCard({
-    required this.child,
-    this.padding,
-    this.onTap,
-    this.elevated = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: padding ?? EdgeInsets.all(DesignTokens.space4),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
-          border: Border.all(
-            color: theme.colorScheme.outline,
-            width: 1,
-          ),
-          boxShadow: elevated ? [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: DesignTokens.elevation4,
-              offset: Offset(0, 2),
-            ),
-          ] : null,
-        ),
-        child: child,
-      ),
-    );
-  }
-}
-```
-
-## Navigation Architecture
-
-### **Navigation Structure**
-```dart
-class NavigationStructure {
-  static final Map<String, WidgetBuilder> routes = {
-    '/': (context) => AuthenticationWrapper(),
-    '/welcome': (context) => WelcomeScreen(),
-    '/signin': (context) => SignInScreen(),
-    '/signup': (context) => SignUpScreen(),
-    '/onboarding': (context) => OnboardingScreen(),
-    '/main': (context) => MainScreen(),
-    '/profile-edit': (context) => ProfileEditScreen(),
-    '/nutrition-details': (context) => NutritionDetailsScreen(),
-    '/progress-history': (context) => ProgressHistoryScreen(),
-  };
-  
-  // Bottom Navigation Configuration
-  static const List<BottomNavItem> bottomNavItems = [
-    BottomNavItem(
-      icon: Icons.home_outlined,
-      selectedIcon: Icons.home,
-      label: 'Home',
-      screen: HomeScreen,
-    ),
-    BottomNavItem(
-      icon: Icons.trending_up_outlined,
-      selectedIcon: Icons.trending_up,
-      label: 'Progress',
-      screen: ProgressScreen,
-    ),
-    BottomNavItem(
-      icon: Icons.restaurant_outlined,
-      selectedIcon: Icons.restaurant,
-      label: 'Nutrition',
-      screen: NutritionScreen,
-    ),
-    BottomNavItem(
-      icon: Icons.chat_outlined,
-      selectedIcon: Icons.chat,
-      label: 'Streaker',
-      screen: ChatScreen,
-    ),
-    BottomNavItem(
-      icon: Icons.person_outlined,
-      selectedIcon: Icons.person,
-      label: 'Profile',
-      screen: ProfileScreen,
-    ),
-  ];
-}
-```
-
-### **Navigation Patterns**
-
-#### **1. Hierarchical Navigation**
-```dart
-class NavigationService {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  
-  static Future<T?> pushNamed<T>(String routeName, {Object? arguments}) {
-    return navigatorKey.currentState!.pushNamed<T>(routeName, arguments: arguments);
-  }
-  
-  static void pop<T>([T? result]) {
-    return navigatorKey.currentState!.pop<T>(result);
-  }
-  
-  static Future<T?> pushReplacementNamed<T, TO>(String routeName, {Object? arguments}) {
-    return navigatorKey.currentState!.pushReplacementNamed<T, TO>(routeName, arguments: arguments);
-  }
-  
-  // Authentication flow navigation
-  static void navigateToAuth() {
-    pushReplacementNamed('/welcome');
-  }
-  
-  static void navigateToMain() {
-    pushReplacementNamed('/main');
-  }
-  
-  static void navigateToOnboarding() {
-    pushReplacementNamed('/onboarding');
-  }
-}
-```
-
-#### **2. Modal Navigation**
-```dart
-class ModalService {
-  static Future<T?> showBottomSheet<T>({
-    required BuildContext context,
-    required Widget child,
-    bool isDismissible = true,
-    bool enableDrag = true,
-  }) {
-    return showModalBottomSheet<T>(
-      context: context,
-      isDismissible: isDismissible,
-      enableDrag: enableDrag,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-  
-  static Future<T?> showDialog<T>({
-    required BuildContext context,
-    required Widget child,
-    bool barrierDismissible = true,
-  }) {
-    return showDialog<T>(
-      context: context,
-      barrierDismissible: barrierDismissible,
-      builder: (context) => Dialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
-        ),
-        child: child,
-      ),
-    );
-  }
-}
-```
-
-## Animation & Interaction Architecture
-
-### **Animation System**
-```dart
-class AnimationSystem {
-  // Standard durations
-  static const Duration fast = Duration(milliseconds: 200);
-  static const Duration normal = Duration(milliseconds: 300);
-  static const Duration slow = Duration(milliseconds: 500);
-  
-  // Standard curves
-  static const Curve easeInOut = Curves.easeInOut;
-  static const Curve easeOut = Curves.easeOut;
-  static const Curve bounce = Curves.bounceOut;
-  
-  // Page transitions
-  static PageRouteBuilder<T> slideTransition<T>({
-    required Widget child,
-    required RouteSettings settings,
-    Offset beginOffset = const Offset(1.0, 0.0),
-  }) {
-    return PageRouteBuilder<T>(
-      settings: settings,
-      pageBuilder: (context, animation, secondaryAnimation) => child,
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return SlideTransition(
-          position: animation.drive(
-            Tween(begin: beginOffset, end: Offset.zero).chain(
-              CurveTween(curve: easeInOut),
-            ),
-          ),
-          child: child,
-        );
-      },
-      transitionDuration: normal,
-    );
-  }
-  
-  // Micro-interactions
-  static Widget scaleOnTap({
-    required Widget child,
-    required VoidCallback onTap,
-    double scaleValue = 0.95,
-  }) {
-    return TapScaleAnimation(
-      scaleValue: scaleValue,
-      onTap: onTap,
-      child: child,
-    );
-  }
-}
-```
-
-### **Gesture Handling**
-```dart
-class GesturePatterns {
-  // Swipe gesture handling
-  static Widget swipeToDelete({
-    required Widget child,
-    required VoidCallback onDelete,
-    Color backgroundColor = Colors.red,
-  }) {
-    return Dismissible(
-      key: UniqueKey(),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        color: backgroundColor,
-        padding: EdgeInsets.only(right: 16),
-        child: Icon(Icons.delete, color: Colors.white),
-      ),
-      onDismissed: (direction) => onDelete(),
-      child: child,
-    );
-  }
-  
-  // Pull to refresh
-  static Widget pullToRefresh({
-    required Widget child,
-    required Future<void> Function() onRefresh,
-  }) {
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      color: AppTheme.accentOrange,
-      backgroundColor: AppTheme.secondaryBackground,
-      child: child,
-    );
-  }
-}
-```
-
-## Performance Architecture
-
-### **Optimization Strategies**
-
-#### **1. Widget Optimization**
-```dart
-class OptimizedListView extends StatelessWidget {
-  final List<dynamic> items;
-  final Widget Function(BuildContext, dynamic, int) itemBuilder;
-  
-  const OptimizedListView({
-    required this.items,
-    required this.itemBuilder,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      // Only build visible items
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return RepaintBoundary(
-          // Isolate repaints
-          child: itemBuilder(context, item, index),
-        );
-      },
-      // Performance optimizations
-      cacheExtent: 200.0,
-      physics: const BouncingScrollPhysics(),
-    );
-  }
-}
-```
-
-#### **2. State Optimization**
-```dart
-class OptimizedProvider extends ChangeNotifier {
-  Map<String, dynamic> _cache = {};
-  
-  T getCachedValue<T>(String key, T Function() computeValue) {
-    if (_cache.containsKey(key)) {
-      return _cache[key] as T;
-    }
-    
-    final value = computeValue();
-    _cache[key] = value;
-    return value;
-  }
-  
-  void invalidateCache([String? key]) {
-    if (key != null) {
-      _cache.remove(key);
-    } else {
-      _cache.clear();
-    }
-  }
-  
-  @override
-  void notifyListeners() {
-    invalidateCache(); // Clear cache on state changes
-    super.notifyListeners();
-  }
-}
-```
-
-#### **3. Image Optimization**
-```dart
-class OptimizedImage extends StatelessWidget {
-  final String imageUrl;
-  final double? width;
-  final double? height;
-  final BoxFit fit;
-  
-  const OptimizedImage({
-    required this.imageUrl,
-    this.width,
-    this.height,
-    this.fit = BoxFit.cover,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return CachedNetworkImage(
-      imageUrl: imageUrl,
-      width: width,
-      height: height,
-      fit: fit,
-      placeholder: (context, url) => ShimmerPlaceholder(
-        width: width,
-        height: height,
-      ),
-      errorWidget: (context, url, error) => Container(
-        width: width,
-        height: height,
-        color: Colors.grey[300],
-        child: Icon(Icons.error),
-      ),
-      memCacheWidth: width?.toInt(),
-      memCacheHeight: height?.toInt(),
-    );
-  }
-}
-```
-
-## Testing Architecture
-
-### **Testing Strategy**
-```dart
-// Widget Testing
-class WidgetTestHelpers {
-  static Widget wrapWithProviders(
-    Widget widget, {
-    List<ChangeNotifierProvider>? providers,
-  }) {
-    return MultiProvider(
-      providers: providers ?? [
-        ChangeNotifierProvider(create: (_) => MockAuthProvider()),
-        ChangeNotifierProvider(create: (_) => MockNutritionProvider()),
-      ],
-      child: MaterialApp(home: widget),
-    );
-  }
-  
-  static Future<void> pumpAndSettle(WidgetTester tester, Widget widget) async {
-    await tester.pumpWidget(wrapWithProviders(widget));
-    await tester.pumpAndSettle();
-  }
-}
-
-// Example Widget Test
-void main() {
-  group('MetricCard Widget Tests', () {
-    testWidgets('displays title and value correctly', (tester) async {
-      const title = 'Calories';
-      const value = '1,250';
-      
-      await WidgetTestHelpers.pumpAndSettle(
-        tester,
-        MetricCard(
-          title: title,
-          value: value,
-        ),
-      );
-      
-      expect(find.text(title), findsOneWidget);
-      expect(find.text(value), findsOneWidget);
-    });
-    
-    testWidgets('handles tap events', (tester) async {
-      bool tapped = false;
-      
-      await WidgetTestHelpers.pumpAndSettle(
-        tester,
-        MetricCard(
-          title: 'Test',
-          value: '123',
-          onTap: () => tapped = true,
-        ),
-      );
-      
-      await tester.tap(find.byType(MetricCard));
-      expect(tapped, isTrue);
-    });
-  });
-}
-```
-
-## Accessibility Architecture
-
-### **Accessibility Implementation**
-```dart
-class AccessibilityHelpers {
-  static Widget semanticWrapper({
-    required Widget child,
-    required String label,
-    String? hint,
-    bool? focusable,
-    VoidCallback? onTap,
-  }) {
-    return Semantics(
-      label: label,
-      hint: hint,
-      focusable: focusable,
-      onTap: onTap,
-      child: child,
-    );
-  }
-  
-  static Widget accessibleCard({
-    required String title,
-    required String value,
-    String? description,
-    required Widget child,
-    VoidCallback? onTap,
-  }) {
-    return semanticWrapper(
-      label: '$title: $value',
-      hint: description,
-      onTap: onTap,
-      child: child,
-    );
-  }
-}
-
-// Usage in Components
-class AccessibleMetricCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final String? description;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return AccessibilityHelpers.accessibleCard(
-      title: title,
-      value: value,
-      description: description,
-      onTap: onTap,
-      child: Card(
-        child: Column(
-          children: [
-            Text(title),
-            Text(value, style: Theme.of(context).textTheme.headlineMedium),
-          ],
-        ),
-      ),
-    );
-  }
-}
-```
-
-## Error Handling Architecture
-
-### **Error Boundary Pattern**
-```dart
-class ErrorBoundary extends StatefulWidget {
-  final Widget child;
-  final Widget Function(Object error, StackTrace stackTrace)? errorBuilder;
-  
-  const ErrorBoundary({
-    required this.child,
-    this.errorBuilder,
-  });
-
-  @override
-  State<ErrorBoundary> createState() => _ErrorBoundaryState();
-}
-
-class _ErrorBoundaryState extends State<ErrorBoundary> {
-  Object? error;
-  StackTrace? stackTrace;
-
-  @override
-  Widget build(BuildContext context) {
-    if (error != null) {
-      return widget.errorBuilder?.call(error!, stackTrace!) ?? 
-        DefaultErrorWidget(error: error!, stackTrace: stackTrace!);
-    }
-    
-    return ErrorWidget.builder = (FlutterErrorDetails details) {
-      setState(() {
-        error = details.exception;
-        stackTrace = details.stack;
-      });
-      return Container();
-    };
-    
-    return widget.child;
-  }
-}
-
-// Global Error Handling
-class ErrorService {
-  static void initialize() {
-    FlutterError.onError = (FlutterErrorDetails details) {
-      _logError(details.exception, details.stack);
-    };
-    
-    PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-      _logError(error, stack);
-      return true;
-    };
-  }
-  
-  static void _logError(Object error, StackTrace? stack) {
-    print('Error: $error');
-    print('Stack: $stack');
-    // Send to crash reporting service
-  }
-}
-```
-
-## Build & Deployment Architecture
-
-### **Build Configuration**
-```dart
-class BuildConfig {
-  static const String environment = String.fromEnvironment(
-    'ENVIRONMENT',
-    defaultValue: 'development',
-  );
-  
-  static const String apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://api.streaks.local',
-  );
-  
-  static bool get isProduction => environment == 'production';
-  static bool get isDevelopment => environment == 'development';
-  static bool get isStaging => environment == 'staging';
-  
-  // Feature flags
-  static const bool enableAnalytics = bool.fromEnvironment(
-    'ENABLE_ANALYTICS',
-    defaultValue: false,
-  );
-  
-  static const bool enableCrashReporting = bool.fromEnvironment(
-    'ENABLE_CRASH_REPORTING',
-    defaultValue: false,
-  );
-}
-```
-
-### **Deployment Scripts**
-```yaml
-# build_config.yaml
-environments:
-  development:
-    api_url: "https://api-dev.streaks.com"
-    enable_logging: true
-    enable_debug_tools: true
-    
-  staging:
-    api_url: "https://api-staging.streaks.com"
-    enable_logging: true
-    enable_debug_tools: false
-    
-  production:
-    api_url: "https://api.streaks.com"
-    enable_logging: false
-    enable_debug_tools: false
+)
 ```
 
 ---
 
-**Generated:** August 21, 2025  
-**Author:** Claude Code Assistant  
-**Project:** Streaks Flutter App  
-**Status:** Architecture Documentation ✅
+## Screen Layouts
+
+### Layout Grid System
+- **Mobile**: 4-column grid with 16px margins
+- **Tablet**: 8-column grid with 24px margins
+- **Spacing Units**: 4px base unit (4, 8, 12, 16, 20, 24, 32)
+
+### Screen Structure Template
+```dart
+Scaffold
+├── AppBar
+│   ├── Title/Logo
+│   ├── Actions
+│   └── Navigation
+├── Body
+│   ├── Header Section
+│   ├── Tab Bar (optional)
+│   ├── Content Area
+│   │   ├── Cards/Lists
+│   │   └── Charts/Visualizations
+│   └── Footer (optional)
+└── BottomNavigationBar/FAB
+```
+
+### Screen-Specific Layouts
+
+#### Home Dashboard
+```
+┌─────────────────────────┐
+│      Period Tabs        │
+├─────────────────────────┤
+│  ┌─────┐    ┌─────┐   │
+│  │Card │    │Card │   │  2x3 Grid
+│  └─────┘    └─────┘   │
+│  ┌─────┐    ┌─────┐   │
+│  │Card │    │Card │   │
+│  └─────┘    └─────┘   │
+│  ┌─────┐    ┌─────┐   │
+│  │Card │    │Card │   │
+│  └─────┘    └─────┘   │
+└─────────────────────────┘
+```
+
+#### Profile Screen
+```
+┌─────────────────────────┐
+│    Profile Header       │
+│    (Avatar + Info)      │
+├─────────────────────────┤
+│    Stats Summary        │
+├─────────────────────────┤
+│    Settings List        │
+│    - Item 1            │
+│    - Item 2            │
+│    - Item 3            │
+└─────────────────────────┘
+```
+
+#### Chat Interface
+```
+┌─────────────────────────┐
+│      Chat Header        │
+├─────────────────────────┤
+│                         │
+│    Message List         │
+│    (Scrollable)         │
+│                         │
+├─────────────────────────┤
+│    Input Bar            │
+└─────────────────────────┘
+```
+
+---
+
+## Navigation Architecture
+
+### Navigation Hierarchy
+```
+Root Navigator
+├── Authentication Flow
+│   ├── Welcome
+│   ├── Sign In
+│   └── Sign Up
+└── Main App Flow
+    ├── Bottom Navigation
+    │   ├── Home
+    │   ├── Progress
+    │   ├── Nutrition
+    │   ├── Streaker (formerly AI Coach)
+    │   └── Profile
+    └── Modal Screens
+        ├── Settings
+        ├── Food Entry
+        └── Detail Views
+```
+
+### Navigation Patterns
+
+#### Bottom Navigation
+- 5 persistent tabs
+- Icon + Label display
+- Active state indication
+- Badge support for notifications
+
+#### Stack Navigation
+- Standard push/pop for detail views
+- Hero animations for shared elements
+- Gesture-based back navigation (iOS)
+
+#### Modal Navigation
+- Bottom sheets for quick actions
+- Full-screen modals for complex tasks
+- Dialog overlays for confirmations
+
+### Route Management
+```dart
+// Named Routes
+/welcome      - Welcome screen
+/signin       - Sign in
+/signup       - Sign up
+/main         - Main app (with bottom nav)
+/settings     - Settings screen
+/food-entry   - Food entry modal
+```
+
+---
+
+## State Management Patterns
+
+### Provider Architecture
+```dart
+MultiProvider
+├── AuthProvider (authentication state + user validation)
+├── UserProvider (user data)
+├── NutritionProvider (nutrition tracking)
+├── HealthProvider (health metrics)
+└── ThemeProvider (theme preferences)
+```
+
+### Service Layer (Added August 2024)
+```dart
+Services
+├── UserContextBuilder (AI personalization)
+│   ├── buildComprehensiveContext()
+│   └── generatePersonalizedSystemPrompt()
+├── GrokService (Streaker AI integration)
+├── HealthService (HealthKit integration)
+└── NetworkService (API communications)
+```
+
+### State Flow Patterns
+
+#### Data Flow
+```
+User Action → Provider Method → Service Call → State Update → UI Rebuild
+```
+
+#### Loading States
+```dart
+enum DataState {
+  initial,    // No data loaded
+  loading,    // Fetching data
+  loaded,     // Data available
+  error,      // Error occurred
+  empty,      // No data found
+}
+```
+
+### Provider Usage Patterns
+
+#### Consumer Pattern
+```dart
+Consumer<ProviderType>(
+  builder: (context, provider, child) {
+    return Widget(data: provider.data);
+  },
+)
+```
+
+#### Selector Pattern
+```dart
+Selector<ProviderType, SpecificData>(
+  selector: (_, provider) => provider.specificData,
+  builder: (context, data, child) {
+    return Widget(data: data);
+  },
+)
+```
+
+---
+
+## Animation & Interaction Design
+
+### Animation Types
+
+#### Micro-animations
+- Button press effects (scale: 0.95)
+- Loading spinners
+- Progress bar fills
+- Skeleton loaders
+
+#### Transition Animations
+- Page transitions (300ms)
+- Tab switches (200ms)
+- Card expansions (250ms)
+- Modal presentations (300ms)
+
+#### Complex Animations
+- Circular progress animations
+- Chart data updates
+- Typing indicators
+- Streak celebrations
+
+### Animation Implementation
+```dart
+// Standard Animation Controller
+AnimationController(
+  duration: Duration(milliseconds: 300),
+  vsync: this,
+)
+
+// Curve Types Used
+Curves.easeInOut    // Default
+Curves.easeOut      // Exit animations
+Curves.elasticOut   // Celebratory animations
+Curves.linear       // Progress indicators
+```
+
+### Interaction Feedback
+
+#### Haptic Feedback
+- Light impact: Button taps
+- Medium impact: Toggle switches
+- Heavy impact: Significant actions
+- Selection feedback: List items
+
+#### Visual Feedback
+- Ripple effects on taps
+- Hover states (web)
+- Focus indicators
+- Loading overlays
+
+---
+
+## Responsive Design
+
+### Breakpoints
+```dart
+Mobile:  < 600px
+Tablet:  600px - 1024px
+Desktop: > 1024px
+```
+
+### Adaptive Layouts
+
+#### Grid Adaptations
+- Mobile: 2 columns
+- Tablet: 3-4 columns
+- Desktop: 4-6 columns
+
+#### Typography Scaling
+- Base size: 14px (mobile)
+- Scale factor: 1.1x (tablet)
+- Scale factor: 1.2x (desktop)
+
+### Platform-Specific Adaptations
+
+#### iOS
+- Cupertino-style navigation
+- Swipe gestures
+- iOS-specific haptics
+- SF Symbols support
+
+#### Android
+- Material Design compliance
+- Back button handling
+- Android-specific transitions
+- Material You theming
+
+---
+
+## Performance Optimization
+
+### Rendering Optimizations
+
+#### Widget Optimization
+- ~~`const` constructors where possible~~ (Limited with Theme.of(context))
+- `Key` usage for list items
+- `RepaintBoundary` for complex widgets
+- Selective widget rebuilds
+- Remove `const` when using Theme.of(context) to avoid compilation errors
+
+#### List Performance
+```dart
+ListView.builder(      // Lazy loading
+  itemBuilder: ...,
+  itemCount: ...,
+)
+
+GridView.builder(      // Efficient grids
+  gridDelegate: ...,
+  itemBuilder: ...,
+)
+```
+
+### Memory Management
+
+#### Image Handling
+- Cached network images
+- Appropriate image sizes
+- Image compression
+- Lazy loading
+
+#### Data Management
+- Pagination for large lists
+- Data caching strategies
+- Proper disposal of resources
+- Stream subscription management
+
+### Build Optimization
+
+#### Code Splitting
+- Lazy-loaded routes
+- Deferred components
+- Tree shaking
+- Minimal dependencies
+
+#### Asset Optimization
+- SVG for icons
+- WebP for images
+- Font subsetting
+- Asset bundling
+
+---
+
+## Component Documentation
+
+### Creating New Components
+
+#### Component Template
+```dart
+class CustomComponent extends StatelessWidget {
+  // Required properties
+  final String title;
+  final VoidCallback onTap;
+  
+  // Optional properties  
+  final Color? backgroundColor;
+  final double? height;
+  
+  const CustomComponent({
+    Key? key,
+    required this.title,
+    required this.onTap,
+    this.backgroundColor,
+    this.height,
+  }) : super(key: key);
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      // Implementation
+    );
+  }
+}
+```
+
+### Component Guidelines
+
+#### Naming Conventions
+- Widgets: `PascalCase` (e.g., `MetricCard`)
+- Files: `snake_case` (e.g., `metric_card.dart`)
+- Private members: `_leadingUnderscore`
+- Constants: `SCREAMING_SNAKE_CASE`
+
+#### Documentation Standards
+- Clear property descriptions
+- Usage examples
+- Performance considerations
+- Accessibility notes
+
+---
+
+## Future Enhancements
+
+### Planned UI Improvements
+1. **Advanced Animations**: Lottie integration for celebrations
+2. **Gesture Controls**: Swipe actions for list items
+3. **Voice UI**: Voice command integration
+4. **AR Features**: Camera-based food recognition
+5. **Widget Customization**: User-configurable dashboard
+
+### Design System Evolution
+1. **Design Tokens**: Centralized design token system
+2. **Component Library**: Storybook-style component documentation
+3. **Accessibility**: Enhanced screen reader support
+4. **Internationalization**: Multi-language support
+5. **Theme Variants**: Additional theme options
+
+### Performance Goals
+1. **Load Time**: < 2s initial load
+2. **Frame Rate**: Consistent 60fps
+3. **Memory Usage**: < 150MB average
+4. **Battery Impact**: Minimal background drain
+5. **Network Efficiency**: Optimized API calls
+
+---
+
+## Resources & References
+
+### Design Resources
+- Material Design Guidelines: https://material.io
+- Flutter Widget Catalog: https://flutter.dev/docs/development/ui/widgets
+- Human Interface Guidelines: https://developer.apple.com/design/
+
+### Performance Tools
+- Flutter DevTools
+- Performance Overlay
+- Widget Inspector
+- Memory Profiler
+
+### Testing Approaches
+- Widget Testing
+- Golden Tests (Visual Regression)
+- Integration Testing
+- Accessibility Testing
+
+---
+
+*Last Updated: August 2024*  
+*Version: 1.0.0*  
+*Maintained by: Streaks Flutter Team*
+
+## Recent Updates (August 2024 Session)
+
+### Theme System Overhaul
+- Migrated from purple/blue to orange brand color (#FF6B1A)
+- Fixed dark theme text contrast issues
+- Removed hardcoded colors in favor of Theme.of(context)
+- Resolved const expression compilation errors
+
+### UI Standardization
+- Progress screen: Grey card backgrounds with colored icons
+- Nutrition screen: Uniform grey backgrounds for cards
+- Preserved functional colors (green, blue, amber, orange) for icons
+- Added grey borders for better card definition
+
+### Branding Updates
+- Renamed "AI Coach" to "Streaker" throughout app
+- Updated navigation labels and screen headers
+- Maintained consistent branding across all touchpoints
+
+### Streaker AI Personalization
+- Implemented UserContextBuilder service
+- Full user context awareness (profile, nutrition, health, streaks)
+- Dynamic system prompt generation
+- Time-aware and experience-appropriate responses
+
+### Authentication Enhancement
+- Added user validation system
+- Mock user database implementation
+- Proper sign-in/sign-up flow separation
+- Clear error messaging for auth failures
+
+### Welcome Screen Simplification
+- Restored simple "Get Started" and "Sign In" buttons
+- Removed elaborate card sections
+- Maintained clean, minimal design
+
+### Technical Improvements
+- Fixed Theme.of(context) const expression errors
+- Improved code organization and modularity
+- Enhanced provider patterns for better state management
+- Added comprehensive user context aggregation
+
+## Latest Session Updates (August 2024 - Part 2)
+
+### New Screen Implementations
+
+#### 1. Homepage Redesign (home_screen_new.dart)
+**Layout Structure:**
+```
+HomePage
+├── Personalized Header
+│   ├── Greeting (Time-based)
+│   ├── User Name
+│   └── Notification Icon
+├── Motivational Message
+├── Primary Metrics Section
+│   ├── Steps Circle (Large)
+│   └── Side Metrics
+│       ├── Calories Card
+│       └── Heart Rate Card
+├── Secondary Metrics
+│   ├── Sleep Card
+│   └── Calories Burned Card
+├── Insights Section
+│   └── Insight Cards (3-4)
+└── Action Button (FAB)
+```
+
+**Key Design Elements:**
+- **Large Circular Progress**: Steps as primary focus (160px)
+- **Heart Rate Wave**: Custom painter for ECG visualization
+- **Progress Bars**: Linear indicators for calories
+- **Insight Cards**: Emoji-led feedback messages
+- **Color Usage**:
+  - Blue: Steps progress
+  - Orange: Calories/Fire metrics
+  - Purple: Sleep tracking
+  - Green: Achievements
+
+#### 2. Progress Screen Redesign (progress_screen_new.dart)
+**Tab Structure:**
+```
+ProgressScreen
+├── AppBar with TabBar
+│   ├── Progress Tab
+│   └── Achievements Tab
+├── Progress Tab Content
+│   ├── Today's Summary
+│   ├── Weekly Progress Chart
+│   └── Goal Progress Bars
+└── Achievements Tab Content
+    ├── Streak Statistics
+    ├── Weekly Performance
+    ├── Motivational Message
+    └── Achievement Badges Grid
+```
+
+**Chart Implementation:**
+- **fl_chart Library**: Line charts for weekly progress
+- **Dual Metrics**: Calories burned vs consumed
+- **Curved Lines**: Smooth data visualization
+- **Area Fills**: Translucent fills under curves
+
+### Component Patterns Update
+
+#### Enhanced Metric Cards
+```dart
+MetricCard
+├── Icon Container (48x48)
+├── Content Area
+│   ├── Title (titleMedium)
+│   ├── Value (headlineMedium, bold)
+│   └── Subtitle (bodySmall)
+└── Progress Indicator (optional)
+```
+
+#### Achievement Badge Pattern
+```dart
+AchievementCard
+├── Container (with border)
+├── Icon Circle (48x48)
+│   └── Status-based coloring
+├── Title (titleMedium)
+└── Subtitle (bodySmall)
+```
+
+### Data Visualization Components
+
+#### 1. Circular Progress Widget
+- **Sizes**: 60px (small), 100px (medium), 160px (large)
+- **Stroke Width**: 6-12px based on size
+- **Colors**: Dynamic based on metric type
+- **Center Content**: Value display with units
+
+#### 2. Linear Progress Bars
+- **Height**: 8px standard
+- **Border Radius**: 4px
+- **Background**: Grey[300] or borderColor
+- **Fill**: Metric-specific colors
+
+#### 3. Line Charts (fl_chart)
+- **Grid**: Horizontal lines only
+- **Axes**: Bottom (days), Left (values)
+- **Lines**: 3px width, curved
+- **Area Fill**: 10% opacity of line color
+
+### Navigation Updates
+
+#### Tab Navigation Pattern
+```dart
+TabController
+├── AppBar Integration
+│   └── TabBar (indicator: orange)
+├── TabBarView
+│   ├── Tab 1 Content
+│   └── Tab 2 Content
+└── Animations (fade transitions)
+```
+
+### State Management Enhancements
+
+#### Provider Clear Methods
+```dart
+// New clearing patterns for logout
+UserProvider.clearUserData()
+NutritionProvider.clearNutritionData()
+AuthProvider.signOut() // Enhanced
+```
+
+### Animation Patterns
+
+#### Fade Transitions
+```dart
+AnimationController(duration: 800ms)
+├── FadeTransition
+├── CurvedAnimation (easeIn)
+└── Auto-forward on init
+```
+
+#### Tab Transitions
+- Default Material slide animations
+- Smooth switching between tabs
+- State preservation on tab change
+
+### Color System Usage
+
+#### Metric-Specific Colors
+- **Steps**: Blue (#2196F3)
+- **Calories**: Orange (#FF6B1A)
+- **Heart Rate**: Blue (wave)
+- **Sleep**: Purple (#9C27B0)
+- **Protein**: Green (#4CAF50)
+- **Workouts**: Purple
+- **Water**: Light Blue (#4FC3F7)
+
+#### Achievement Colors
+- **Locked**: Grey backgrounds
+- **Bronze/Grey**: Grey[600]
+- **Gold**: Orange (#FFA726)
+- **Success**: Green (#4CAF50)
+
+### Responsive Design Updates
+
+#### Card Sizing
+- **Summary Cards**: Flexible 1/3 width
+- **Metric Cards**: Full width with padding
+- **Achievement Badges**: Grid 2 columns, 1.5 aspect ratio
+- **Stat Cards**: Flexible with min-width
+
+#### Spacing System
+- **Section Gap**: 32px
+- **Card Gap**: 16px
+- **Internal Padding**: 20px
+- **Small Gap**: 8px
+
+### Performance Optimizations
+
+#### Chart Rendering
+- Lazy data generation
+- Efficient spot calculations
+- Minimal redraws
+- Cached painter patterns
+
+#### Tab Performance
+- Lazy loading of tab content
+- State preservation with AutomaticKeepAliveClientMixin (if needed)
+- Efficient Consumer usage
+
+### Accessibility Improvements
+
+- Proper semantic labels
+- Sufficient touch targets (min 48x48)
+- Color contrast compliance
+- Screen reader support
+
+### Testing Considerations
+
+#### Widget Testing Points
+- Tab navigation functionality
+- Progress calculations
+- Chart data accuracy
+- Achievement unlock logic
+
+#### Integration Testing
+- Navigation flow
+- Data persistence
+- Provider updates
+- Logout flow
+
+### Future Enhancement Opportunities
+
+1. **Animations**:
+   - Animated progress fills
+   - Chart entry animations
+   - Achievement unlock animations
+
+2. **Interactions**:
+   - Swipe between tabs
+   - Pull-to-refresh
+   - Long press for details
+
+3. **Visualizations**:
+   - 3D charts option
+   - Heat maps for activity
+   - Animated counters
+
+4. **Personalization**:
+   - Customizable dashboard
+   - Metric preferences
+   - Theme variations
+
+## Latest Session Updates (August 2024 - Part 3)
+
+### SVG Logo Integration & Brand Identity
+
+#### Logo Implementation Architecture
+```dart
+// SVG Asset Management
+assets/
+├── images/
+│   └── streaker_logo.svg    // Main brand logo
+└── icons/                    // Future icon assets
+```
+
+#### Logo Usage Patterns
+
+##### 1. Authentication Screens
+```dart
+SvgPicture.asset(
+  'assets/images/streaker_logo.svg',
+  width: 150,  // Welcome screen
+  height: 150,
+  fit: BoxFit.contain,
+)
+```
+
+##### 2. Navigation Components
+```dart
+// Bottom Navigation with Dynamic Theming
+SvgPicture.asset(
+  'assets/images/streaker_logo.svg',
+  width: 24,
+  height: 24,
+  colorFilter: ColorFilter.mode(
+    isActive ? AppTheme.primaryAccent : AppTheme.textSecondary,
+    BlendMode.srcIn,
+  ),
+)
+```
+
+##### 3. Chat Interface (Streaker AI)
+```dart
+// Avatar Container with Gradient Background
+Container(
+  width: 32,
+  height: 32,
+  padding: EdgeInsets.all(6),
+  decoration: BoxDecoration(
+    gradient: LinearGradient(
+      colors: [AppTheme.primaryAccent, Color(0xFFFF8F00)],
+    ),
+    borderRadius: BorderRadius.circular(16),
+  ),
+  child: SvgPicture.asset(
+    'assets/images/streaker_logo.svg',
+    colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+  ),
+)
+```
+
+### Brand Identity System
+
+#### Visual Hierarchy
+1. **Primary Logo Display**: 150x150 (Welcome)
+2. **Secondary Logo Display**: 100x100 (Auth forms)
+3. **Navigation Logo**: 24x24 (Bottom nav)
+4. **Avatar Logo**: 32x32 (Chat interface)
+
+#### Color Application
+- **Active State**: Primary Accent (#FF6B1A)
+- **Inactive State**: Text Secondary (Grey)
+- **On Gradient**: White with ColorFilter
+- **On Dark Background**: White or Primary Accent
+
+### Technical Implementation Details
+
+#### Dependencies
+```yaml
+flutter_svg: ^2.0.10  # SVG rendering support
+```
+
+#### Asset Configuration
+```yaml
+flutter:
+  assets:
+    - assets/images/
+    - assets/icons/
+```
+
+#### Dynamic Theming Support
+- ColorFilter for runtime color changes
+- Theme-aware color selection
+- Consistent sizing across breakpoints
+- Aspect ratio preservation with BoxFit.contain
+
+### Component Integration Points
+
+1. **Welcome Screen** (welcome_screen.dart:23-30)
+   - Central brand presentation
+   - 150x150 focal point
+
+2. **Sign In/Up Screens** (signin_screen.dart:81-90, signup_screen.dart:86-95)
+   - Form header branding
+   - 100x100 consistent sizing
+
+3. **Main Navigation** (main_screen.dart:43-47)
+   - Dynamic "Streaker" tab icon
+   - Active/inactive state handling
+
+4. **Chat Interface** (chat_screen.dart)
+   - App bar logo (line 204-218)
+   - AI message avatars (line 472-486)
+   - Typing indicator (line 291-305)
+
+### Design System Integration
+
+#### Logo Sizing Guidelines
+```dart
+enum LogoSize {
+  large(150),   // Hero/Welcome screens
+  medium(100),  // Form headers
+  small(32),    // Avatars/Icons
+  tiny(24);     // Navigation items
+  
+  final double size;
+  const LogoSize(this.size);
+}
+```
+
+#### Consistent Spacing
+- Padding around logos: 6px (small), 12px (medium)
+- Margin after logo: 24-32px in forms
+- Navigation item spacing: Standard Material specs
+
+### Performance Considerations
+
+1. **SVG Optimization**
+   - Single SVG file cached
+   - ColorFilter for runtime theming (no multiple assets)
+   - Efficient rendering with flutter_svg
+
+2. **Memory Management**
+   - SVG cached after first load
+   - Reused across all instances
+   - Proper disposal handled by framework
+
+### Accessibility Features
+
+- Semantic labels for screen readers
+- Sufficient contrast ratios
+- Touch targets meet 48x48 minimum
+- Alternative text descriptions
+
+### Future Enhancements
+
+1. **Animated Logo**
+   - Loading animations
+   - Transition effects
+   - Interactive states
+
+2. **Logo Variants**
+   - Simplified icon version
+   - Monochrome variants
+   - Holiday/special editions
+
+3. **Brand Extensions**
+   - App icon generation
+   - Splash screen integration
+   - Marketing materials
+
+---
+*Updated: August 2024*
+*Latest Changes: Homepage redesign, Progress tabs, Enhanced visualizations, SVG Logo Integration*
+*Session Completed: Full brand identity implementation with scalable vector graphics*

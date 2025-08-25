@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../utils/app_theme.dart';
-import 'home_screen.dart';
-import 'progress_screen.dart';
+import 'home_screen_new.dart';
+import 'progress_screen_new.dart';
 import 'nutrition_screen.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
@@ -17,8 +18,8 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
-    const HomeScreen(),
-    const ProgressScreen(),
+    const HomeScreenNew(),
+    const ProgressScreenNew(),
     const NutritionScreen(),
     const ChatScreen(),
     const ProfileScreen(),
@@ -26,28 +27,48 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<BottomNavigationBarItem> _bottomNavItems = [
     const BottomNavigationBarItem(
-      icon: Icon(Icons.home_outlined),
-      activeIcon: Icon(Icons.home),
+      icon: Icon(Icons.dashboard_outlined),
+      activeIcon: Icon(Icons.dashboard_rounded),
       label: 'Home',
     ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.analytics_outlined),
-      activeIcon: Icon(Icons.analytics),
+      icon: Icon(Icons.trending_up_outlined),
+      activeIcon: Icon(Icons.trending_up_rounded),
       label: 'Progress',
     ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.restaurant_outlined),
-      activeIcon: Icon(Icons.restaurant),
+      icon: Icon(Icons.local_dining_outlined),
+      activeIcon: Icon(Icons.local_dining_rounded),
       label: 'Nutrition',
     ),
-    const BottomNavigationBarItem(
-      icon: Icon(Icons.chat_outlined),
-      activeIcon: Icon(Icons.chat),
-      label: 'Chat',
+    BottomNavigationBarItem(
+      icon: SizedBox(
+        width: 24,
+        height: 24,
+        child: SvgPicture.asset(
+          'assets/images/streaker_logo.svg',
+          colorFilter: ColorFilter.mode(
+            AppTheme.textSecondary,
+            BlendMode.srcIn,
+          ),
+        ),
+      ),
+      activeIcon: SizedBox(
+        width: 24,
+        height: 24,
+        child: SvgPicture.asset(
+          'assets/images/streaker_logo.svg',
+          colorFilter: ColorFilter.mode(
+            AppTheme.primaryAccent,
+            BlendMode.srcIn,
+          ),
+        ),
+      ),
+      label: 'Streaker',
     ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.person_outline),
-      activeIcon: Icon(Icons.person),
+      icon: Icon(Icons.account_circle_outlined),
+      activeIcon: Icon(Icons.account_circle_rounded),
       label: 'Profile',
     ),
   ];
@@ -60,10 +81,10 @@ class _MainScreenState extends State<MainScreen> {
         children: _screens,
       ),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(
             top: BorderSide(
-              color: AppTheme.borderColor,
+              color: Theme.of(context).dividerColor,
               width: 1,
             ),
           ),
@@ -75,20 +96,6 @@ class _MainScreenState extends State<MainScreen> {
               _currentIndex = index;
             });
           },
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: AppTheme.secondaryBackground,
-          selectedItemColor: AppTheme.accentOrange,
-          unselectedItemColor: AppTheme.textSecondary,
-          selectedLabelStyle: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'SF Pro Display',
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            fontFamily: 'SF Pro Display',
-          ),
           items: _bottomNavItems,
         ),
       ),

@@ -376,4 +376,23 @@ class UserProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  Future<void> clearUserData() async {
+    try {
+      // Clear user profile data
+      await _prefs.remove('user_profile');
+      await _prefs.remove('streak_data');
+      await _prefs.remove('onboarding_completed');
+      
+      // Reset state
+      _profile = null;
+      _streakData = null;
+      _error = null;
+      _isLoading = false;
+      
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to clear user data');
+    }
+  }
 }

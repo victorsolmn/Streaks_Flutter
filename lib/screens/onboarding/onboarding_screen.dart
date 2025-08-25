@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/supabase_auth_provider.dart';
+import '../../providers/supabase_user_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../main/main_screen.dart';
 
@@ -35,11 +37,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _completeOnboarding() async {
     if (_formKey.currentState?.validate() ?? false) {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final supabaseAuth = Provider.of<SupabaseAuthProvider>(context, listen: false);
       
-      final name = userProvider.profile?.name ?? 'User';
-      final email = userProvider.profile?.email ?? 'user@example.com';
+      // Get name and email from Supabase auth or use defaults
+      final currentUser = supabaseAuth.currentUser;
+      final name = currentUser?.userMetadata?['name'] ?? 
+                   currentUser?.email?.split('@')[0] ?? 'User';
+      final email = currentUser?.email ?? 'user@example.com';
 
+      // Create profile in local storage
       await userProvider.createProfile(
         name: name,
         email: email,
@@ -72,11 +78,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               final authProvider = Provider.of<AuthProvider>(context, listen: false);
               await authProvider.signOut();
             },
-            child: const Text('Skip'),
+            child: Text('Skip'),
           ),
         ],
       ),
-      body: Consumer<UserProvider>(
+      body: Consumer<SupabaseUserProvider>(
         builder: (context, user, child) {
           return Padding(
             padding: const EdgeInsets.all(24.0),
@@ -86,10 +92,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 LinearProgressIndicator(
                   value: (_currentStep + 1) / 3,
                   backgroundColor: AppTheme.borderColor,
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.accentOrange),
+                  valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryAccent),
                 ),
                 
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 
                 Expanded(
                   child: _buildCurrentStep(),
@@ -106,10 +112,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               _currentStep--;
                             });
                           },
-                          child: const Text('Back'),
+                          child: Text('Back'),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(width: 16),
                     ],
                     
                     Expanded(
@@ -117,12 +123,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: ElevatedButton(
                         onPressed: user.isLoading ? null : _handleNext,
                         child: user.isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: AppTheme.textPrimary,
+                                  color: Theme.of(context).textTheme.bodyLarge?.color,
                                 ),
                               )
                             : Text(_currentStep == 2 ? 'Complete' : 'Next'),
@@ -159,14 +165,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'What\'s your fitness goal?',
           style: Theme.of(context).textTheme.displaySmall,
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         Text(
           'This helps us personalize your experience',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: AppTheme.textSecondary,
+            color: Theme.of(context).textTheme.bodyMedium?.color,
           ),
         ),
-        const SizedBox(height: 48),
+        SizedBox(height: 48),
         
         Expanded(
           child: Column(
@@ -179,7 +185,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 isSelected: _selectedGoal == FitnessGoal.weightLoss,
                 onTap: () => setState(() => _selectedGoal = FitnessGoal.weightLoss),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               
               _GoalOption(
                 goal: FitnessGoal.muscleGain,
@@ -189,7 +195,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 isSelected: _selectedGoal == FitnessGoal.muscleGain,
                 onTap: () => setState(() => _selectedGoal = FitnessGoal.muscleGain),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               
               _GoalOption(
                 goal: FitnessGoal.maintenance,
@@ -199,7 +205,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 isSelected: _selectedGoal == FitnessGoal.maintenance,
                 onTap: () => setState(() => _selectedGoal = FitnessGoal.maintenance),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               
               _GoalOption(
                 goal: FitnessGoal.endurance,
@@ -224,14 +230,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'How active are you?',
           style: Theme.of(context).textTheme.displaySmall,
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         Text(
           'This helps calculate your daily calorie needs',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: AppTheme.textSecondary,
+            color: Theme.of(context).textTheme.bodyMedium?.color,
           ),
         ),
-        const SizedBox(height: 48),
+        SizedBox(height: 48),
         
         Expanded(
           child: Column(
@@ -243,7 +249,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 isSelected: _selectedActivityLevel == ActivityLevel.sedentary,
                 onTap: () => setState(() => _selectedActivityLevel = ActivityLevel.sedentary),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               
               _ActivityOption(
                 level: ActivityLevel.lightlyActive,
@@ -252,7 +258,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 isSelected: _selectedActivityLevel == ActivityLevel.lightlyActive,
                 onTap: () => setState(() => _selectedActivityLevel = ActivityLevel.lightlyActive),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               
               _ActivityOption(
                 level: ActivityLevel.moderatelyActive,
@@ -261,7 +267,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 isSelected: _selectedActivityLevel == ActivityLevel.moderatelyActive,
                 onTap: () => setState(() => _selectedActivityLevel = ActivityLevel.moderatelyActive),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               
               _ActivityOption(
                 level: ActivityLevel.veryActive,
@@ -270,7 +276,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 isSelected: _selectedActivityLevel == ActivityLevel.veryActive,
                 onTap: () => setState(() => _selectedActivityLevel = ActivityLevel.veryActive),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               
               _ActivityOption(
                 level: ActivityLevel.extremelyActive,
@@ -296,14 +302,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             'Personal Information',
             style: Theme.of(context).textTheme.displaySmall,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             'This helps us calculate your nutritional needs',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).textTheme.bodyMedium?.color,
             ),
           ),
-          const SizedBox(height: 48),
+          SizedBox(height: 48),
           
           TextFormField(
             controller: _ageController,
@@ -323,7 +329,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               return null;
             },
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           
           TextFormField(
             controller: _heightController,
@@ -343,7 +349,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               return null;
             },
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           
           TextFormField(
             controller: _weightController,
@@ -426,10 +432,10 @@ class _GoalOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.accentOrange.withOpacity(0.1) : AppTheme.secondaryBackground,
+          color: isSelected ? AppTheme.primaryAccent.withOpacity(0.1) : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppTheme.accentOrange : AppTheme.borderColor,
+            color: isSelected ? AppTheme.primaryAccent : Theme.of(context).dividerColor,
             width: 2,
           ),
         ),
@@ -439,16 +445,16 @@ class _GoalOption extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: isSelected ? AppTheme.accentOrange : AppTheme.borderColor,
+                color: isSelected ? AppTheme.primaryAccent : Theme.of(context).dividerColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 icon,
-                color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
+                color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyMedium?.color,
                 size: 24,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: 16),
             
             Expanded(
               child: Column(
@@ -457,14 +463,14 @@ class _GoalOption extends StatelessWidget {
                   Text(
                     title,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: isSelected ? AppTheme.accentOrange : AppTheme.textPrimary,
+                      color: isSelected ? AppTheme.primaryAccent : Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
                     ),
                   ),
                 ],
@@ -474,7 +480,7 @@ class _GoalOption extends StatelessWidget {
             if (isSelected)
               Icon(
                 Icons.check_circle,
-                color: AppTheme.accentOrange,
+                color: AppTheme.primaryAccent,
                 size: 24,
               ),
           ],
@@ -506,10 +512,10 @@ class _ActivityOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.accentOrange.withOpacity(0.1) : AppTheme.secondaryBackground,
+          color: isSelected ? AppTheme.primaryAccent.withOpacity(0.1) : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppTheme.accentOrange : AppTheme.borderColor,
+            color: isSelected ? AppTheme.primaryAccent : Theme.of(context).dividerColor,
             width: 2,
           ),
         ),
@@ -522,14 +528,14 @@ class _ActivityOption extends StatelessWidget {
                   Text(
                     title,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: isSelected ? AppTheme.accentOrange : AppTheme.textPrimary,
+                      color: isSelected ? AppTheme.primaryAccent : Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
                     ),
                   ),
                 ],
@@ -539,7 +545,7 @@ class _ActivityOption extends StatelessWidget {
             if (isSelected)
               Icon(
                 Icons.check_circle,
-                color: AppTheme.accentOrange,
+                color: AppTheme.primaryAccent,
                 size: 24,
               ),
           ],

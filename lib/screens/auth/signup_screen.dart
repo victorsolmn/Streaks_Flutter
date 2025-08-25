@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/supabase_auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../onboarding/onboarding_screen.dart';
 import 'signin_screen.dart';
@@ -43,7 +44,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         return;
       }
 
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
       
       final success = await authProvider.signUp(
         _nameController.text.trim(),
@@ -65,14 +66,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign Up'),
+        title: Text('Sign Up'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: SafeArea(
-        child: Consumer<AuthProvider>(
+        child: Consumer<SupabaseAuthProvider>(
           builder: (context, auth, child) {
             return SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
@@ -81,22 +82,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 32),
+                    // Logo
+                    Center(
+                      child: SizedBox(
+                        width: 100,
+                        height: 100,
+                        child: SvgPicture.asset(
+                          'assets/images/streaker_logo.svg',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                    
+                    SizedBox(height: 32),
                     
                     // Header
                     Text(
                       'Create Account',
                       style: Theme.of(context).textTheme.displaySmall,
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
                       'Start your fitness journey today',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
                       ),
                     ),
                     
-                    const SizedBox(height: 48),
+                    SizedBox(height: 32),
                     
                     // Name field
                     TextFormField(
@@ -118,7 +131,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       },
                     ),
                     
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
                     
                     // Email field
                     TextFormField(
@@ -140,7 +153,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       },
                     ),
                     
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
                     
                     // Password field
                     TextFormField(
@@ -149,7 +162,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       textInputAction: TextInputAction.next,
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outlined),
+                        prefixIcon: Icon(Icons.lock_outlined),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword 
@@ -177,7 +190,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       },
                     ),
                     
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
                     
                     // Confirm password field
                     TextFormField(
@@ -186,7 +199,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       textInputAction: TextInputAction.done,
                       decoration: InputDecoration(
                         labelText: 'Confirm Password',
-                        prefixIcon: const Icon(Icons.lock_outlined),
+                        prefixIcon: Icon(Icons.lock_outlined),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscureConfirmPassword 
@@ -212,7 +225,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       },
                     ),
                     
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                     
                     // Terms and conditions
                     Row(
@@ -225,7 +238,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               _agreeToTerms = value ?? false;
                             });
                           },
-                          activeColor: AppTheme.accentOrange,
+                          activeColor: AppTheme.primaryAccent,
                         ),
                         Expanded(
                           child: Padding(
@@ -238,7 +251,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   TextSpan(
                                     text: 'Terms & Conditions',
                                     style: TextStyle(
-                                      color: AppTheme.accentOrange,
+                                      color: AppTheme.primaryAccent,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -246,7 +259,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   TextSpan(
                                     text: 'Privacy Policy',
                                     style: TextStyle(
-                                      color: AppTheme.accentOrange,
+                                      color: AppTheme.primaryAccent,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -258,7 +271,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ],
                     ),
                     
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                     
                     // Error message
                     if (auth.error != null) ...[
@@ -279,7 +292,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               color: AppTheme.errorRed,
                               size: 20,
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 auth.error!,
@@ -292,7 +305,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: 24),
                     ],
                     
                     // Sign up button
@@ -301,19 +314,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       child: ElevatedButton(
                         onPressed: auth.isLoading ? null : _signUp,
                         child: auth.isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: AppTheme.textPrimary,
+                                  color: Theme.of(context).textTheme.bodyLarge?.color,
                                 ),
                               )
-                            : const Text('Create Account'),
+                            : Text('Create Account'),
                       ),
                     ),
                     
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                     
                     // Sign in link
                     Row(
@@ -334,7 +347,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           child: Text(
                             'Sign In',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.accentOrange,
+                              color: AppTheme.primaryAccent,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -342,7 +355,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ],
                     ),
                     
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                   ],
                 ),
               ),

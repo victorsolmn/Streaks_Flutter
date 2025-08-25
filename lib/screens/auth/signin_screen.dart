@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/user_provider.dart';
+import '../../providers/supabase_auth_provider.dart';
+import '../../providers/supabase_user_provider.dart';
 import '../../utils/app_theme.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../main/main_screen.dart';
@@ -29,8 +30,8 @@ class _SignInScreenState extends State<SignInScreen> {
 
   Future<void> _signIn() async {
     if (_formKey.currentState?.validate() ?? false) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final authProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
+      final userProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
       
       final success = await authProvider.signIn(
         _emailController.text.trim(),
@@ -60,14 +61,14 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign In'),
+        title: Text('Sign In'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: SafeArea(
-        child: Consumer<AuthProvider>(
+        child: Consumer<SupabaseAuthProvider>(
           builder: (context, auth, child) {
             return Padding(
               padding: const EdgeInsets.all(24.0),
@@ -76,22 +77,34 @@ class _SignInScreenState extends State<SignInScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 32),
+                    // Logo
+                    Center(
+                      child: SizedBox(
+                        width: 100,
+                        height: 100,
+                        child: SvgPicture.asset(
+                          'assets/images/streaker_logo.svg',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                    
+                    SizedBox(height: 32),
                     
                     // Header
                     Text(
                       'Welcome back',
                       style: Theme.of(context).textTheme.displaySmall,
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
                       'Sign in to continue your fitness journey',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
                       ),
                     ),
                     
-                    const SizedBox(height: 48),
+                    SizedBox(height: 32),
                     
                     // Email field
                     TextFormField(
@@ -113,7 +126,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       },
                     ),
                     
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
                     
                     // Password field
                     TextFormField(
@@ -122,7 +135,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       textInputAction: TextInputAction.done,
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outlined),
+                        prefixIcon: Icon(Icons.lock_outlined),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword 
@@ -148,7 +161,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       },
                     ),
                     
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     
                     // Forgot password
                     Align(
@@ -165,14 +178,14 @@ class _SignInScreenState extends State<SignInScreen> {
                         child: Text(
                           'Forgot Password?',
                           style: TextStyle(
-                            color: AppTheme.accentOrange,
+                            color: AppTheme.primaryAccent,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
                     ),
                     
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                     
                     // Error message
                     if (auth.error != null) ...[
@@ -193,7 +206,7 @@ class _SignInScreenState extends State<SignInScreen> {
                               color: AppTheme.errorRed,
                               size: 20,
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 auth.error!,
@@ -206,7 +219,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: 24),
                     ],
                     
                     // Sign in button
@@ -215,15 +228,15 @@ class _SignInScreenState extends State<SignInScreen> {
                       child: ElevatedButton(
                         onPressed: auth.isLoading ? null : _signIn,
                         child: auth.isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: AppTheme.textPrimary,
+                                  color: Theme.of(context).textTheme.bodyLarge?.color,
                                 ),
                               )
-                            : const Text('Sign In'),
+                            : Text('Sign In'),
                       ),
                     ),
                     
@@ -248,7 +261,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           child: Text(
                             'Sign Up',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.accentOrange,
+                              color: AppTheme.primaryAccent,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -256,7 +269,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       ],
                     ),
                     
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                   ],
                 ),
               ),

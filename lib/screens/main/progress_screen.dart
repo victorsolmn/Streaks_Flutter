@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/user_provider.dart';
-import '../../providers/nutrition_provider.dart';
+import '../../providers/supabase_user_provider.dart';
+import '../../providers/supabase_nutrition_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/metric_card.dart';
 import '../../widgets/circular_progress_widget.dart';
@@ -33,11 +33,11 @@ class _ProgressScreenState extends State<ProgressScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Progress'),
+        title: Text('Progress'),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: AppTheme.accentOrange,
-          labelColor: AppTheme.accentOrange,
+          indicatorColor: AppTheme.primaryAccent,
+          labelColor: AppTheme.primaryAccent,
           unselectedLabelColor: AppTheme.textSecondary,
           tabs: const [
             Tab(text: 'Overview'),
@@ -84,7 +84,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        AppTheme.accentOrange,
+                        AppTheme.primaryAccent,
                         Color(0xFFFF8F00),
                       ],
                     ),
@@ -94,34 +94,34 @@ class _ProgressScreenState extends State<ProgressScreen>
                     children: [
                       Icon(
                         Icons.local_fire_department,
-                        color: AppTheme.textPrimary,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
                         size: 48,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       
                       Text(
                         '${streakData?.currentStreak ?? 0}',
                         style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                          color: AppTheme.textPrimary,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                           fontSize: 56,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       
                       Text(
                         'Day Current Streak',
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: AppTheme.textPrimary,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       
                       Text(
                         userProvider.getGoalDescription(),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textPrimary.withOpacity(0.8),
+                          color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.8) ?? Colors.grey.withOpacity(0.8),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -129,7 +129,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   ),
                 ),
                 
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 
                 // Quick stats grid
                 Row(
@@ -143,7 +143,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                         color: AppTheme.successGreen,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     
                     Expanded(
                       child: StatCard(
@@ -157,7 +157,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   ],
                 ),
                 
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 Row(
                   children: [
@@ -170,7 +170,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                         color: Colors.amber,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     
                     Expanded(
                       child: StatCard(
@@ -178,13 +178,13 @@ class _ProgressScreenState extends State<ProgressScreen>
                         value: '${todayNutrition.totalCalories}',
                         subtitle: 'logged',
                         icon: Icons.local_fire_department,
-                        color: AppTheme.accentOrange,
+                        color: AppTheme.primaryAccent,
                       ),
                     ),
                   ],
                 ),
                 
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 
                 // Progress towards goals
                 Text(
@@ -193,7 +193,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 ProgressMetricCard(
                   title: 'Calories',
@@ -201,9 +201,9 @@ class _ProgressScreenState extends State<ProgressScreen>
                   target: nutritionProvider.calorieGoal.toDouble(),
                   unit: 'cal',
                   icon: Icons.local_fire_department,
-                  color: AppTheme.accentOrange,
+                  color: AppTheme.primaryAccent,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 
                 ProgressMetricCard(
                   title: 'Protein',
@@ -213,7 +213,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   icon: Icons.fitness_center,
                   color: AppTheme.successGreen,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 
                 ProgressMetricCard(
                   title: 'Water (Estimated)',
@@ -232,7 +232,7 @@ class _ProgressScreenState extends State<ProgressScreen>
   }
 
   Widget _buildStreaksTab() {
-    return Consumer<UserProvider>(
+    return Consumer<SupabaseUserProvider>(
       builder: (context, userProvider, child) {
         final streakData = userProvider.streakData;
         final activityDates = streakData?.activityDates ?? [];
@@ -255,11 +255,11 @@ class _ProgressScreenState extends State<ProgressScreen>
                         title: 'Current',
                         value: '${streakData?.currentStreak ?? 0}',
                         subtitle: 'days',
-                        color: AppTheme.accentOrange,
+                        color: AppTheme.primaryAccent,
                         icon: Icons.local_fire_department,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     
                     Expanded(
                       child: _StreakStatCard(
@@ -273,7 +273,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   ],
                 ),
                 
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 
                 // Weekly calendar view
                 Text(
@@ -282,11 +282,11 @@ class _ProgressScreenState extends State<ProgressScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 _buildWeeklyCalendar(activityDates),
                 
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 
                 // Streak milestones
                 Text(
@@ -295,7 +295,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 _MilestoneCard(
                   title: '7 Day Streak',
@@ -303,7 +303,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   isCompleted: (streakData?.longestStreak ?? 0) >= 7,
                   icon: Icons.calendar_view_week,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 
                 _MilestoneCard(
                   title: '30 Day Streak',
@@ -311,7 +311,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   isCompleted: (streakData?.longestStreak ?? 0) >= 30,
                   icon: Icons.calendar_month,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 
                 _MilestoneCard(
                   title: '100 Day Streak',
@@ -320,7 +320,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   icon: Icons.military_tech,
                 ),
                 
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 
                 // Recent activity
                 Text(
@@ -329,7 +329,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 if (activityDates.isEmpty)
                   Container(
@@ -344,21 +344,21 @@ class _ProgressScreenState extends State<ProgressScreen>
                       children: [
                         Icon(
                           Icons.timeline_outlined,
-                          color: AppTheme.textSecondary,
+                          color: Theme.of(context).textTheme.bodyMedium?.color,
                           size: 48,
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         Text(
                           'No activity yet',
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppTheme.textSecondary,
+                            color: Theme.of(context).textTheme.bodyMedium?.color,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8),
                         Text(
                           'Start logging meals to build your streak!',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textSecondary,
+                            color: Theme.of(context).textTheme.bodyMedium?.color,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -397,7 +397,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 Card(
                   child: Padding(
@@ -423,7 +423,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                                       child: Text(
                                         dayName.substring(0, 3),
                                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: AppTheme.textSecondary,
+                                          color: Theme.of(context).textTheme.bodyMedium?.color,
                                         ),
                                       ),
                                     ),
@@ -440,7 +440,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                                           child: Container(
                                             decoration: BoxDecoration(
                                               color: _isToday(dailyNutrition.date) 
-                                                  ? AppTheme.accentOrange
+                                                  ? AppTheme.primaryAccent
                                                   : AppTheme.successGreen,
                                               borderRadius: BorderRadius.circular(12),
                                             ),
@@ -448,7 +448,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
+                                    SizedBox(width: 12),
                                     SizedBox(
                                       width: 60,
                                       child: Text(
@@ -470,7 +470,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   ),
                 ),
                 
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 
                 // Nutrition averages
                 Text(
@@ -479,7 +479,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 Row(
                   children: [
@@ -489,10 +489,10 @@ class _ProgressScreenState extends State<ProgressScreen>
                         value: '${_calculateWeeklyAverage(weeklyNutrition, 'calories')}',
                         unit: 'cal',
                         icon: Icons.local_fire_department,
-                        color: AppTheme.accentOrange,
+                        color: AppTheme.primaryAccent,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     
                     Expanded(
                       child: _AnalyticsCard(
@@ -506,7 +506,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   ],
                 ),
                 
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 Row(
                   children: [
@@ -519,7 +519,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                         color: Colors.blue,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     
                     Expanded(
                       child: _AnalyticsCard(
@@ -533,7 +533,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                   ],
                 ),
                 
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 
                 // Insights
                 Text(
@@ -542,7 +542,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 
                 _buildInsights(userProvider, nutritionProvider),
               ],
@@ -576,19 +576,19 @@ class _ProgressScreenState extends State<ProgressScreen>
                   Text(
                     ['M', 'T', 'W', 'T', 'F', 'S', 'S'][index],
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   
                   Container(
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
                       color: hasActivity 
-                          ? AppTheme.accentOrange
+                          ? AppTheme.primaryAccent
                           : isToday
-                              ? AppTheme.accentOrange.withOpacity(0.3)
+                              ? AppTheme.primaryAccent.withOpacity(0.3)
                               : AppTheme.borderColor,
                       shape: BoxShape.circle,
                     ),
@@ -599,7 +599,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                           color: hasActivity 
                               ? AppTheme.textPrimary
                               : isToday
-                                  ? AppTheme.accentOrange
+                                  ? AppTheme.primaryAccent
                                   : AppTheme.textSecondary,
                           fontWeight: FontWeight.w600,
                         ),
@@ -635,7 +635,7 @@ class _ProgressScreenState extends State<ProgressScreen>
         title: 'Building momentum',
         subtitle: 'You\'re on a $currentStreak day streak. Aim for 7 days!',
         icon: Icons.trending_up,
-        color: AppTheme.accentOrange,
+        color: AppTheme.primaryAccent,
       ));
     }
     
@@ -746,7 +746,7 @@ class _StreakStatCard extends StatelessWidget {
       child: Column(
         children: [
           Icon(icon, color: color, size: 32),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           
           Text(
             value,
@@ -755,7 +755,7 @@ class _StreakStatCard extends StatelessWidget {
               color: color,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           
           Text(
             title,
@@ -763,12 +763,12 @@ class _StreakStatCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: 2),
           
           Text(
             subtitle,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).textTheme.bodyMedium?.color,
             ),
           ),
         ],
@@ -824,7 +824,7 @@ class _MilestoneCard extends StatelessWidget {
               size: 20,
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           
           Expanded(
             child: Column(
@@ -837,11 +837,11 @@ class _MilestoneCard extends StatelessWidget {
                     color: isCompleted ? AppTheme.successGreen : null,
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
                   ),
                 ),
               ],
@@ -890,7 +890,7 @@ class _ActivityItem extends StatelessWidget {
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           
           Expanded(
             child: Text(
@@ -902,7 +902,7 @@ class _ActivityItem extends StatelessWidget {
           Text(
             timeAgo,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).textTheme.bodyMedium?.color,
             ),
           ),
         ],
@@ -939,7 +939,7 @@ class _AnalyticsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 24),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -951,24 +951,24 @@ class _AnalyticsCard extends StatelessWidget {
                   color: color,
                 ),
               ),
-              const SizedBox(width: 4),
+              SizedBox(width: 4),
               Padding(
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
                   unit,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           
           Text(
             title,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).textTheme.bodyMedium?.color,
             ),
           ),
         ],
@@ -1002,7 +1002,7 @@ class _InsightCard extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, color: color, size: 24),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           
           Expanded(
             child: Column(
@@ -1015,11 +1015,11 @@ class _InsightCard extends StatelessWidget {
                     color: color,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   subtitle,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
                   ),
                 ),
               ],

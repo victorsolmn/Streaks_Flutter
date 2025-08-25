@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "250385454172",
+    "project_id": "streaker-342ad",
+    "storage_bucket": "streaker-342ad.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:250385454172:android:9ed1e4caa6d5f882e7c299",
+        "android_client_info": {
+          "package_name": "com.streaker.streaker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAWY_j-WW27w1fjM70c0vdJbSTftIzonjk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

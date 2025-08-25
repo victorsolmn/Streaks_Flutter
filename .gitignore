@@ -5,9 +5,11 @@
 *.swp
 .DS_Store
 .atom/
+.build/
 .buildlog/
 .history
 .svn/
+.swiftpm/
 migrate_working_dir/
 
 # IntelliJ related
@@ -18,6 +20,9 @@ migrate_working_dir/
 
 # VS Code
 .vscode/
+
+# API Configuration - IMPORTANT: Contains sensitive API keys
+lib/config/api_config.dart
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -84,4 +89,4 @@ app.*.map.json
 **/linux/flutter/generated_plugins.cmake
 
 # Coverage
-coverage/
+coverage/test_grok_api.dart
