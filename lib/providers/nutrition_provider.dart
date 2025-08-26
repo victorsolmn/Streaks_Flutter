@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../services/nutrition_ai_service.dart';
 
 class NutritionEntry {
   final String id;
@@ -9,6 +10,7 @@ class NutritionEntry {
   final double protein;
   final double carbs;
   final double fat;
+  final double fiber;
   final DateTime timestamp;
 
   NutritionEntry({
@@ -18,6 +20,7 @@ class NutritionEntry {
     required this.protein,
     required this.carbs,
     required this.fat,
+    this.fiber = 0.0,
     required this.timestamp,
   });
 
@@ -29,6 +32,7 @@ class NutritionEntry {
       'protein': protein,
       'carbs': carbs,
       'fat': fat,
+      'fiber': fiber,
       'timestamp': timestamp.toIso8601String(),
     };
   }
@@ -41,6 +45,7 @@ class NutritionEntry {
       protein: json['protein'].toDouble(),
       carbs: json['carbs'].toDouble(),
       fat: json['fat'].toDouble(),
+      fiber: json['fiber']?.toDouble() ?? 0.0,
       timestamp: DateTime.parse(json['timestamp']),
     );
   }
@@ -195,35 +200,19 @@ class NutritionProvider with ChangeNotifier {
     _setError(null);
 
     try {
-      // Simulate AI food recognition
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Mock response based on common foods
-      final mockFoods = [
-        {'name': 'Apple', 'calories': 95, 'protein': 0.5, 'carbs': 25.0, 'fat': 0.3},
-        {'name': 'Chicken Breast', 'calories': 165, 'protein': 31.0, 'carbs': 0.0, 'fat': 3.6},
-        {'name': 'Brown Rice', 'calories': 216, 'protein': 5.0, 'carbs': 45.0, 'fat': 1.8},
-        {'name': 'Broccoli', 'calories': 55, 'protein': 3.7, 'carbs': 11.0, 'fat': 0.6},
-        {'name': 'Salmon', 'calories': 206, 'protein': 22.0, 'carbs': 0.0, 'fat': 12.0},
-      ];
-      
-      final random = DateTime.now().millisecond % mockFoods.length;
-      final food = mockFoods[random];
-      
-      final entry = NutritionEntry(
-        id: 'nutrition_${DateTime.now().millisecondsSinceEpoch}',
-        foodName: food['name'] as String,
-        calories: food['calories'] as int,
-        protein: food['protein'] as double,
-        carbs: food['carbs'] as double,
-        fat: food['fat'] as double,
-        timestamp: DateTime.now(),
-      );
+      // Use AI service to analyze the food image
+      final entry = await NutritionAIService.analyzeFood(imagePath);
       
       _setLoading(false);
-      return entry;
+      
+      if (entry != null) {
+        return entry;
+      } else {
+        _setError('Could not identify food. Please try again or enter manually.');
+        return null;
+      }
     } catch (e) {
-      _setError('Failed to scan food');
+      _setError('Failed to analyze food: ${e.toString()}');
       _setLoading(false);
       return null;
     }

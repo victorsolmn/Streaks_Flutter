@@ -7,7 +7,7 @@ import '../../providers/health_provider.dart';
 import '../../models/health_metric_model.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/circular_progress_widget.dart';
-import 'dart:math' as math;
+// import 'dart:math' as math; // Not needed anymore - no random data
 
 class ProgressScreenNew extends StatefulWidget {
   const ProgressScreenNew({Key? key}) : super(key: key);
@@ -132,9 +132,9 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
     final todayNutrition = nutritionProvider.todayNutrition;
     final caloriesConsumed = todayNutrition.totalCalories;
     
-    // Calculate calories burned (mock data for now)
-    final caloriesBurned = 1230;
-    final activeStreak = userProvider.streakData?.currentStreak ?? 3;
+    // Get actual calories burned from health provider
+    final caloriesBurned = healthProvider.todayCaloriesBurned.toInt();
+    final activeStreak = userProvider.streakData?.currentStreak ?? 0;
 
     return Row(
       children: [
@@ -357,16 +357,10 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
   }
 
   List<FlSpot> _generateWeeklyData(bool isBurned) {
-    // Generate sample data for the week
-    final random = math.Random();
+    // Start with zero data - will be populated from actual tracking
     return List.generate(8, (index) {
-      if (isBurned) {
-        // Calories burned data
-        return FlSpot(index.toDouble(), 1000 + random.nextDouble() * 1500);
-      } else {
-        // Calories consumed data
-        return FlSpot(index.toDouble(), 800 + random.nextDouble() * 700);
-      }
+      // Return 0 for all days initially
+      return FlSpot(index.toDouble(), 0);
     });
   }
 
@@ -375,8 +369,8 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
     final caloriesProgress = todayNutrition.totalCalories / nutritionProvider.calorieGoal;
     final proteinProgress = todayNutrition.totalProtein / nutritionProvider.proteinGoal;
     
-    // Mock workout data
-    final workoutsCompleted = 3;
+    // Start with zero workouts - will track actual workouts
+    final workoutsCompleted = 0;
     final workoutsGoal = 7;
     final workoutProgress = workoutsCompleted / workoutsGoal;
 
@@ -490,9 +484,9 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
 
   Widget _buildStreakStatsSection(UserProvider userProvider) {
     final streakData = userProvider.streakData;
-    final currentStreak = streakData?.currentStreak ?? 5;
-    final bestStreak = streakData?.longestStreak ?? 10;
-    final goalsCompleted = 18; // Mock data
+    final currentStreak = streakData?.currentStreak ?? 0;
+    final bestStreak = streakData?.longestStreak ?? 0;
+    final goalsCompleted = 0; // Start from zero
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -607,10 +601,10 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
   }
 
   Widget _buildWeeklyPerformance(UserProvider userProvider, NutritionProvider nutritionProvider) {
-    final totalStreakDays = 31;
-    final caloriesBurnedThisWeek = 25; // Mock: thousands
-    final hoursWorkedOut = 5;
-    final performancePercentage = 65;
+    final totalStreakDays = userProvider.streakData?.currentStreak ?? 0;
+    final caloriesBurnedThisWeek = 0; // Start from zero
+    final hoursWorkedOut = 0; // Start from zero
+    final performancePercentage = 0; // Start from zero
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -689,7 +683,7 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
   }
 
   Widget _buildMotivationalMessage(UserProvider userProvider) {
-    final currentStreak = userProvider.streakData?.currentStreak ?? 5;
+    final currentStreak = userProvider.streakData?.currentStreak ?? 0;
     final daysToNextMilestone = 7 - (currentStreak % 7);
     
     return Container(
@@ -747,7 +741,7 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
           crossAxisCount: 2,
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
-          childAspectRatio: 1.5,
+          childAspectRatio: 1.8, // Increased to prevent overflow
           children: [
             _buildAchievementCard(
               title: 'Build the Habit',
@@ -809,7 +803,7 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12), // Reduced padding
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -828,8 +822,8 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 40, // Reduced icon container size
+            height: 40,
             decoration: BoxDecoration(
               color: bgColor,
               shape: BoxShape.circle,
@@ -837,24 +831,32 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
             child: Icon(
               icon,
               color: iconColor,
-              size: 24,
+              size: 20, // Reduced icon size
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+          const SizedBox(height: 8), // Reduced spacing
+          Flexible( // Added Flexible to prevent text overflow
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith( // Changed to bodyMedium
+                fontWeight: FontWeight.w600,
+                fontSize: 13, // Explicit font size
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2), // Reduced spacing
           Text(
             subtitle,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: AppTheme.textSecondary,
+              fontSize: 11, // Explicit smaller font size
             ),
             textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

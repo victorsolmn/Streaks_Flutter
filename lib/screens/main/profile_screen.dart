@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../providers/supabase_auth_provider.dart';
@@ -10,6 +11,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/nutrition_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/health_provider.dart';
+import '../../services/smartwatch_service.dart';
 import '../../models/weight_model.dart';
 import '../../widgets/weight_progress_card.dart';
 import '../../utils/app_theme.dart';
@@ -35,43 +38,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _initializeWeightData() {
-    // Sample data - replace with actual data from provider
+    // Initialize with empty data - will be populated from user input
     _weightProgress = WeightProgress(
-      startWeight: 85.0,
-      currentWeight: 78.5,
-      targetWeight: 75.0,
-      entries: [
-        WeightEntry(
-          id: '1',
-          weight: 85.0,
-          timestamp: DateTime.now().subtract(const Duration(days: 30)),
-        ),
-        WeightEntry(
-          id: '2',
-          weight: 83.5,
-          timestamp: DateTime.now().subtract(const Duration(days: 25)),
-        ),
-        WeightEntry(
-          id: '3',
-          weight: 82.0,
-          timestamp: DateTime.now().subtract(const Duration(days: 20)),
-        ),
-        WeightEntry(
-          id: '4',
-          weight: 80.5,
-          timestamp: DateTime.now().subtract(const Duration(days: 15)),
-        ),
-        WeightEntry(
-          id: '5',
-          weight: 79.0,
-          timestamp: DateTime.now().subtract(const Duration(days: 10)),
-        ),
-        WeightEntry(
-          id: '6',
-          weight: 78.5,
-          timestamp: DateTime.now().subtract(const Duration(days: 5)),
-        ),
-      ],
+      startWeight: 0,
+      currentWeight: 0,
+      targetWeight: 0,
+      entries: [], // Start with empty entries
       unit: 'kg',
     );
   }
@@ -127,9 +99,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileInfo() {
-    return Consumer<SupabaseUserProvider>(
+    return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
-        final profile = userProvider.userProfile;
+        final profile = userProvider.profile;
         
         return Container(
           color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkCardBackground : Colors.white,
@@ -269,6 +241,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SizedBox(height: 16),
           _buildThemeToggle(),
           const Divider(height: 32),
+          _buildSettingItem(
+            icon: Icons.watch,
+            title: 'Smartwatch Integration',
+            subtitle: 'Connect your fitness tracker',
+            onTap: () => _showSmartwatchIntegrationDialog(),
+          ),
           _buildSettingItem(
             icon: Icons.track_changes,
             title: 'Nutrition Goals',
@@ -780,5 +758,353 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  void _showSmartwatchIntegrationDialog() {
+    // Track which smartwatch is currently selected
+    String? selectedDevice;
+    bool isConnecting = false;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.watch, color: AppTheme.primaryAccent),
+              SizedBox(width: 12),
+              Text('Smartwatch Integration'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Connect your smartwatch or fitness tracker to sync health data automatically.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                SizedBox(height: 20),
+                Text(
+                  'Available Devices:',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 12),
+                
+                // Apple Watch
+                _buildSmartwatchOption(
+                  icon: Icons.watch,
+                  name: 'Apple Watch',
+                  subtitle: 'via Apple Health',
+                  isSelected: selectedDevice == 'apple_watch',
+                  isAvailable: Theme.of(context).platform == TargetPlatform.iOS,
+                  onTap: () {
+                    setState(() {
+                      selectedDevice = 'apple_watch';
+                    });
+                  },
+                ),
+                
+                // Samsung Galaxy Watch
+                _buildSmartwatchOption(
+                  icon: Icons.watch,
+                  name: 'Samsung Galaxy Watch',
+                  subtitle: 'via Samsung Health',
+                  isSelected: selectedDevice == 'samsung_watch',
+                  isAvailable: true,
+                  onTap: () {
+                    setState(() {
+                      selectedDevice = 'samsung_watch';
+                    });
+                  },
+                ),
+                
+                // Garmin
+                _buildSmartwatchOption(
+                  icon: Icons.directions_run,
+                  name: 'Garmin',
+                  subtitle: 'Connect, Fenix, Forerunner series',
+                  isSelected: selectedDevice == 'garmin',
+                  isAvailable: true,
+                  onTap: () {
+                    setState(() {
+                      selectedDevice = 'garmin';
+                    });
+                  },
+                ),
+                
+                // Fitbit
+                _buildSmartwatchOption(
+                  icon: Icons.favorite,
+                  name: 'Fitbit',
+                  subtitle: 'Versa, Sense, Charge series',
+                  isSelected: selectedDevice == 'fitbit',
+                  isAvailable: true,
+                  onTap: () {
+                    setState(() {
+                      selectedDevice = 'fitbit';
+                    });
+                  },
+                ),
+                
+                // Xiaomi Mi Band
+                _buildSmartwatchOption(
+                  icon: Icons.watch_outlined,
+                  name: 'Xiaomi Mi Band',
+                  subtitle: 'Mi Band 5, 6, 7, 8 series',
+                  isSelected: selectedDevice == 'mi_band',
+                  isAvailable: true,
+                  onTap: () {
+                    setState(() {
+                      selectedDevice = 'mi_band';
+                    });
+                  },
+                ),
+                
+                // Amazfit
+                _buildSmartwatchOption(
+                  icon: Icons.sports_score,
+                  name: 'Amazfit',
+                  subtitle: 'GTR, GTS, Bip series',
+                  isSelected: selectedDevice == 'amazfit',
+                  isAvailable: true,
+                  onTap: () {
+                    setState(() {
+                      selectedDevice = 'amazfit';
+                    });
+                  },
+                ),
+                
+                // Huawei Watch
+                _buildSmartwatchOption(
+                  icon: Icons.watch,
+                  name: 'Huawei Watch',
+                  subtitle: 'Watch GT, Watch Fit series',
+                  isSelected: selectedDevice == 'huawei',
+                  isAvailable: true,
+                  onTap: () {
+                    setState(() {
+                      selectedDevice = 'huawei';
+                    });
+                  },
+                ),
+                
+                // Google Fit (Generic)
+                _buildSmartwatchOption(
+                  icon: Icons.fitness_center,
+                  name: 'Google Fit',
+                  subtitle: 'For other Wear OS devices',
+                  isSelected: selectedDevice == 'google_fit',
+                  isAvailable: true,
+                  onTap: () {
+                    setState(() {
+                      selectedDevice = 'google_fit';
+                    });
+                  },
+                ),
+                
+                if (isConnecting) ...[
+                  SizedBox(height: 20),
+                  Center(
+                    child: Column(
+                      children: [
+                        CircularProgressIndicator(
+                          color: AppTheme.primaryAccent,
+                        ),
+                        SizedBox(height: 12),
+                        Text('Connecting...'),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: selectedDevice == null || isConnecting
+                  ? null
+                  : () async {
+                      setState(() {
+                        isConnecting = true;
+                      });
+                      
+                      // Connect to the smartwatch via the service
+                      final smartwatchService = SmartwatchService();
+                      bool connected = await smartwatchService.connectDevice(selectedDevice!);
+                      
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                        
+                        if (connected) {
+                          // Trigger immediate sync
+                          final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+                          await healthProvider.syncWithSmartwatch();
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Connected to ${_getDeviceName(selectedDevice!)}! Health data will now sync automatically.',
+                              ),
+                              backgroundColor: AppTheme.successGreen,
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Failed to connect to ${_getDeviceName(selectedDevice!)}. Please check permissions.',
+                              ),
+                              backgroundColor: Colors.red,
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryAccent,
+              ),
+              child: Text(
+                isConnecting ? 'Connecting...' : 'Connect',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildSmartwatchOption({
+    required IconData icon,
+    required String name,
+    required String subtitle,
+    required bool isSelected,
+    required bool isAvailable,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: InkWell(
+        onTap: isAvailable ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isSelected 
+                  ? AppTheme.primaryAccent 
+                  : isAvailable 
+                      ? AppTheme.borderColor 
+                      : AppTheme.borderColor.withOpacity(0.3),
+              width: isSelected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            color: isSelected 
+                ? AppTheme.primaryAccent.withOpacity(0.1)
+                : isAvailable
+                    ? Colors.transparent
+                    : AppTheme.borderColor.withOpacity(0.05),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isAvailable
+                      ? AppTheme.primaryAccent.withOpacity(0.1)
+                      : AppTheme.borderColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: isAvailable
+                      ? AppTheme.primaryAccent
+                      : AppTheme.textSecondary,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: isAvailable
+                            ? Theme.of(context).textTheme.bodyLarge?.color
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isAvailable)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.borderColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Coming Soon',
+                    style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                  ),
+                ),
+              if (isSelected)
+                Icon(
+                  Icons.check_circle,
+                  color: AppTheme.primaryAccent,
+                  size: 20,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  String _getDeviceName(String deviceId) {
+    switch (deviceId) {
+      case 'apple_watch':
+        return 'Apple Watch';
+      case 'samsung_watch':
+        return 'Samsung Galaxy Watch';
+      case 'garmin':
+        return 'Garmin';
+      case 'fitbit':
+        return 'Fitbit';
+      case 'mi_band':
+        return 'Xiaomi Mi Band';
+      case 'amazfit':
+        return 'Amazfit';
+      case 'huawei':
+        return 'Huawei Watch';
+      case 'google_fit':
+        return 'Google Fit';
+      default:
+        return 'Smartwatch';
+    }
   }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/supabase_user_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../providers/supabase_nutrition_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/metric_card.dart';
@@ -232,7 +232,7 @@ class _ProgressScreenState extends State<ProgressScreen>
   }
 
   Widget _buildStreaksTab() {
-    return Consumer<SupabaseUserProvider>(
+    return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         final streakData = userProvider.streakData;
         final activityDates = streakData?.activityDates ?? [];

@@ -98,8 +98,9 @@ class _HomeScreenNewState extends State<HomeScreenNew>
                       _buildSecondaryMetrics(healthProvider),
                       const SizedBox(height: 32),
                       _buildInsightsSection(healthProvider, nutritionProvider, userProvider),
-                      const SizedBox(height: 24),
-                      _buildActionSection(nutritionProvider),
+                      // Removed floating action button as it has no functionality
+                      // const SizedBox(height: 24),
+                      // _buildActionSection(nutritionProvider),
                     ],
                   );
                 },
@@ -130,18 +131,70 @@ class _HomeScreenNewState extends State<HomeScreenNew>
             ),
           ],
         ),
-        Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: AppTheme.primaryAccent.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: Icon(
-            Icons.notifications_outlined,
-            color: AppTheme.primaryAccent,
-            size: 24,
-          ),
+        Row(
+          children: [
+            // Smartwatch sync indicator
+            Consumer<HealthProvider>(
+              builder: (context, healthProvider, _) {
+                if (healthProvider.isSmartWatchConnected) {
+                  return Container(
+                    margin: EdgeInsets.only(right: 8),
+                    child: InkWell(
+                      onTap: () async {
+                        // Show syncing
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Syncing data...'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                        
+                        await healthProvider.syncWithSmartwatch();
+                        
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Data synced!'),
+                              backgroundColor: AppTheme.successGreen,
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(25),
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: AppTheme.successGreen.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: Icon(
+                          Icons.watch,
+                          color: AppTheme.successGreen,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryAccent.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(25),
+              ),
+              child: Icon(
+                Icons.notifications_outlined,
+                color: AppTheme.primaryAccent,
+                size: 24,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -149,7 +202,7 @@ class _HomeScreenNewState extends State<HomeScreenNew>
 
   Widget _buildMotivationalSection(HealthProvider healthProvider) {
     final stepsData = healthProvider.metrics[MetricType.steps];
-    final steps = stepsData?.currentValue?.toInt() ?? 7700;
+    final steps = stepsData?.currentValue?.toInt() ?? 0;
     final stepsGoal = stepsData?.goalValue?.toInt() ?? 10000;
     
     return Text(
@@ -164,7 +217,7 @@ class _HomeScreenNewState extends State<HomeScreenNew>
 
   Widget _buildPrimaryMetrics(HealthProvider healthProvider, NutritionProvider nutritionProvider) {
     final stepsData = healthProvider.metrics[MetricType.steps];
-    final steps = stepsData?.currentValue?.toInt() ?? 7700;
+    final steps = stepsData?.currentValue?.toInt() ?? 0;
     final stepsGoal = stepsData?.goalValue?.toInt() ?? 10000;
     
     final dailyNutrition = nutritionProvider.todayNutrition;
@@ -377,7 +430,7 @@ class _HomeScreenNewState extends State<HomeScreenNew>
 
   Widget _buildSecondaryMetrics(HealthProvider healthProvider) {
     final sleepData = healthProvider.metrics[MetricType.sleep];
-    final sleepMinutes = sleepData?.currentValue ?? 450; // 7.5 hours
+    final sleepMinutes = sleepData?.currentValue ?? 0; // Start from 0
     final sleepHours = (sleepMinutes / 60).toStringAsFixed(1);
     
     return Row(
@@ -530,6 +583,13 @@ class _HomeScreenNewState extends State<HomeScreenNew>
   }
 
   Widget _buildInsightsSection(HealthProvider healthProvider, NutritionProvider nutritionProvider, UserProvider userProvider) {
+    // Generate personalized insights based on actual user data
+    final List<Map<String, String>> insights = _generatePersonalizedInsights(
+      healthProvider, 
+      nutritionProvider, 
+      userProvider
+    );
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -542,29 +602,160 @@ class _HomeScreenNewState extends State<HomeScreenNew>
         ),
         const SizedBox(height: 16),
         
-        _buildInsightCard(
-          '🔥',
-          'You burned 450 kcal more than yesterday',
-          '👏',
-        ),
-        
-        const SizedBox(height: 12),
-        
-        _buildInsightCard(
-          '😴',
-          'Your sleep dropped by 1.5 hours last night',
-          '',
-        ),
-        
-        const SizedBox(height: 12),
-        
-        _buildInsightCard(
-          '💧',
-          'Water intake looks low — drink 2 more cups',
-          '💧',
-        ),
+        ...insights.map((insight) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildInsightCard(
+            insight['leadingIcon'] ?? '',
+            insight['text'] ?? '',
+            insight['trailingIcon'] ?? '',
+          ),
+        )).toList(),
       ],
     );
+  }
+  
+  List<Map<String, String>> _generatePersonalizedInsights(
+    HealthProvider healthProvider,
+    NutritionProvider nutritionProvider,
+    UserProvider userProvider,
+  ) {
+    List<Map<String, String>> insights = [];
+    
+    // Get user data
+    final profile = userProvider.profile;
+    final todayNutrition = nutritionProvider.todayNutrition;
+    final steps = healthProvider.todaySteps;
+    final heartRate = healthProvider.todayHeartRate;
+    final sleep = healthProvider.todaySleep;
+    final calories = healthProvider.todayCaloriesBurned;
+    
+    // Steps insight
+    if (steps > 0) {
+      if (steps >= 10000) {
+        insights.add({
+          'leadingIcon': '🎉',
+          'text': 'Amazing! You\'ve hit your ${steps.toStringAsFixed(0)} steps goal!',
+          'trailingIcon': '🏆',
+        });
+      } else if (steps >= 7000) {
+        final remaining = 10000 - steps;
+        insights.add({
+          'leadingIcon': '👟',
+          'text': 'Great progress! Just ${remaining.toStringAsFixed(0)} more steps to reach 10,000',
+          'trailingIcon': '💪',
+        });
+      } else {
+        insights.add({
+          'leadingIcon': '🚶',
+          'text': 'Time to move! You\'re at ${steps.toStringAsFixed(0)} steps today',
+          'trailingIcon': '→',
+        });
+      }
+    }
+    
+    // Nutrition insight
+    if (todayNutrition != null) {
+      final calorieGoal = profile?.goal == FitnessGoal.weightLoss ? 2000 : 2500;
+      final consumedCalories = todayNutrition.totalCalories;
+      
+      if (consumedCalories > 0) {
+        if (consumedCalories < calorieGoal * 0.5) {
+          insights.add({
+            'leadingIcon': '🍽️',
+            'text': 'Don\'t forget to fuel your body! Only ${consumedCalories.toStringAsFixed(0)} kcal logged',
+            'trailingIcon': '⬆️',
+          });
+        } else if (consumedCalories > calorieGoal) {
+          insights.add({
+            'leadingIcon': '⚠️',
+            'text': 'You\'re ${(consumedCalories - calorieGoal).toStringAsFixed(0)} kcal over your daily goal',
+            'trailingIcon': '',
+          });
+        } else {
+          final remaining = calorieGoal - consumedCalories;
+          insights.add({
+            'leadingIcon': '✅',
+            'text': 'Good nutrition tracking! ${remaining.toStringAsFixed(0)} kcal remaining',
+            'trailingIcon': '📊',
+          });
+        }
+      }
+      
+      // Protein insight
+      if (todayNutrition.totalProtein < 50) {
+        insights.add({
+          'leadingIcon': '🥩',
+          'text': 'Protein intake is low (${todayNutrition.totalProtein}g). Aim for at least 50g',
+          'trailingIcon': '💪',
+        });
+      }
+    }
+    
+    // Sleep insight
+    if (sleep > 0) {
+      if (sleep < 6) {
+        insights.add({
+          'leadingIcon': '😴',
+          'text': 'Only ${sleep.toStringAsFixed(1)} hours of sleep. Try to get 7-8 hours',
+          'trailingIcon': '🛏️',
+        });
+      } else if (sleep >= 7 && sleep <= 9) {
+        insights.add({
+          'leadingIcon': '😊',
+          'text': 'Great sleep! ${sleep.toStringAsFixed(1)} hours is optimal for recovery',
+          'trailingIcon': '✨',
+        });
+      }
+    }
+    
+    // Heart rate insight
+    if (heartRate > 0) {
+      if (heartRate > 100) {
+        insights.add({
+          'leadingIcon': '❤️',
+          'text': 'Heart rate is elevated (${heartRate.toStringAsFixed(0)} bpm). Consider relaxation',
+          'trailingIcon': '🧘',
+        });
+      } else if (heartRate >= 60 && heartRate <= 80) {
+        insights.add({
+          'leadingIcon': '💚',
+          'text': 'Healthy resting heart rate at ${heartRate.toStringAsFixed(0)} bpm',
+          'trailingIcon': '👍',
+        });
+      }
+    }
+    
+    // Water insight (always show as reminder)
+    insights.add({
+      'leadingIcon': '💧',
+      'text': 'Stay hydrated! Aim for 8 glasses of water today',
+      'trailingIcon': '💧',
+    });
+    
+    // Activity level insight based on profile
+    if (profile != null && profile.activityLevel == ActivityLevel.sedentary) {
+      insights.add({
+        'leadingIcon': '🏃',
+        'text': 'Try to increase your activity level for better results',
+        'trailingIcon': '📈',
+      });
+    }
+    
+    // Limit to 4 most relevant insights
+    if (insights.length > 4) {
+      insights = insights.take(4).toList();
+    }
+    
+    // If no insights generated, add default encouraging message
+    if (insights.isEmpty) {
+      insights.add({
+        'leadingIcon': '🌟',
+        'text': 'Start logging your activities to get personalized insights',
+        'trailingIcon': '→',
+      });
+    }
+    
+    return insights;
   }
 
   Widget _buildInsightCard(String leadingIcon, String text, String trailingIcon) {

@@ -77,22 +77,38 @@ class _NutritionScreenState extends State<NutritionScreen>
   }
 
   Future<ImageSource?> _showImageSourceDialog() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return await showDialog<ImageSource>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.secondaryBackground,
-        title: Text('Select Image Source'),
+        backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+        title: Text(
+          'Select Image Source',
+          style: TextStyle(
+            color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: Icon(Icons.camera_alt, color: AppTheme.primaryAccent),
-              title: Text('Camera'),
+              title: Text(
+                'Camera',
+                style: TextStyle(
+                  color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                ),
+              ),
               onTap: () => Navigator.of(context).pop(ImageSource.camera),
             ),
             ListTile(
               leading: Icon(Icons.photo_library, color: AppTheme.primaryAccent),
-              title: Text('Gallery'),
+              title: Text(
+                'Gallery',
+                style: TextStyle(
+                  color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                ),
+              ),
               onTap: () => Navigator.of(context).pop(ImageSource.gallery),
             ),
           ],
@@ -108,11 +124,17 @@ class _NutritionScreenState extends State<NutritionScreen>
   }
 
   Future<bool> _showNutritionPreview(NutritionEntry entry) async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.secondaryBackground,
-        title: Text('Confirm Food Entry'),
+        backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+        title: Text(
+          'Confirm Food Entry',
+          style: TextStyle(
+            color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,6 +151,7 @@ class _NutritionScreenState extends State<NutritionScreen>
             _NutritionDetailRow(label: 'Protein', value: '${entry.protein.round()}', unit: 'g'),
             _NutritionDetailRow(label: 'Carbs', value: '${entry.carbs.round()}', unit: 'g'),
             _NutritionDetailRow(label: 'Fat', value: '${entry.fat.round()}', unit: 'g'),
+            _NutritionDetailRow(label: 'Fiber', value: '${entry.fiber.round()}', unit: 'g'),
           ],
         ),
         actions: [
@@ -147,12 +170,23 @@ class _NutritionScreenState extends State<NutritionScreen>
   }
 
   void _showErrorDialog(String message) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.secondaryBackground,
-        title: Text('Error'),
-        content: Text(message),
+        backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+        title: Text(
+          'Error',
+          style: TextStyle(
+            color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+          ),
+        ),
+        content: Text(
+          message,
+          style: TextStyle(
+            color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -169,13 +203,20 @@ class _NutritionScreenState extends State<NutritionScreen>
     final proteinController = TextEditingController();
     final carbsController = TextEditingController();
     final fatController = TextEditingController();
+    final fiberController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.secondaryBackground,
-        title: Text('Add Food Manually'),
+        backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+        title: Text(
+          'Add Food Manually',
+          style: TextStyle(
+            color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+          ),
+        ),
         content: Form(
           key: formKey,
           child: SingleChildScrollView(
@@ -219,6 +260,13 @@ class _NutritionScreenState extends State<NutritionScreen>
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
+                SizedBox(height: 16),
+                
+                TextFormField(
+                  controller: fiberController,
+                  decoration: const InputDecoration(labelText: 'Fiber (g) - Optional'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
               ],
             ),
           ),
@@ -238,6 +286,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                   protein: double.parse(proteinController.text),
                   carbs: double.parse(carbsController.text),
                   fat: double.parse(fatController.text),
+                  fiber: fiberController.text.isNotEmpty ? double.parse(fiberController.text) : 0.0,
                   timestamp: DateTime.now(),
                 );
 
@@ -563,12 +612,23 @@ class _NutritionScreenState extends State<NutritionScreen>
   }
 
   Future<bool> _showDeleteConfirmation() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.secondaryBackground,
-        title: Text('Delete Entry'),
-        content: Text('Are you sure you want to delete this nutrition entry?'),
+        backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+        title: Text(
+          'Delete Entry',
+          style: TextStyle(
+            color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete this nutrition entry?',
+          style: TextStyle(
+            color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
