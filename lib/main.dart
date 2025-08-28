@@ -7,6 +7,8 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
 import 'services/supabase_service.dart';
 import 'services/firebase_analytics_service.dart';
+import 'services/bluetooth_smartwatch_service.dart';
+import 'services/realtime_sync_service.dart';
 // Using Supabase providers for cloud storage
 import 'providers/supabase_auth_provider.dart';
 import 'providers/supabase_nutrition_provider.dart';
@@ -26,6 +28,12 @@ void main() async {
   
   // Initialize Supabase
   await SupabaseService().initialize();
+  
+  // Initialize Bluetooth Smartwatch Service
+  await BluetoothSmartwatchService().initialize();
+  
+  // Initialize Real-time Sync Service
+  await RealtimeSyncService().initialize();
   
   // Initialize Firebase
   try {

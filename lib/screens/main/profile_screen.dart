@@ -13,6 +13,9 @@ import '../../providers/nutrition_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/health_provider.dart';
 import '../../services/smartwatch_service.dart';
+import '../../services/bluetooth_smartwatch_service.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../models/weight_model.dart';
 import '../../widgets/weight_progress_card.dart';
 import '../../utils/app_theme.dart';
@@ -760,8 +763,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showSmartwatchIntegrationDialog() {
-    // Track which smartwatch is currently selected
+  void _showSmartwatchIntegrationDialog() async {
+    final bluetoothService = BluetoothSmartwatchService();
+    
+    // Check if already connected
+    if (bluetoothService.isDeviceConnected) {
+      final deviceInfo = bluetoothService.getConnectedDeviceInfo();
+      _showConnectedDeviceDialog(deviceInfo!);
+      return;
+    }
+    
+    // Show device discovery dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.bluetooth_searching, color: AppTheme.primaryAccent),
+            SizedBox(width: 12),
+            Text('Searching for Devices'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppTheme.primaryAccent),
+            SizedBox(height: 20),
+            Text('Scanning for nearby smartwatches...'),
+            SizedBox(height: 10),
+            Text(
+              'Please make sure your device is:\n'
+              '• Powered on\n'
+              '• Bluetooth enabled\n'
+              '• Within range',
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      // Check permissions first
+      bool hasPermissions = await bluetoothService.checkPermissions();
+      if (!hasPermissions) {
+        Navigator.of(context).pop();
+        _showPermissionDeniedDialog();
+        return;
+      }
+      
+      // Scan for devices
+      List<Map<String, dynamic>> devices = await bluetoothService.scanForDevices();
+      
+      // Close scanning dialog
+      Navigator.of(context).pop();
+      
+      if (devices.isEmpty) {
+        _showNoDevicesFoundDialog();
+      } else {
+        _showDeviceSelectionDialog(devices);
+      }
+      
+    } catch (e) {
+      Navigator.of(context).pop();
+      _showErrorDialog('Failed to scan for devices: $e');
+    }
+  }
+  
+  void _showDeviceSelectionDialog(List<Map<String, dynamic>> devices) {
     String? selectedDevice;
     bool isConnecting = false;
     
@@ -773,7 +844,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Icon(Icons.watch, color: AppTheme.primaryAccent),
               SizedBox(width: 12),
-              Text('Smartwatch Integration'),
+              Text('Select Device'),
             ],
           ),
           content: SingleChildScrollView(
@@ -782,129 +853,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Connect your smartwatch or fitness tracker to sync health data automatically.',
+                  'Found ${devices.length} device${devices.length > 1 ? 's' : ''}:',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 SizedBox(height: 20),
-                Text(
-                  'Available Devices:',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 12),
-                
-                // Apple Watch
-                _buildSmartwatchOption(
-                  icon: Icons.watch,
-                  name: 'Apple Watch',
-                  subtitle: 'via Apple Health',
-                  isSelected: selectedDevice == 'apple_watch',
-                  isAvailable: Theme.of(context).platform == TargetPlatform.iOS,
+                // Show discovered devices
+                ...devices.map((device) => _buildDiscoveredDeviceOption(
+                  icon: _getDeviceIcon(device['type']),
+                  name: device['name'],
+                  subtitle: 'Signal: ${device['rssi']} dBm',
+                  isSelected: selectedDevice == device['id'],
+                  deviceInfo: device,
                   onTap: () {
                     setState(() {
-                      selectedDevice = 'apple_watch';
+                      selectedDevice = device['id'];
                     });
                   },
-                ),
-                
-                // Samsung Galaxy Watch
-                _buildSmartwatchOption(
-                  icon: Icons.watch,
-                  name: 'Samsung Galaxy Watch',
-                  subtitle: 'via Samsung Health',
-                  isSelected: selectedDevice == 'samsung_watch',
-                  isAvailable: true,
-                  onTap: () {
-                    setState(() {
-                      selectedDevice = 'samsung_watch';
-                    });
-                  },
-                ),
-                
-                // Garmin
-                _buildSmartwatchOption(
-                  icon: Icons.directions_run,
-                  name: 'Garmin',
-                  subtitle: 'Connect, Fenix, Forerunner series',
-                  isSelected: selectedDevice == 'garmin',
-                  isAvailable: true,
-                  onTap: () {
-                    setState(() {
-                      selectedDevice = 'garmin';
-                    });
-                  },
-                ),
-                
-                // Fitbit
-                _buildSmartwatchOption(
-                  icon: Icons.favorite,
-                  name: 'Fitbit',
-                  subtitle: 'Versa, Sense, Charge series',
-                  isSelected: selectedDevice == 'fitbit',
-                  isAvailable: true,
-                  onTap: () {
-                    setState(() {
-                      selectedDevice = 'fitbit';
-                    });
-                  },
-                ),
-                
-                // Xiaomi Mi Band
-                _buildSmartwatchOption(
-                  icon: Icons.watch_outlined,
-                  name: 'Xiaomi Mi Band',
-                  subtitle: 'Mi Band 5, 6, 7, 8 series',
-                  isSelected: selectedDevice == 'mi_band',
-                  isAvailable: true,
-                  onTap: () {
-                    setState(() {
-                      selectedDevice = 'mi_band';
-                    });
-                  },
-                ),
-                
-                // Amazfit
-                _buildSmartwatchOption(
-                  icon: Icons.sports_score,
-                  name: 'Amazfit',
-                  subtitle: 'GTR, GTS, Bip series',
-                  isSelected: selectedDevice == 'amazfit',
-                  isAvailable: true,
-                  onTap: () {
-                    setState(() {
-                      selectedDevice = 'amazfit';
-                    });
-                  },
-                ),
-                
-                // Huawei Watch
-                _buildSmartwatchOption(
-                  icon: Icons.watch,
-                  name: 'Huawei Watch',
-                  subtitle: 'Watch GT, Watch Fit series',
-                  isSelected: selectedDevice == 'huawei',
-                  isAvailable: true,
-                  onTap: () {
-                    setState(() {
-                      selectedDevice = 'huawei';
-                    });
-                  },
-                ),
-                
-                // Google Fit (Generic)
-                _buildSmartwatchOption(
-                  icon: Icons.fitness_center,
-                  name: 'Google Fit',
-                  subtitle: 'For other Wear OS devices',
-                  isSelected: selectedDevice == 'google_fit',
-                  isAvailable: true,
-                  onTap: () {
-                    setState(() {
-                      selectedDevice = 'google_fit';
-                    });
-                  },
-                ),
+                )),
                 
                 if (isConnecting) ...[
                   SizedBox(height: 20),
@@ -936,22 +901,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         isConnecting = true;
                       });
                       
-                      // Connect to the smartwatch via the service
-                      final smartwatchService = SmartwatchService();
-                      bool connected = await smartwatchService.connectDevice(selectedDevice!);
+                      // Get selected device info
+                      final deviceToConnect = devices.firstWhere(
+                        (d) => d['id'] == selectedDevice,
+                      );
+                      
+                      // Connect via Bluetooth service
+                      final bluetoothService = BluetoothSmartwatchService();
+                      bool connected = await bluetoothService.connectDevice(deviceToConnect);
                       
                       if (mounted) {
                         Navigator.of(context).pop();
                         
                         if (connected) {
-                          // Trigger immediate sync
+                          // Update health provider to sync
                           final healthProvider = Provider.of<HealthProvider>(context, listen: false);
-                          await healthProvider.syncWithSmartwatch();
+                          bluetoothService.setDataUpdateCallback((data) {
+                            healthProvider.updateFromSmartwatch(data);
+                          });
+                          
+                          // Trigger immediate sync
+                          await bluetoothService.syncNow();
                           
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Connected to ${_getDeviceName(selectedDevice!)}! Health data will now sync automatically.',
+                                'Connected to ${deviceToConnect['name']}! Health data will now sync automatically.',
                               ),
                               backgroundColor: AppTheme.successGreen,
                               duration: Duration(seconds: 3),
@@ -961,7 +936,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Failed to connect to ${_getDeviceName(selectedDevice!)}. Please check permissions.',
+                                'Failed to connect to ${deviceToConnect['name']}. Please try again.',
                               ),
                               backgroundColor: Colors.red,
                               duration: Duration(seconds: 3),
@@ -1106,5 +1081,340 @@ class _ProfileScreenState extends State<ProfileScreen> {
       default:
         return 'Smartwatch';
     }
+  }
+  
+  Widget _buildDiscoveredDeviceOption({
+    required IconData icon,
+    required String name,
+    required String subtitle,
+    required bool isSelected,
+    required Map<String, dynamic> deviceInfo,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? AppTheme.primaryAccent
+                  : AppTheme.borderColor,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppTheme.primaryAccent.withOpacity(0.1)
+                      : AppTheme.borderColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: AppTheme.primaryAccent,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Icon(
+                  Icons.check_circle,
+                  color: AppTheme.primaryAccent,
+                  size: 20,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  IconData _getDeviceIcon(String type) {
+    switch (type) {
+      case 'samsung_watch':
+        return Icons.watch;
+      case 'garmin':
+        return Icons.directions_run;
+      case 'fitbit':
+        return Icons.favorite;
+      case 'mi_band':
+        return Icons.watch_outlined;
+      case 'amazfit':
+        return Icons.sports_score;
+      case 'huawei':
+        return Icons.watch;
+      case 'apple_watch':
+        return Icons.watch;
+      default:
+        return Icons.bluetooth;
+    }
+  }
+  
+  void _showConnectedDeviceDialog(Map<String, dynamic> deviceInfo) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.bluetooth_connected, color: AppTheme.successGreen),
+            SizedBox(width: 12),
+            Text('Device Connected'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Currently connected to:',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.successGreen.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.successGreen),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _getDeviceIcon(deviceInfo['type'] ?? 'generic_ble'),
+                    color: AppTheme.successGreen,
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      deviceInfo['name'] ?? 'Unknown Device',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Health data is syncing automatically every 5 minutes.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              final bluetoothService = BluetoothSmartwatchService();
+              await bluetoothService.disconnectDevice();
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Device disconnected'),
+                  backgroundColor: AppTheme.warningYellow,
+                ),
+              );
+            },
+            child: Text(
+              'Disconnect',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              final bluetoothService = BluetoothSmartwatchService();
+              await bluetoothService.syncNow();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Syncing data...'),
+                  backgroundColor: AppTheme.primaryAccent,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryAccent,
+            ),
+            child: Text(
+              'Sync Now',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showNoDevicesFoundDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.bluetooth_disabled, color: AppTheme.warningYellow),
+            SizedBox(width: 12),
+            Text('No Devices Found'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'No compatible smartwatches were found nearby.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Please ensure:',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '\u2022 Your smartwatch is powered on\n'
+              '\u2022 Bluetooth is enabled on the watch\n'
+              '\u2022 The watch is in pairing mode\n'
+              '\u2022 The watch is within range',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _showSmartwatchIntegrationDialog();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryAccent,
+            ),
+            child: Text(
+              'Try Again',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showPermissionDeniedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 12),
+            Text('Permissions Required'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Bluetooth and location permissions are required to discover and connect to smartwatches.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Please grant the necessary permissions in your device settings.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              // Open app settings
+              await openAppSettings();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryAccent,
+            ),
+            child: Text(
+              'Open Settings',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showErrorDialog(String error) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 12),
+            Text('Connection Error'),
+          ],
+        ),
+        content: Text(
+          error,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryAccent,
+            ),
+            child: Text(
+              'OK',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

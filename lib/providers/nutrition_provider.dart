@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:io';
 import '../services/nutrition_ai_service.dart';
+import '../services/indian_food_nutrition_service.dart';
+import '../services/realtime_sync_service.dart';
 
 class NutritionEntry {
   final String id;
@@ -68,6 +71,8 @@ class NutritionProvider with ChangeNotifier {
   List<NutritionEntry> _entries = [];
   bool _isLoading = false;
   String? _error;
+  final IndianFoodNutritionService _indianFoodService = IndianFoodNutritionService();
+  final RealtimeSyncService _syncService = RealtimeSyncService();
 
   // Daily goals
   int _calorieGoal = 2000;
@@ -172,6 +177,10 @@ class NutritionProvider with ChangeNotifier {
     try {
       _entries.add(entry);
       await _saveNutritionData();
+      
+      // Sync to Supabase immediately
+      await _syncService.syncNutritionEntry(entry);
+      
       _setLoading(false);
       notifyListeners();
     } catch (e) {
@@ -200,7 +209,35 @@ class NutritionProvider with ChangeNotifier {
     _setError(null);
 
     try {
-      // Use AI service to analyze the food image
+      // First try Indian food recognition for better accuracy
+      final imageFile = File(imagePath);
+      debugPrint('Analyzing with Indian Food Service first...');
+      final indianResult = await _indianFoodService.analyzeIndianFood(imageFile);
+      
+      if (indianResult['success'] == true && indianResult['nutrition'] != null) {
+        final nutrition = indianResult['nutrition'];
+        final foods = indianResult['foods'] as List? ?? [];
+        
+        // Create nutrition entry from Indian food result
+        final entry = NutritionEntry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          foodName: foods.isNotEmpty 
+              ? foods.map((f) => f['name']).join(', ')
+              : 'Indian Food',
+          calories: nutrition['calories'] ?? 0,
+          protein: (nutrition['protein'] ?? 0).toDouble(),
+          carbs: (nutrition['carbs'] ?? 0).toDouble(),
+          fat: (nutrition['fat'] ?? 0).toDouble(),
+          fiber: (nutrition['fiber'] ?? 0).toDouble(),
+          timestamp: DateTime.now(),
+        );
+        
+        _setLoading(false);
+        return entry;
+      }
+      
+      // Fallback to original AI service (Edamam)
+      debugPrint('Falling back to Edamam API...');
       final entry = await NutritionAIService.analyzeFood(imagePath);
       
       _setLoading(false);
@@ -216,6 +253,41 @@ class NutritionProvider with ChangeNotifier {
       _setLoading(false);
       return null;
     }
+  }
+  
+  // New method for text-based Indian food search
+  Future<NutritionEntry?> searchIndianFood(String query) async {
+    try {
+      final result = await _indianFoodService.searchIndianFood(query);
+      
+      if (result['success'] == true && result['nutrition'] != null) {
+        final nutrition = result['nutrition'];
+        final foods = result['foods'] as List? ?? [];
+        
+        final entry = NutritionEntry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          foodName: foods.isNotEmpty 
+              ? foods.map((f) => f['name']).join(', ')
+              : query,
+          calories: nutrition['calories'] ?? 0,
+          protein: (nutrition['protein'] ?? 0).toDouble(),
+          carbs: (nutrition['carbs'] ?? 0).toDouble(),
+          fat: (nutrition['fat'] ?? 0).toDouble(),
+          fiber: (nutrition['fiber'] ?? 0).toDouble(),
+          timestamp: DateTime.now(),
+        );
+        
+        return entry;
+      }
+    } catch (e) {
+      debugPrint('Error searching Indian food: $e');
+    }
+    return null;
+  }
+  
+  // Get list of all Indian foods for autocomplete
+  List<String> getIndianFoodSuggestions() {
+    return _indianFoodService.getAllIndianFoods();
   }
 
   List<DailyNutrition> getWeeklyNutrition() {

@@ -7,6 +7,7 @@ import '../../providers/nutrition_provider.dart';
 import '../../models/health_metric_model.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/circular_progress_widget.dart';
+import '../../widgets/sync_status_indicator.dart';
 import 'dart:math' as math;
 
 class HomeScreenNew extends StatefulWidget {
@@ -133,6 +134,9 @@ class _HomeScreenNewState extends State<HomeScreenNew>
         ),
         Row(
           children: [
+            // Cloud sync indicator
+            const SyncStatusIndicator(),
+            const SizedBox(width: 8),
             // Smartwatch sync indicator
             Consumer<HealthProvider>(
               builder: (context, healthProvider, _) {
