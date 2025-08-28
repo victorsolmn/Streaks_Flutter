@@ -14,6 +14,7 @@
 10. [Performance Optimization](#performance-optimization)
 11. [AI Integration Architecture](#ai-integration-architecture)
 12. [Device Integration](#device-integration)
+13. [Cloud Synchronization](#cloud-synchronization)
 
 ---
 
@@ -497,19 +498,42 @@ ListView.builder(
 
 ### AI Services
 
-#### Nutrition AI Service
+#### Nutrition AI Service (Enhanced August 2025)
 ```dart
 class NutritionAIService {
-  // Image Analysis Pipeline
+  // Dual-approach Image Analysis Pipeline
   analyzeFood(imagePath) → 
-    Vision API → 
-    Food Detection → 
-    Nutrition Database → 
-    NutritionEntry
+    1. Indian Food Service (Primary) →
+       - Google Gemini Vision API →
+       - Indian food detection →
+       - IFCT 2017 Database (50+ foods) →
+       - Accurate Indian nutrition
+    
+    2. Edamam API (Fallback) →
+       - General food detection →
+       - International cuisine →
+       - Basic nutrition facts
   
-  // Fallback Strategy
-  if (API fails) → Local Database
-  if (No match) → Manual Entry
+  // Intelligent Fallback Strategy
+  if (Gemini API succeeds) → Use Indian nutrition data
+  if (Gemini API fails) → Try Edamam API
+  if (No match) → Manual Entry with suggestions
+}
+```
+
+#### Indian Food Recognition Service
+```dart
+class IndianFoodNutritionService {
+  // Comprehensive Indian Food Database
+  - 50+ common Indian dishes
+  - IFCT 2017 nutrition values
+  - Regional cuisine support
+  - Multi-food detection in single image
+  
+  // Analysis Methods
+  analyzeIndianFood(imageFile) → Gemini Vision
+  searchIndianFood(query) → Local database
+  getAllIndianFoods() → Autocomplete list
 }
 ```
 
@@ -535,29 +559,106 @@ class InsightsEngine {
 
 ## Device Integration
 
-### Smartwatch Connection
+### Bluetooth Smartwatch Connection (Implemented August 2025)
 ```dart
-class SmartwatchIntegration {
-  // Connection Flow
-  Device Selection →
-  Permission Request →
-  Pairing Process →
-  Data Sync Setup →
-  Real-time Updates
+class BluetoothSmartwatchService {
+  // BLE Connection Flow
+  1. Check Bluetooth permissions →
+  2. Scan for BLE devices (15 sec) →
+  3. Filter smartwatch devices →
+  4. Connect to selected device →
+  5. Discover services & characteristics →
+  6. Subscribe to notifications →
+  7. Real-time data streaming
+  
+  // Supported Devices
+  - Samsung Galaxy Watch (all models)
+  - Wear OS devices
+  - Generic BLE fitness trackers
+  
+  // Health Data Points
+  - Heart rate (real-time)
+  - Steps count
+  - Sleep duration
+  - Calories burned
+  - Distance traveled
 }
 ```
 
-### Sync Indicators
-- Connection status badge
-- Last sync timestamp
-- Sync progress indicator
-- Error state handling
-
-### Data Flow
+### Real-time Sync Architecture (Implemented August 2025)
+```dart
+class RealtimeSyncService {
+  // Sync Strategy
+  - Auto-sync every 30 seconds (online)
+  - Immediate sync on data changes
+  - Offline queue for disconnected state
+  - Batch sync when connection restored
+  
+  // Data Types Synced
+  - Nutrition entries → Supabase
+  - Health metrics → Supabase
+  - User profile → Supabase
+  - Streak counters → Supabase
+  
+  // Visual Indicators
+  - Green cloud ✓ = Synced
+  - Blue rotating = Syncing
+  - Orange cloud = Offline (with badge count)
+}
 ```
-Device → Bluetooth/API → Service → Provider → UI
-         ↓                ↓           ↓
-      Fallback        Cache      Update
+
+### Data Flow Architecture
+```
+Smartwatch → BLE → BluetoothService → HealthProvider → SharedPreferences
+                                           ↓                    ↓
+                                    RealtimeSyncService → Supabase Cloud
+                                           ↑
+                                    Offline Queue (when disconnected)
+```
+
+---
+
+## Cloud Synchronization
+
+### Supabase Backend Architecture
+```dart
+// Database Schema (August 2025)
+Tables:
+├── profiles (user data)
+├── nutrition_entries (daily nutrition)
+├── health_metrics (fitness data)
+├── streaks (achievement tracking)
+├── workouts (exercise logs)
+└── weight_logs (weight history)
+
+// Row Level Security
+- Users can only access their own data
+- Automatic user filtering via auth.uid()
+```
+
+### Sync Status Widget
+```dart
+class SyncStatusIndicator {
+  // Visual States
+  CloudDone (green) → All synced
+  Sync (blue, rotating) → Syncing in progress
+  CloudOff (orange) → Offline mode
+  Badge → Number of pending operations
+  
+  // User Actions
+  - Tap to force sync
+  - View offline queue count
+  - See last sync timestamp
+}
+```
+
+### Offline-First Architecture
+```
+1. User Action → Save to SharedPreferences
+2. Trigger sync → Check connectivity
+3. If Online → Sync to Supabase immediately
+4. If Offline → Add to queue → Sync when online
+5. Visual feedback → Update sync indicator
 ```
 
 ---
