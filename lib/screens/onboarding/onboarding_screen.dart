@@ -6,6 +6,7 @@ import '../../providers/user_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../main/main_screen.dart';
+import '../auth/welcome_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
@@ -69,14 +70,39 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Text('Setup Profile (${_currentStep + 1}/3)'),
         automaticallyImplyLeading: false,
         actions: [
           TextButton(
             onPressed: () async {
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
-              await authProvider.signOut();
+              final userProvider = Provider.of<UserProvider>(context, listen: false);
+              final supabaseAuth = Provider.of<SupabaseAuthProvider>(context, listen: false);
+              
+              // Get current user info for creating a basic profile
+              final currentUser = supabaseAuth.currentUser;
+              final name = currentUser?.userMetadata?['name'] ?? 
+                           currentUser?.email?.split('@')[0] ?? 'User';
+              final email = currentUser?.email ?? 'user@example.com';
+
+              // Create a basic profile with default values when skipping
+              await userProvider.createProfile(
+                name: name,
+                email: email,
+                age: 25, // Default age
+                height: 170.0, // Default height in cm
+                weight: 70.0, // Default weight in kg
+                goal: FitnessGoal.maintenance, // Default goal
+                activityLevel: ActivityLevel.moderatelyActive, // Default activity level
+              );
+
+              // Navigate to main screen
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => const MainScreen()),
+                );
+              }
             },
             child: Text('Skip'),
           ),
@@ -84,57 +110,86 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
       body: Consumer<SupabaseUserProvider>(
         builder: (context, user, child) {
-          return Padding(
-            padding: const EdgeInsets.all(24.0),
+          return SafeArea(
             child: Column(
               children: [
                 // Progress indicator
-                LinearProgressIndicator(
-                  value: (_currentStep + 1) / 3,
-                  backgroundColor: AppTheme.borderColor,
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryAccent),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                  child: LinearProgressIndicator(
+                    value: (_currentStep + 1) / 3,
+                    backgroundColor: AppTheme.borderColor,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryAccent),
+                  ),
                 ),
                 
-                SizedBox(height: 32),
-                
+                // Main content area
                 Expanded(
-                  child: _buildCurrentStep(),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Column(
+                      children: [
+                        SizedBox(height: 16),
+                        _buildCurrentStep(),
+                        SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
                 ),
                 
-                // Navigation buttons
-                Row(
-                  children: [
-                    if (_currentStep > 0) ...[
+                // Navigation buttons - fixed at bottom
+                Container(
+                  padding: const EdgeInsets.all(24.0),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      if (_currentStep > 0) ...[
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _currentStep--;
+                              });
+                            },
+                            child: Text('Back'),
+                          ),
+                        ),
+                        SizedBox(width: 16),
+                      ],
+                      
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setState(() {
-                              _currentStep--;
-                            });
-                          },
-                          child: Text('Back'),
+                        flex: _currentStep == 0 ? 1 : 1,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          onPressed: user.isLoading ? null : _handleNext,
+                          child: user.isLoading
+                              ? SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                                  ),
+                                )
+                              : Text(_currentStep == 2 ? 'Complete' : 'Next'),
                         ),
                       ),
-                      SizedBox(width: 16),
                     ],
-                    
-                    Expanded(
-                      flex: _currentStep == 0 ? 1 : 1,
-                      child: ElevatedButton(
-                        onPressed: user.isLoading ? null : _handleNext,
-                        child: user.isLoading
-                            ? SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                                ),
-                              )
-                            : Text(_currentStep == 2 ? 'Complete' : 'Next'),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -174,10 +229,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
         SizedBox(height: 48),
         
-        Expanded(
-          child: Column(
-            children: [
-              _GoalOption(
+        Column(
+          children: [
+            _GoalOption(
                 goal: FitnessGoal.weightLoss,
                 title: 'Lose Weight',
                 subtitle: 'Burn calories and get fit',
@@ -216,7 +270,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onTap: () => setState(() => _selectedGoal = FitnessGoal.endurance),
               ),
             ],
-          ),
         ),
       ],
     );
@@ -239,10 +292,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
         SizedBox(height: 48),
         
-        Expanded(
-          child: Column(
-            children: [
-              _ActivityOption(
+        Column(
+          children: [
+            _ActivityOption(
                 level: ActivityLevel.sedentary,
                 title: 'Sedentary',
                 subtitle: 'Little to no exercise',
@@ -286,7 +338,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onTap: () => setState(() => _selectedActivityLevel = ActivityLevel.extremelyActive),
               ),
             ],
-          ),
         ),
       ],
     );
@@ -369,8 +420,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               return null;
             },
           ),
-          
-          const Spacer(),
         ],
       ),
     );

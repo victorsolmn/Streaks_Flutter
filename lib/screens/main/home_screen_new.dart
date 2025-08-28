@@ -140,7 +140,7 @@ class _HomeScreenNewState extends State<HomeScreenNew>
             // Smartwatch sync indicator
             Consumer<HealthProvider>(
               builder: (context, healthProvider, _) {
-                if (healthProvider.isSmartWatchConnected) {
+                if (healthProvider.isHealthSourceConnected) {
                   return Container(
                     margin: EdgeInsets.only(right: 8),
                     child: InkWell(
@@ -153,7 +153,7 @@ class _HomeScreenNewState extends State<HomeScreenNew>
                           ),
                         );
                         
-                        await healthProvider.syncWithSmartwatch();
+                        await healthProvider.syncWithHealth();
                         
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(

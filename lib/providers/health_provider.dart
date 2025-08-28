@@ -1,16 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/health_metric_model.dart';
-import '../services/smartwatch_service.dart';
+import '../services/unified_health_service.dart';
 import '../services/realtime_sync_service.dart';
 
 class HealthProvider with ChangeNotifier {
   Map<MetricType, HealthMetric> _metrics = {};
   bool _isLoading = false;
   bool _isInitialized = false;
-  final SmartwatchService _smartwatchService = SmartwatchService();
+  final UnifiedHealthService _healthService = UnifiedHealthService();
   final RealtimeSyncService _syncService = RealtimeSyncService();
   SharedPreferences? _prefs;
+  HealthDataSource _currentDataSource = HealthDataSource.unavailable;
   
   // Today's data
   double _todaySteps = 0;
@@ -33,6 +34,8 @@ class HealthProvider with ChangeNotifier {
   double get todayDistance => _todayDistance;
   int get todayWater => _todayWater;
   int get todayWorkouts => _todayWorkouts;
+  HealthDataSource get dataSource => _currentDataSource;
+  Map<String, String> get dataSourceInfo => _healthService.getDataSourceInfo();
   
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -43,15 +46,18 @@ class HealthProvider with ChangeNotifier {
     // Load saved data from SharedPreferences
     await _loadHealthData();
     
-    // Initialize smartwatch service
-    await _smartwatchService.initialize();
+    // Initialize unified health service
+    await _healthService.initialize();
     
     // Set up callback for data updates
-    _smartwatchService.setDataUpdateCallback((data) {
-      updateMetricsFromSmartwatch(data);
+    _healthService.setDataUpdateCallback((data) {
+      updateMetricsFromHealth(data);
     });
     
-    // Initialize with saved or zero values - will be populated from actual fitness tracker
+    // Get current data source
+    _currentDataSource = _healthService.currentSource;
+    
+    // Initialize with saved or zero values - will be populated from health service
     _metrics = {
       MetricType.steps: HealthMetric(value: _todaySteps, timestamp: DateTime.now(), type: MetricType.steps, currentValue: _todaySteps, goalValue: 10000),
       MetricType.caloriesIntake: HealthMetric(value: _todayCaloriesBurned, timestamp: DateTime.now(), type: MetricType.caloriesIntake, currentValue: _todayCaloriesBurned, goalValue: 2200),
@@ -59,10 +65,20 @@ class HealthProvider with ChangeNotifier {
       MetricType.restingHeartRate: HealthMetric(value: _todayHeartRate, timestamp: DateTime.now(), type: MetricType.restingHeartRate, currentValue: _todayHeartRate, goalValue: 60),
     };
     
-    // Fetch initial data from smartwatch if connected
-    if (_smartwatchService.isDeviceConnected) {
+    // Request permissions and fetch initial data if source available
+    if (_healthService.isDataSourceAvailable) {
       await fetchMetrics();
+    } else {
+      // Try to request permissions for platform health APIs
+      bool authorized = await _healthService.requestHealthPermissions();
+      if (authorized) {
+        _currentDataSource = _healthService.currentSource;
+        await fetchMetrics();
+      }
     }
+    
+    // Start automatic sync
+    await _healthService.startDataSync();
     
     _isInitialized = true;
     notifyListeners();
@@ -73,9 +89,10 @@ class HealthProvider with ChangeNotifier {
     notifyListeners();
     
     try {
-      // Fetch data from smartwatch
-      final data = await _smartwatchService.fetchHealthData();
-      updateMetricsFromSmartwatch(data);
+      // Fetch data from unified health service
+      final data = await _healthService.fetchHealthData();
+      _currentDataSource = _healthService.currentSource;
+      updateMetricsFromHealth(data);
     } catch (e) {
       debugPrint('Error fetching metrics: $e');
     }
@@ -84,7 +101,7 @@ class HealthProvider with ChangeNotifier {
     notifyListeners();
   }
   
-  void updateMetricsFromSmartwatch(Map<String, dynamic> data) {
+  void updateMetricsFromHealth(Map<String, dynamic> data) {
     // Update today's data
     _todaySteps = (data['steps'] ?? 0).toDouble();
     _todayCaloriesBurned = (data['calories'] ?? 0).toDouble();
@@ -133,17 +150,81 @@ class HealthProvider with ChangeNotifier {
   }
   
   // Method to manually sync data
-  Future<void> syncWithSmartwatch() async {
+  Future<void> syncWithHealth() async {
+    await _healthService.syncNow();
     await fetchMetrics();
   }
   
-  // Check if smartwatch is connected
-  bool get isSmartWatchConnected => _smartwatchService.isDeviceConnected;
-  String? get connectedDevice => _smartwatchService.connectedDevice;
+  // Check if health source is connected
+  bool get isHealthSourceConnected => _healthService.isDataSourceAvailable;
+  String? get connectedDevice {
+    if (_currentDataSource == HealthDataSource.bluetooth) {
+      var deviceInfo = _healthService.getConnectedDeviceInfo();
+      return deviceInfo?['name'];
+    }
+    return _healthService.getDataSourceInfo()['source'];
+  }
   
-  // Update from new Bluetooth service
-  void updateFromSmartwatch(Map<String, dynamic> data) {
-    updateMetricsFromSmartwatch(data);
+  // Scan for Bluetooth devices (fallback option)
+  Future<List<Map<String, dynamic>>> scanForBluetoothDevices() async {
+    return await _healthService.scanForBluetoothDevices();
+  }
+  
+  // Connect to Bluetooth device
+  Future<bool> connectBluetoothDevice(Map<String, dynamic> deviceInfo) async {
+    bool connected = await _healthService.connectBluetoothDevice(deviceInfo);
+    if (connected) {
+      _currentDataSource = HealthDataSource.bluetooth;
+      await fetchMetrics();
+    }
+    return connected;
+  }
+  
+  // Disconnect Bluetooth device
+  Future<void> disconnectBluetoothDevice() async {
+    await _healthService.disconnectBluetoothDevice();
+    _currentDataSource = _healthService.currentSource;
+    notifyListeners();
+  }
+  
+  // Request health permissions
+  Future<bool> requestHealthPermissions() async {
+    bool authorized = await _healthService.requestHealthPermissions();
+    if (authorized) {
+      _currentDataSource = _healthService.currentSource;
+      await fetchMetrics();
+    }
+    return authorized;
+  }
+
+  // Initialize health service connection (for UI calls)
+  Future<bool> initializeHealth() async {
+    try {
+      // Initialize the health service
+      await _healthService.initialize();
+      
+      // Update current data source
+      _currentDataSource = _healthService.currentSource;
+      
+      // If source is available, fetch initial data
+      if (_healthService.isDataSourceAvailable) {
+        await fetchMetrics();
+        return true;
+      } else {
+        // Try to request permissions
+        bool authorized = await _healthService.requestHealthPermissions();
+        if (authorized) {
+          _currentDataSource = _healthService.currentSource;
+          await fetchMetrics();
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (e) {
+      debugPrint('HealthProvider: Error initializing health service: $e');
+      return false;
+    }
   }
   
   // Load health data from SharedPreferences

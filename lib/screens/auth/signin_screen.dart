@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../providers/supabase_auth_provider.dart';
 import '../../providers/supabase_user_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../utils/app_theme.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../main/main_screen.dart';
@@ -31,7 +32,7 @@ class _SignInScreenState extends State<SignInScreen> {
   Future<void> _signIn() async {
     if (_formKey.currentState?.validate() ?? false) {
       final authProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
-      final userProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
+      final localUserProvider = Provider.of<UserProvider>(context, listen: false);
       
       final success = await authProvider.signIn(
         _emailController.text.trim(),
@@ -39,14 +40,19 @@ class _SignInScreenState extends State<SignInScreen> {
       );
 
       if (success && mounted) {
-        // Check if user has completed onboarding
-        if (userProvider.hasCompletedOnboarding) {
+        // Reload user data after sign-in to check if profile exists
+        await localUserProvider.reloadUserData();
+        
+        // Check if user has profile data (existing user)
+        if (localUserProvider.hasProfile && localUserProvider.hasCompletedOnboarding) {
+          // Existing user with profile - go directly to main screen
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => const MainScreen(),
             ),
           );
         } else {
+          // New user or user without profile - go to onboarding
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => const OnboardingScreen(),
@@ -60,6 +66,7 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Text('Sign In'),
         leading: IconButton(
@@ -70,7 +77,7 @@ class _SignInScreenState extends State<SignInScreen> {
       body: SafeArea(
         child: Consumer<SupabaseAuthProvider>(
           builder: (context, auth, child) {
-            return Padding(
+            return SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Form(
                 key: _formKey,
@@ -240,7 +247,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                     ),
                     
-                    const Spacer(),
+                    SizedBox(height: 48),
                     
                     // Sign up link
                     Row(

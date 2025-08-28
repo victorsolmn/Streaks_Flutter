@@ -13,12 +13,13 @@ dependencies:
   shared_preferences: ^2.2.3
   camera: ^0.10.5+9
   image_picker: ^1.0.7
-  # health: ^10.2.0  # Temporarily disabled for build compatibility
   permission_handler: ^11.3.1
   http: ^1.2.1
   flutter_blue_plus: ^1.32.7
   google_generative_ai: ^0.4.3
   cupertino_icons: ^1.0.6
+  health: ^11.0.0  # For both Apple HealthKit and Android Health Connect support
+  url_launcher: ^6.2.5
   fl_chart: ^0.66.0
   intl: ^0.19.0
   flutter_secure_storage: ^9.2.2

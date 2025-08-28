@@ -5,6 +5,7 @@ import '../../providers/user_provider.dart';
 import '../../providers/health_provider.dart';
 import '../../models/health_metric_model.dart';
 import '../../widgets/dashboard_metric_card.dart';
+import '../../widgets/health_source_indicator.dart';
 import '../../utils/app_theme.dart';
 import 'dart:math' as math;
 
@@ -91,82 +92,143 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildHeader() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final now = DateTime.now();
+    final hour = now.hour;
+    String greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkCardBackground : Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Dashboard',
-            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppTheme.darkCardBackground : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
-                onPressed: () {
-                  // Notification action
-                },
-                icon: Stack(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.notifications_outlined,
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
-                      size: 28,
+                    Text(
+                      greeting,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isDarkMode ? Colors.white70 : Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primaryAccent,
-                          shape: BoxShape.circle,
-                        ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Dashboard',
+                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: () {
-                  // Menu action
-                },
-                icon: Icon(
-                  Icons.menu,
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                  size: 28,
-                ),
+              Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: (isDarkMode ? Colors.white : AppTheme.primaryAccent).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      onPressed: () {
+                        // Notification action
+                      },
+                      icon: Stack(
+                        children: [
+                          Icon(
+                            Icons.notifications_outlined,
+                            color: isDarkMode ? Colors.white : AppTheme.primaryAccent,
+                            size: 24,
+                          ),
+                          Positioned(
+                            right: 2,
+                            top: 2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: AppTheme.primaryAccent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: (isDarkMode ? Colors.white : AppTheme.primaryAccent).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      onPressed: () {
+                        // Settings/Menu action
+                      },
+                      icon: Icon(
+                        Icons.settings_outlined,
+                        color: isDarkMode ? Colors.white : AppTheme.primaryAccent,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          const HealthSourceIndicator(),
         ],
       ),
     );
   }
 
   Widget _buildTimePeriodTabs() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
-      height: 50,
-      color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkCardBackground : Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppTheme.darkCardBackground : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Row(
         children: [
-          _buildPeriodTab('Today', TimePeriod.daily),
-          _buildPeriodTab('Week', TimePeriod.weekly),
-          _buildPeriodTab('Month', TimePeriod.monthly),
-          _buildPeriodTab('3 Month', TimePeriod.yearly),
+          _buildPeriodTab('Today', TimePeriod.daily, Icons.today),
+          _buildPeriodTab('Week', TimePeriod.weekly, Icons.date_range),
+          _buildPeriodTab('Month', TimePeriod.monthly, Icons.calendar_month),
+          _buildPeriodTab('3M', TimePeriod.yearly, Icons.calendar_view_month),
         ],
       ),
     );
   }
 
-  Widget _buildPeriodTab(String label, TimePeriod period) {
+  Widget _buildPeriodTab(String label, TimePeriod period, IconData icon) {
     final isSelected = _selectedPeriod == period;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     return Expanded(
       child: GestureDetector(
@@ -182,23 +244,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             healthProvider.updatePeriod(metricType, period);
           }
         },
-        child: Container(
-          alignment: Alignment.center,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.all(4),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: isSelected ? AppTheme.primaryAccent : Colors.transparent,
-                width: 3,
-              ),
-            ),
+            color: isSelected 
+              ? AppTheme.primaryAccent
+              : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected ? AppTheme.textPrimary : Colors.grey[500],
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected 
+                  ? Colors.white
+                  : (isDarkMode ? Colors.white70 : Colors.grey[600]),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected 
+                    ? Colors.white
+                    : (isDarkMode ? Colors.white70 : Colors.grey[700]),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -208,17 +285,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildMetricsGrid(HealthProvider healthProvider) {
     return GridView.count(
       crossAxisCount: 2,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       mainAxisSpacing: 16,
       crossAxisSpacing: 16,
-      childAspectRatio: 1.0,
+      childAspectRatio: 1.1,
       children: [
         _buildHeartRateCard(healthProvider),
         _buildStepsCard(healthProvider),
         _buildWaterCard(healthProvider),
         _buildSleepCard(healthProvider),
-        _buildTrainingCard(healthProvider),
         _buildCaloriesCard(healthProvider),
+        _buildTrainingCard(healthProvider),
       ],
     );
   }

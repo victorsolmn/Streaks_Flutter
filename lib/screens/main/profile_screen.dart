@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:async';
 import '../../providers/supabase_auth_provider.dart';
 import '../../providers/supabase_user_provider.dart';
 import '../../providers/supabase_nutrition_provider.dart';
@@ -13,12 +14,14 @@ import '../../providers/nutrition_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/health_provider.dart';
 import '../../services/smartwatch_service.dart';
+import '../../services/unified_health_service.dart';
 import '../../services/bluetooth_smartwatch_service.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../models/weight_model.dart';
 import '../../widgets/weight_progress_card.dart';
 import '../../utils/app_theme.dart';
+import '../auth/welcome_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -720,6 +723,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
+              final supabaseAuthProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
               final authProvider = Provider.of<AuthProvider>(context, listen: false);
               final userProvider = Provider.of<UserProvider>(context, listen: false);
               final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
@@ -737,20 +741,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
               );
               
               try {
-                // Clear all provider data
-                userProvider.clearUserData();
-                nutritionProvider.clearNutritionData();
+                // Clear all provider data FIRST
+                await userProvider.clearUserData();
+                await nutritionProvider.clearNutritionData();
                 
-                // Sign out (this will trigger navigation change)
+                // Sign out from both auth providers
                 await authProvider.signOut();
+                await supabaseAuthProvider.signOut();
                 
+                // Navigate to Welcome screen explicitly
+                if (mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+                    (route) => false,
+                  );
+                }
               } catch (e) {
                 print('Logout error: $e');
-              }
-              
-              // Close loading indicator
-              if (mounted) {
-                Navigator.of(context).pop();
+                // Still try to navigate even if there's an error
+                if (mounted) {
+                  Navigator.of(context).pop(); // Close loading
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+                    (route) => false,
+                  );
+                }
               }
             },
             style: TextButton.styleFrom(
@@ -764,72 +779,145 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showSmartwatchIntegrationDialog() async {
-    final bluetoothService = BluetoothSmartwatchService();
+    final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
-    // Check if already connected
-    if (bluetoothService.isDeviceConnected) {
-      final deviceInfo = bluetoothService.getConnectedDeviceInfo();
-      _showConnectedDeviceDialog(deviceInfo!);
-      return;
-    }
+    // Check current health source status
+    final currentSource = healthProvider.dataSource;
+    final isHealthConnected = healthProvider.isHealthSourceConnected;
     
-    // Show device discovery dialog
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.bluetooth_searching, color: AppTheme.primaryAccent),
-            SizedBox(width: 12),
-            Text('Searching for Devices'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: AppTheme.primaryAccent),
-            SizedBox(height: 20),
-            Text('Scanning for nearby smartwatches...'),
-            SizedBox(height: 10),
-            Text(
-              'Please make sure your device is:\n'
-              '• Powered on\n'
-              '• Bluetooth enabled\n'
-              '• Within range',
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+      backgroundColor: isDarkMode ? AppTheme.darkCardBackground : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.watch,
+                      color: AppTheme.primaryAccent,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Smartwatch Integration',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                
+                if (isHealthConnected) ...[
+                  // Already connected - show current status
+                  _buildCurrentConnectionStatus(healthProvider, isDarkMode),
+                  const SizedBox(height: 20),
+                  
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            await healthProvider.syncWithHealth();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Health data synced successfully!'),
+                                backgroundColor: AppTheme.successGreen,
+                              ),
+                            );
+                          },
+                          icon: Icon(Icons.sync, size: 20),
+                          label: Text('Sync Now'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryAccent,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showBluetoothAlternativeDialog();
+                          },
+                          icon: Icon(Icons.bluetooth, size: 20),
+                          label: Text('Use Bluetooth'),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  // Not connected - show connection options
+                  Text(
+                    'Choose how to connect your smartwatch:',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: isDarkMode ? Colors.white70 : Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Option 1: Health App Integration (Recommended)
+                  _buildIntegrationOption(
+                    context,
+                    icon: Icons.favorite,
+                    title: 'Connect via Health App',
+                    subtitle: 'Recommended • Samsung Health, Apple Health',
+                    description: 'Your watch stays connected to Samsung Health. We sync data automatically.',
+                    isRecommended: true,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      _connectToHealthApp();
+                    },
+                    isDarkMode: isDarkMode,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Option 2: Direct Bluetooth Connection
+                  _buildIntegrationOption(
+                    context,
+                    icon: Icons.bluetooth,
+                    title: 'Direct Bluetooth Connection',
+                    subtitle: 'For watches not using health apps',
+                    description: 'Connect directly to your smartwatch via Bluetooth.',
+                    isRecommended: false,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showBluetoothScanDialog();
+                    },
+                    isDarkMode: isDarkMode,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
-    
-    try {
-      // Check permissions first
-      bool hasPermissions = await bluetoothService.checkPermissions();
-      if (!hasPermissions) {
-        Navigator.of(context).pop();
-        _showPermissionDeniedDialog();
-        return;
-      }
-      
-      // Scan for devices
-      List<Map<String, dynamic>> devices = await bluetoothService.scanForDevices();
-      
-      // Close scanning dialog
-      Navigator.of(context).pop();
-      
-      if (devices.isEmpty) {
-        _showNoDevicesFoundDialog();
-      } else {
-        _showDeviceSelectionDialog(devices);
-      }
-      
-    } catch (e) {
-      Navigator.of(context).pop();
-      _showErrorDialog('Failed to scan for devices: $e');
-    }
   }
   
   void _showDeviceSelectionDialog(List<Map<String, dynamic>> devices) {
@@ -917,7 +1005,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           // Update health provider to sync
                           final healthProvider = Provider.of<HealthProvider>(context, listen: false);
                           bluetoothService.setDataUpdateCallback((data) {
-                            healthProvider.updateFromSmartwatch(data);
+                            healthProvider.updateMetricsFromHealth(data);
                           });
                           
                           // Trigger immediate sync
@@ -1417,4 +1505,436 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  // Helper method to build current connection status display
+  Widget _buildCurrentConnectionStatus(HealthProvider healthProvider, bool isDarkMode) {
+    String sourceName;
+    IconData sourceIcon;
+    Color sourceColor;
+    
+    switch (healthProvider.dataSource) {
+      case HealthDataSource.healthKit:
+        sourceName = 'Apple Health';
+        sourceIcon = Icons.favorite;
+        sourceColor = Colors.red;
+        break;
+      case HealthDataSource.healthConnect:
+        sourceName = 'Samsung Health / Health Connect';
+        sourceIcon = Icons.favorite;
+        sourceColor = Colors.green;
+        break;
+      case HealthDataSource.bluetooth:
+        sourceName = 'Direct Bluetooth';
+        sourceIcon = Icons.bluetooth;
+        sourceColor = Colors.blue;
+        break;
+      default:
+        sourceName = 'Unknown';
+        sourceIcon = Icons.help_outline;
+        sourceColor = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.green.withOpacity(0.1) : Colors.green.withOpacity(0.05),
+        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, color: Colors.green, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Connected to $sourceName',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: isDarkMode ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Your health data is being synced automatically',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDarkMode ? Colors.white70 : Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(sourceIcon, color: sourceColor, size: 20),
+        ],
+      ),
+    );
+  }
+
+  // Helper method to build integration option cards
+  Widget _buildIntegrationOption(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String description,
+    required bool isRecommended,
+    required VoidCallback onTap,
+    required bool isDarkMode,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: isRecommended ? AppTheme.primaryAccent : Colors.grey.withOpacity(0.3),
+            width: isRecommended ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          color: isRecommended 
+              ? AppTheme.primaryAccent.withOpacity(0.05) 
+              : Colors.transparent,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isRecommended ? AppTheme.primaryAccent : Colors.grey[400],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          if (isRecommended) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryAccent,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'RECOMMENDED',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isRecommended ? AppTheme.primaryAccent : Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.grey[400],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              description,
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.white70 : Colors.grey[600],
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Method to connect to health app
+  Future<void> _connectToHealthApp() async {
+    final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+    
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppTheme.primaryAccent),
+            const SizedBox(height: 16),
+            Text('Connecting to health app...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Initialize health service
+      final success = await healthProvider.initializeHealth();
+      
+      // Close loading dialog
+      Navigator.pop(context);
+      
+      if (success) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Successfully connected to health app!'),
+                ),
+              ],
+            ),
+            backgroundColor: AppTheme.successGreen,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Sync initial data
+        await healthProvider.syncWithHealth();
+      } else {
+        _showHealthConnectionError();
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.pop(context);
+      _showHealthConnectionError();
+    }
+  }
+
+  // Show health connection error dialog with retry options
+  void _showHealthConnectionError() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            const SizedBox(width: 12),
+            Text('Connection Failed'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Unable to connect to your health app. This might be due to:',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '• Permissions not granted\n• Health app not available\n• Device compatibility issues',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showBluetoothAlternativeDialog();
+            },
+            child: Text('Try Bluetooth'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _connectToHealthApp(); // Retry
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryAccent,
+            ),
+            child: Text(
+              'Try Again',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Show Bluetooth alternative dialog
+  void _showBluetoothAlternativeDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.bluetooth, color: AppTheme.primaryAccent),
+            const SizedBox(width: 12),
+            Text('Bluetooth Connection'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Connect directly to your smartwatch via Bluetooth.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Note: You may need to disconnect your watch from other apps first.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.orange[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showBluetoothScanDialog();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryAccent,
+            ),
+            child: Text(
+              'Start Scan',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Show Bluetooth scan dialog
+  void _showBluetoothScanDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppTheme.primaryAccent,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text('Scanning for devices...'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Make sure your smartwatch is in pairing mode and close to your device.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.bluetooth_searching, color: Colors.blue),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Searching for smartwatches...',
+                        style: TextStyle(color: Colors.blue[700]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    // TODO: Implement actual Bluetooth scanning logic here
+    // For now, show a timeout after 10 seconds
+    Timer(Duration(seconds: 10), () {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+        _showNoDevicesFoundDialog();
+      }
+    });
+  }
+
 }

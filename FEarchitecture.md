@@ -3,43 +3,117 @@
 
 ## Table of Contents
 1. [Design System Overview](#design-system-overview)
-2. [Color Palette & Theming](#color-palette--theming)
-3. [Typography System](#typography-system)
-4. [Component Architecture](#component-architecture)
-5. [Screen Layouts](#screen-layouts)
-6. [Navigation Architecture](#navigation-architecture)
-7. [State Management Patterns](#state-management-patterns)
-8. [Animation & Interaction Design](#animation--interaction-design)
-9. [Responsive Design](#responsive-design)
-10. [Performance Optimization](#performance-optimization)
-11. [AI Integration Architecture](#ai-integration-architecture)
-12. [Device Integration](#device-integration)
-13. [Cloud Synchronization](#cloud-synchronization)
+2. [Health Integration UI Architecture](#health-integration-ui-architecture)
+3. [Color Palette & Theming](#color-palette--theming)
+4. [Typography System](#typography-system)
+5. [Component Architecture](#component-architecture)
+6. [Screen Layouts](#screen-layouts)
+7. [Navigation Architecture](#navigation-architecture)
+8. [State Management Patterns](#state-management-patterns)
+9. [Animation & Interaction Design](#animation--interaction-design)
+10. [Responsive Design](#responsive-design)
+11. [Performance Optimization](#performance-optimization)
+12. [AI Integration Architecture](#ai-integration-architecture)
+13. [Device Integration Architecture](#device-integration-architecture)
+14. [Cloud Synchronization](#cloud-synchronization)
 
 ---
 
 ## Design System Overview
 
 ### Design Principles
+- **Health-First**: Prioritize health app integration and user wellness
 - **Clarity**: Clear visual hierarchy with distinct primary, secondary, and tertiary information levels
 - **Consistency**: Unified design language across all screens and components
 - **Accessibility**: High contrast ratios, adequate touch targets, semantic labeling
 - **Performance**: Optimized animations and efficient rendering patterns
 - **Modularity**: Reusable components with consistent APIs
 - **Intelligence**: AI-powered features seamlessly integrated into UI
+- **Trust**: Transparent health data handling with clear permission flows
 
 ### Visual Language
 - **Card-based Layout**: Primary content organization pattern
-- **Rounded Corners**: Consistent 14-20px radius for modern, friendly appearance
+- **Health-Focused Icons**: Fitness and wellness iconography
+- **Rounded Corners**: Consistent 12-20px radius for modern, friendly appearance
 - **Subtle Shadows**: Light elevation effects (opacity 0.05-0.06)
-- **Gradient Accents**: Strategic use of gradients for emphasis
+- **Status Indicators**: Clear visual feedback for connection states
 - **White Space**: Generous padding (16-24px) for visual breathing room
-- **Dynamic Content**: Real-time updates from connected devices
+- **Real-time Updates**: Live data visualization with smooth animations
 
 ### Brand Identity
-- **App Icon**: Flame logo representing energy and motivation
+- **App Icon**: Streaker logo representing fitness streaks
 - **Primary Color**: Orange (#FF6B1A) - Energy, enthusiasm, action
-- **Visual Metaphors**: Fire/flame for streaks, charts for progress
+- **Visual Metaphors**: Streaks for consistency, charts for progress, hearts for health
+
+---
+
+## Health Integration UI Architecture
+
+### Health Connection Flow UI
+```
+Profile Screen
+    ↓ 
+Smartwatch Integration Dialog
+    ↓
+[Priority 1] Health App Connection
+    ├── Connection Status Display
+    ├── Permission Request Flow  
+    ├── Success/Error Feedback
+    └── Data Sync Indicators
+    
+[Priority 2] Bluetooth Fallback
+    ├── Device Scanning Interface
+    ├── Connection Progress  
+    ├── Device Selection
+    └── Error Recovery Options
+```
+
+### Health Dialog Components
+
+#### 1. Connection Status Display
+```dart
+_buildCurrentConnectionStatus(HealthProvider healthProvider, bool isDarkMode) {
+  // Visual indicators for:
+  // - Connected health source (Apple Health/Samsung Health)
+  // - Connection quality
+  // - Last sync timestamp
+  // - Data availability status
+}
+```
+
+#### 2. Integration Option Cards
+```dart
+_buildIntegrationOption(
+  icon: IconData,
+  title: String,
+  subtitle: String, 
+  description: String,
+  isRecommended: bool,
+  onTap: VoidCallback,
+  isDarkMode: bool,
+) {
+  // Card design with:
+  // - Recommended badge for health apps
+  // - Clear CTAs and descriptions
+  // - Visual hierarchy
+  // - Accessibility support
+}
+```
+
+### Health Permission UI States
+
+#### Permission Flow States
+1. **Initial State**: Show connection options (health app recommended)
+2. **Loading State**: Connection in progress with spinner and descriptive text
+3. **Permission Request**: System permission dialogs (handled by OS)
+4. **Success State**: Connected with green status indicator and sync button
+5. **Error State**: Failed connection with retry options and alternatives
+
+#### Visual Feedback System
+- **Green**: Successfully connected and syncing
+- **Orange**: Connection in progress or needs attention
+- **Red**: Connection failed or permissions denied
+- **Gray**: Not connected or unavailable
 
 ---
 
@@ -48,716 +122,673 @@
 ### Brand Colors (Updated August 2025)
 ```dart
 // Core Brand Color - Orange Theme
-primaryAccent: Color(0xFFFF6B1A)       // Vibrant Orange (Main Brand)
-primaryHover: Color(0xFFFF8C42)        // Lighter Orange (Hover State)
+class AppTheme {
+  static const Color primaryAccent = Color(0xFFFF6B1A);
+  static const Color primaryLight = Color(0xFFFF8A47);
+  static const Color primaryDark = Color(0xFFE55100);
+  
+  // Health Status Colors
+  static const Color successGreen = Color(0xFF4CAF50);
+  static const Color warningOrange = Color(0xFFFF9800);
+  static const Color errorRed = Color(0xFFF44336);
+  static const Color infoBlue = Color(0xFF2196F3);
+  
+  // Health Data Colors
+  static const Color heartRateRed = Color(0xFFE53E3E);
+  static const Color stepsBlue = Color(0xFF3182CE);
+  static const Color sleepPurple = Color(0xFF805AD5);
+  static const Color caloriesOrange = Color(0xFFDD6B20);
+  
+  // Neutral Colors
+  static const Color textPrimary = Color(0xFF1A1A1A);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color backgroundPrimary = Color(0xFFFAFAFA);
+  static const Color cardBackground = Color(0xFFFFFFFF);
+  static const Color dividerColor = Color(0xFFE5E7EB);
+  
+  // Dark Theme
+  static const Color darkBackground = Color(0xFF121212);
+  static const Color darkCardBackground = Color(0xFF1E1E1E);
+  static const Color darkTextPrimary = Color(0xFFFFFFFF);
+  static const Color darkTextSecondary = Color(0xFFB3B3B3);
+}
 ```
 
-### Theme-Specific Colors
-
-#### Light Theme
+### Health Integration Colors
 ```dart
-// Backgrounds
-backgroundLight: Color(0xFFFFFFFF)      // Pure White Background
-cardBackgroundLight: Color(0xFFF8F9FA)  // Light Grey Card Surface
-
-// Text Colors
-textPrimary: Color(0xFF111111)          // Almost Black Text
-textSecondary: Color(0xFF4F4F4F)        // Grey Secondary Text
-textLight: Color(0xFF4F4F4F)            // Light Grey Text
-
-// UI Elements
-dividerLight: Color(0xFFE0E0E0)         // Light Divider
-secondaryLight: Color(0xFF2D7EF5)       // Blue Accent
-```
-
-#### Dark Theme
-```dart
-// Backgrounds
-darkBackground: Color(0xFF121212)       // Pure Dark Background
-darkCardBackground: Color(0xFF1C1C1E)   // Elevated Dark Surface
-
-// Text Colors
-textPrimaryDark: Color(0xFFFFFFFF)      // White Text
-textSecondaryDark: Color(0xFFB3B3B3)    // Light Grey Text
-
-// UI Elements
-dividerDark: Color(0xFF2E2E2E)          // Dark Divider
-secondaryDark: Color(0xFF4A90E2)        // Blue Accent Dark
-```
-
-### Status Colors (Consistent Across Themes)
-```dart
-successGreen: Color(0xFF00D68F)         // Success States
-warningYellow: Color(0xFFFFAA00)        // Warning States
-errorRed: Color(0xFFFF3838)             // Error States
-infoBlue: Color(0xFF0095FF)             // Information States
-```
-
-### Gradient Definitions
-```dart
-primaryGradient: LinearGradient(
-  colors: [Color(0xFFFF6B1A), Color(0xFFFF8C42)],
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-)
+// Health Source Colors
+static const Map<HealthDataSource, Color> healthSourceColors = {
+  HealthDataSource.healthKit: Color(0xFFFF3B30), // Apple Red
+  HealthDataSource.healthConnect: Color(0xFF34A853), // Google Green  
+  HealthDataSource.bluetooth: Color(0xFF1976D2), // Bluetooth Blue
+  HealthDataSource.unavailable: Color(0xFF9E9E9E), // Disabled Gray
+};
 ```
 
 ---
 
 ## Typography System
 
-### Font Family
-- **Primary**: System Default (San Francisco on iOS, Roboto on Android)
-- **Weights**: 400 (Regular), 500 (Medium), 600 (SemiBold), 700 (Bold)
-
-### Type Scale
+### Font Hierarchy (Updated for Health App)
 ```dart
-// Display
-displayLarge: TextStyle(fontSize: 34, fontWeight: FontWeight.bold)
-displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)
-displaySmall: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)
-
-// Headlines
-headlineLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)
-headlineMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)
-headlineSmall: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)
-
-// Titles
-titleLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)
-titleMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)
-titleSmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)
-
-// Body
-bodyLarge: TextStyle(fontSize: 16, height: 1.5)
-bodyMedium: TextStyle(fontSize: 14, height: 1.5)
-bodySmall: TextStyle(fontSize: 12, height: 1.5)
-
-// Labels
-labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)
-labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)
-labelSmall: TextStyle(fontSize: 10, fontWeight: FontWeight.w500)
+// Primary Font: Inter (System default fallback)
+class TextStyles {
+  // Headers
+  static const displayLarge = TextStyle(
+    fontSize: 32.0,
+    fontWeight: FontWeight.w700,
+    height: 1.2,
+    letterSpacing: -0.5,
+  );
+  
+  static const displayMedium = TextStyle(
+    fontSize: 24.0,
+    fontWeight: FontWeight.w600,
+    height: 1.3,
+    letterSpacing: -0.25,
+  );
+  
+  // Health Metrics
+  static const metricValue = TextStyle(
+    fontSize: 28.0,
+    fontWeight: FontWeight.w700,
+    height: 1.1,
+  );
+  
+  static const metricLabel = TextStyle(
+    fontSize: 14.0,
+    fontWeight: FontWeight.w500,
+    height: 1.3,
+    color: AppTheme.textSecondary,
+  );
+  
+  // Body Text
+  static const bodyLarge = TextStyle(
+    fontSize: 16.0,
+    fontWeight: FontWeight.w400,
+    height: 1.5,
+  );
+  
+  static const bodyMedium = TextStyle(
+    fontSize: 14.0,
+    fontWeight: FontWeight.w400,
+    height: 1.4,
+  );
+  
+  // Health Connection Status
+  static const connectionStatus = TextStyle(
+    fontSize: 16.0,
+    fontWeight: FontWeight.w600,
+    height: 1.3,
+  );
+  
+  static const connectionDescription = TextStyle(
+    fontSize: 14.0,
+    fontWeight: FontWeight.w400,
+    height: 1.4,
+    color: AppTheme.textSecondary,
+  );
+}
 ```
 
 ---
 
 ## Component Architecture
 
-### Core Components
+### Core Health Components
 
-#### 1. Cards
+#### 1. Health Metric Cards
 ```dart
-Card(
-  elevation: 0,
-  color: Theme.of(context).cardColor,
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(20),
-  ),
-  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-)
+class HealthMetricCard extends StatelessWidget {
+  final HealthMetric metric;
+  final Color color;
+  final IconData icon;
+  final bool isConnected;
+  final VoidCallback? onTap;
+  
+  // Features:
+  // - Real-time data updates
+  // - Connection status indicator
+  // - Progress visualization
+  // - Goal tracking
+  // - Sync timestamp
+}
 ```
 
-#### 2. Buttons
+#### 2. Health Connection Status Widget
 ```dart
-// Primary Button
-ElevatedButton(
-  style: ElevatedButton.styleFrom(
-    backgroundColor: AppTheme.primaryAccent,
-    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14),
-    ),
-  ),
-)
-
-// Secondary Button
-OutlinedButton(
-  style: OutlinedButton.styleFrom(
-    side: BorderSide(color: AppTheme.primaryAccent, width: 2),
-  ),
-)
+class HealthConnectionStatus extends StatelessWidget {
+  final HealthDataSource source;
+  final bool isConnected;
+  final DateTime? lastSync;
+  final VoidCallback? onTap;
+  
+  // Features:
+  // - Source identification (Apple Health/Samsung Health)
+  // - Connection quality indicator
+  // - Last sync time
+  // - Manual sync trigger
+}
 ```
 
-#### 3. Input Fields
+#### 3. Health Permission Request Dialog
 ```dart
-TextFormField(
-  decoration: InputDecoration(
-    filled: true,
-    fillColor: Theme.of(context).cardColor,
-    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-    ),
-  ),
-)
+class HealthPermissionDialog extends StatefulWidget {
+  final List<HealthDataType> permissions;
+  final Function(bool) onResult;
+  
+  // Features:
+  // - Permission explanation
+  // - Data usage transparency
+  // - Alternative options
+  // - Retry mechanisms
+}
 ```
 
-#### 4. Dialogs (Theme-Aware)
+### Enhanced Button Components
+
+#### 1. Health Connection Button
 ```dart
-AlertDialog(
-  backgroundColor: isDarkMode 
-    ? AppTheme.darkCardBackground 
-    : AppTheme.cardBackgroundLight,
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(20),
-  ),
-)
+class HealthConnectionButton extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool isRecommended;
+  final bool isLoading;
+  final VoidCallback onPressed;
+  
+  // Design:
+  // - Prominent recommended badge
+  // - Clear visual hierarchy
+  // - Loading states
+  // - Accessibility labels
+}
 ```
 
-### Custom Widgets
-
-#### MetricCard
-- Displays health metrics with icon, value, and trend
-- Supports gradient backgrounds
-- Animated value changes
-
-#### NutritionCard
-- Shows nutrition information with progress bars
-- AI-analyzed nutrition display
-- Macro breakdown visualization
-
-#### AchievementBadge
-- Circular/square badges for milestones
-- Progress indicators
-- Locked/unlocked states
-
-#### InsightCard
-- Personalized recommendation display
-- Icon + title + description layout
-- Action buttons for quick actions
+#### 2. Connection Status Button
+```dart
+class ConnectionStatusButton extends StatelessWidget {
+  final HealthDataSource source;
+  final bool isConnected;
+  final VoidCallback onPressed;
+  
+  // States:
+  // - Connected: Green with sync icon
+  // - Disconnected: Gray with connect icon
+  // - Syncing: Orange with loading spinner
+}
+```
 
 ---
 
 ## Screen Layouts
 
-### Main Navigation Structure
-```
-BottomNavigationBar
-├── Home (Dashboard)
-├── Progress (Analytics)
-├── Nutrition (Food Tracking)
-├── Workouts (Exercise)
-└── Profile (Settings)
-```
-
-### Screen-Specific Layouts
-
-#### Home Screen
-```
-AppBar (with sync indicator)
-├── Greeting Section
-├── Quick Stats Grid (2x2)
-├── Insights Carousel
-├── Recent Activities List
-└── Quick Actions FAB (removed)
-```
-
-#### Nutrition Screen
-```
-AppBar with Actions
-├── TabBar (Today/History)
-├── Nutrition Overview Card
-├── Macro Breakdown Chart
-├── Meals List/Timeline
-└── Camera FAB (AI Scan)
-```
-
-#### Progress Screen
-```
-ScrollView
-├── Streak Calendar
-├── Statistics Grid
-├── Progress Charts
-├── Achievements Grid (1.8 aspect ratio)
-└── Milestones Timeline
+### Enhanced Home Screen Layout
+```dart
+// Updated Home Screen with Health Integration
+Column(
+  children: [
+    // Dynamic Greeting Header
+    HealthGreetingHeader(
+      userName: user.name,
+      healthStatus: healthProvider.connectionStatus,
+      onHealthTap: _showHealthStatus,
+    ),
+    
+    // Time Period Selection with Icons
+    TimePeriodsTabBar(
+      selectedPeriod: _selectedPeriod,
+      onPeriodChanged: _onPeriodChanged,
+      // Icons: Today 📅, Week 📊, Month 📈, Year 🗓️
+    ),
+    
+    // Health Metrics Grid
+    Expanded(
+      child: HealthMetricsGrid(
+        metrics: healthProvider.metrics,
+        connectionStatus: healthProvider.dataSource,
+        onMetricTap: _showMetricDetails,
+        onConnectionTap: _showHealthIntegration,
+      ),
+    ),
+  ],
+)
 ```
 
-#### Profile Screen
-```
-ScrollView
-├── Profile Header (Avatar + Name)
-├── Stats Summary
-├── Settings List
-│   ├── Personal Information
-│   ├── Smartwatch Integration
-│   ├── Goals & Targets
-│   ├── Notifications
-│   └── Privacy & Security
-└── Logout Button
+### Profile Screen Health Integration Section
+```dart
+// Enhanced Profile Screen
+ListView(
+  children: [
+    // User Profile Header
+    ProfileHeader(),
+    
+    // Health Integration Section
+    HealthIntegrationCard(
+      dataSource: healthProvider.dataSource,
+      isConnected: healthProvider.isConnected,
+      lastSync: healthProvider.lastSync,
+      onTap: _showSmartwatchIntegrationDialog,
+      // Features:
+      // - Connection status display
+      // - Manual sync button
+      // - Settings access
+    ),
+    
+    // Other profile sections...
+  ],
+)
 ```
 
 ---
 
 ## Navigation Architecture
 
-### Navigation Patterns
-
-#### Bottom Navigation
-- Persistent across main screens
-- Badge support for notifications
-- Animated transitions
-
-#### Stack Navigation
+### Enhanced Bottom Navigation
 ```dart
-Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => TargetScreen(),
+// Updated Navigation with Health Focus
+final List<BottomNavigationBarItem> _bottomNavItems = [
+  BottomNavigationBarItem(
+    icon: Icon(Icons.home_outlined),
+    activeIcon: Icon(Icons.home_rounded),
+    label: 'Home',
   ),
-)
+  BottomNavigationBarItem(
+    icon: SvgPicture.asset('assets/images/streaker_logo.svg'),
+    activeIcon: SvgPicture.asset('assets/images/streaker_logo.svg', 
+      colorFilter: ColorFilter.mode(AppTheme.primaryAccent, BlendMode.srcIn)),
+    label: 'Streaks', // Changed from Progress to Streaks
+  ),
+  BottomNavigationBarItem(
+    icon: Icon(Icons.restaurant_outlined),
+    activeIcon: Icon(Icons.restaurant_rounded),
+    label: 'Nutrition',
+  ),
+  BottomNavigationBarItem(
+    icon: Icon(Icons.fitness_center_outlined),
+    activeIcon: Icon(Icons.fitness_center_rounded),
+    label: 'Workouts',
+  ),
+  BottomNavigationBarItem(
+    icon: Icon(Icons.person_outline_rounded),
+    activeIcon: Icon(Icons.person_rounded),
+    label: 'Profile',
+  ),
+];
 ```
 
-#### Tab Navigation
-- Used in Nutrition and Progress screens
-- Swipeable with indicators
-- Preserves state between tabs
-
-### Route Management
+### Health Permission Flow Navigation
 ```dart
-// Named Routes
-'/': (context) => SplashScreen(),
-'/onboarding': (context) => OnboardingScreen(),
-'/auth': (context) => AuthScreen(),
-'/main': (context) => MainScreen(),
-'/profile/edit': (context) => EditProfileScreen(),
-'/settings/smartwatch': (context) => SmartwatchSettingsScreen(),
+// Navigation flow for health permissions
+void _navigateToHealthPermissions() {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (context) => HealthPermissionScreen(
+        onPermissionGranted: _handlePermissionSuccess,
+        onPermissionDenied: _handlePermissionError,
+        onAlternativeSelected: _showBluetoothOptions,
+      ),
+    ),
+  );
+}
 ```
 
 ---
 
 ## State Management Patterns
 
-### Provider Architecture
-
-#### Provider Hierarchy
+### Enhanced Health Provider Pattern
 ```dart
-MultiProvider(
-  providers: [
-    // Local Providers (Primary)
-    ChangeNotifierProvider(create: (_) => UserProvider(prefs)),
-    ChangeNotifierProvider(create: (_) => HealthProvider(prefs)),
-    ChangeNotifierProvider(create: (_) => NutritionProvider(prefs)),
-    ChangeNotifierProvider(create: (_) => WorkoutProvider()),
-    
-    // Cloud Providers (Backup)
-    ChangeNotifierProvider(create: (_) => SupabaseUserProvider()),
-    ChangeNotifierProvider(create: (_) => SupabaseNutritionProvider()),
-  ],
-)
+class HealthProvider with ChangeNotifier {
+  // Core state
+  HealthDataSource _dataSource = HealthDataSource.unavailable;
+  bool _isConnected = false;
+  DateTime? _lastSync;
+  Map<MetricType, HealthMetric> _metrics = {};
+  
+  // Connection management
+  Future<bool> initializeHealth() async {
+    // Configure health services
+    // Request permissions
+    // Establish connection
+    // Start data sync
+  }
+  
+  // Real-time updates
+  void _updateMetrics(Map<String, dynamic> data) {
+    // Parse health data
+    // Update metrics
+    // Trigger UI refresh
+    // Sync to cloud
+  }
+  
+  // Error handling
+  void _handleConnectionError(Exception error) {
+    // Log error
+    // Show user feedback
+    // Offer alternatives
+  }
+}
 ```
 
-#### Consumer Patterns
+### Unified Health Service Architecture
 ```dart
-// Single Provider
-Consumer<HealthProvider>(
-  builder: (context, healthProvider, child) {
-    return MetricCard(
-      value: healthProvider.todaySteps,
-    );
-  },
-)
-
-// Multiple Providers
-Consumer2<HealthProvider, NutritionProvider>(
-  builder: (context, health, nutrition, child) {
-    return InsightsList(
-      health: health,
-      nutrition: nutrition,
-    );
-  },
-)
-```
-
-#### Selective Rebuilds
-```dart
-Selector<HealthProvider, int>(
-  selector: (context, provider) => provider.todaySteps,
-  builder: (context, steps, child) {
-    return Text('$steps steps');
-  },
-)
+class UnifiedHealthService {
+  // Platform detection and configuration
+  Future<void> initialize() async {
+    await _determineBestDataSource();
+    await _configureHealthService();
+    _setupDataCallbacks();
+  }
+  
+  // Cross-platform permission handling
+  Future<bool> requestPermissions() async {
+    if (Platform.isIOS) {
+      return _requestHealthKitPermissions();
+    } else if (Platform.isAndroid) {
+      return _requestHealthConnectPermissions();
+    }
+    return false;
+  }
+  
+  // Data source management
+  Future<void> _determineBestDataSource() async {
+    // Priority: HealthKit > Health Connect > Bluetooth > Manual
+  }
+}
 ```
 
 ---
 
 ## Animation & Interaction Design
 
-### Animation Types
-
-#### Micro-animations
-- Button press: Scale 0.95 with 150ms duration
-- Card hover: Elevation change with shadow
-- Value changes: AnimatedCounter widget
-- Progress bars: Animated fill with curves
-
-#### Page Transitions
+### Health Data Animations
 ```dart
-PageRouteBuilder(
-  transitionDuration: Duration(milliseconds: 300),
-  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-    return SlideTransition(
-      position: Tween<Offset>(
-        begin: Offset(1, 0),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeInOut,
-      )),
-      child: child,
+// Smooth metric value transitions
+AnimatedBuilder(
+  animation: _valueAnimation,
+  builder: (context, child) {
+    return Text(
+      _formatMetricValue(_valueAnimation.value),
+      style: TextStyles.metricValue,
     );
   },
 )
+
+// Connection status transitions
+AnimatedContainer(
+  duration: Duration(milliseconds: 300),
+  curve: Curves.easeInOut,
+  decoration: BoxDecoration(
+    color: _getConnectionColor(),
+    borderRadius: BorderRadius.circular(12),
+  ),
+  child: ConnectionStatusWidget(),
+)
 ```
 
-#### Loading States
-- Shimmer effects for content loading
-- Skeleton screens for initial load
-- Pull-to-refresh with custom indicators
-- Progress indicators during AI analysis
+### Loading States for Health Operations
+```dart
+// Health connection loading
+class HealthConnectionLoading extends StatefulWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        CircularProgressIndicator(
+          color: AppTheme.primaryAccent,
+          strokeWidth: 3,
+        ),
+        SizedBox(height: 16),
+        Text('Connecting to health app...'),
+        SizedBox(height: 8),
+        Text(
+          'This may take a few moments',
+          style: TextStyles.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+```
 
-### Gesture Interactions
-- Swipe to delete/dismiss
-- Pull to refresh
-- Long press for context menus
-- Pinch to zoom on charts
-- Drag to reorder lists
+---
+
+## Device Integration Architecture
+
+### Health Connect Integration (Android)
+```dart
+// Android Health Connect configuration
+class HealthConnectService {
+  static Future<void> configure() async {
+    // Critical: Configure Health Connect SDK
+    await Health().configure();
+    
+    // Request permissions
+    final permissions = [
+      HealthDataType.STEPS,
+      HealthDataType.HEART_RATE,
+      HealthDataType.ACTIVE_ENERGY_BURNED,
+      // ... other types
+    ];
+    
+    await Health().requestAuthorization(
+      permissions,
+      permissions: [HealthDataAccess.READ],
+    );
+  }
+}
+```
+
+### HealthKit Integration (iOS)
+```dart
+// iOS HealthKit configuration
+class HealthKitService {
+  static Future<void> configure() async {
+    final permissions = [
+      HealthDataType.STEPS,
+      HealthDataType.HEART_RATE,
+      HealthDataType.ACTIVE_ENERGY_BURNED,
+      // ... other types
+    ];
+    
+    await Health().requestAuthorization(
+      permissions,
+      permissions: [HealthDataAccess.READ],
+    );
+  }
+}
+```
+
+### Bluetooth Fallback Service
+```dart
+// Bluetooth smartwatch integration
+class BluetoothSmartwatchService {
+  Stream<Map<String, dynamic>> get healthDataStream => _dataController.stream;
+  
+  Future<void> scanForDevices() async {
+    // Scan for BLE devices
+    // Filter for health devices
+    // Present connection options
+  }
+  
+  Future<bool> connectToDevice(String deviceId) async {
+    // Establish BLE connection
+    // Subscribe to health characteristics
+    // Start data streaming
+  }
+}
+```
 
 ---
 
 ## Responsive Design
 
-### Breakpoints
+### Health Metric Card Responsive Layout
 ```dart
-class Breakpoints {
-  static const double mobile = 600;
-  static const double tablet = 900;
-  static const double desktop = 1200;
+// Adaptive grid for health metrics
+GridView.builder(
+  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: _getGridColumns(context),
+    childAspectRatio: _getCardAspectRatio(context),
+    crossAxisSpacing: 16,
+    mainAxisSpacing: 16,
+  ),
+  itemBuilder: (context, index) => HealthMetricCard(
+    metric: _metrics[index],
+    isExpanded: _isTablet(context),
+  ),
+)
+
+int _getGridColumns(BuildContext context) {
+  final width = MediaQuery.of(context).size.width;
+  if (width > 768) return 3; // Tablet
+  if (width > 480) return 2; // Large phone
+  return 2; // Default phone
 }
 ```
-
-### Adaptive Layouts
-```dart
-LayoutBuilder(
-  builder: (context, constraints) {
-    if (constraints.maxWidth < Breakpoints.mobile) {
-      return MobileLayout();
-    } else if (constraints.maxWidth < Breakpoints.tablet) {
-      return TabletLayout();
-    } else {
-      return DesktopLayout();
-    }
-  },
-)
-```
-
-### Grid Configurations
-- Mobile: 2 columns
-- Tablet: 3-4 columns
-- Desktop: 4-6 columns
-
-### Text Scaling
-- Support for system text size preferences
-- Minimum and maximum scale factors
-- Responsive line heights
 
 ---
 
 ## Performance Optimization
 
-### Image Optimization
-- Lazy loading for lists
-- Cached network images
-- Compressed thumbnails
-- Progressive image loading
-
-### List Performance
+### Health Data Caching Strategy
 ```dart
-ListView.builder(
-  itemCount: items.length,
-  itemBuilder: (context, index) {
-    return ListItem(items[index]);
-  },
-  cacheExtent: 100,
+class HealthDataCache {
+  static final Map<String, dynamic> _cache = {};
+  static const Duration _cacheExpiry = Duration(minutes: 5);
+  
+  static Future<Map<String, dynamic>> getCachedData(String key) async {
+    final cached = _cache[key];
+    if (cached != null && !_isExpired(cached['timestamp'])) {
+      return cached['data'];
+    }
+    return {};
+  }
+  
+  static void cacheData(String key, Map<String, dynamic> data) {
+    _cache[key] = {
+      'data': data,
+      'timestamp': DateTime.now(),
+    };
+  }
+}
+```
+
+### Efficient Health Data Updates
+```dart
+// Debounced health data updates
+Timer? _updateTimer;
+
+void _scheduleHealthUpdate() {
+  _updateTimer?.cancel();
+  _updateTimer = Timer(Duration(seconds: 2), () {
+    _fetchLatestHealthData();
+  });
+}
+```
+
+---
+
+## Cloud Synchronization Architecture
+
+### Real-time Health Data Sync
+```dart
+class HealthDataSyncService {
+  static Future<void> syncHealthMetrics() async {
+    final localData = await _getLocalHealthData();
+    final cloudData = await _getCloudHealthData();
+    
+    // Merge and resolve conflicts
+    final mergedData = _mergeHealthData(localData, cloudData);
+    
+    // Sync to both local and cloud
+    await _saveLocalHealthData(mergedData);
+    await _saveCloudHealthData(mergedData);
+    
+    // Notify UI of updates
+    HealthProvider.instance.notifyDataUpdated();
+  }
+}
+```
+
+### Offline Health Data Queue
+```dart
+class OfflineHealthQueue {
+  static final List<HealthDataEntry> _queue = [];
+  
+  static void queueHealthData(HealthDataEntry entry) {
+    _queue.add(entry);
+    _persistQueue();
+  }
+  
+  static Future<void> syncQueuedData() async {
+    for (final entry in _queue) {
+      try {
+        await _syncHealthEntry(entry);
+        _queue.remove(entry);
+      } catch (e) {
+        // Keep in queue for retry
+        print('Failed to sync health entry: $e');
+      }
+    }
+    _persistQueue();
+  }
+}
+```
+
+---
+
+## Future UI Enhancements
+
+### Planned Health Features
+- [ ] Advanced health insights dashboard
+- [ ] Personalized health recommendations
+- [ ] Social health challenges
+- [ ] Wearable device management screen
+- [ ] Health data export functionality
+- [ ] Medical integration (doctor sharing)
+
+### AI-Powered Health Insights
+- [ ] Predictive health trends
+- [ ] Personalized coaching recommendations
+- [ ] Anomaly detection in health metrics
+- [ ] Smart goal adjustments based on data
+
+---
+
+## Accessibility & Internationalization
+
+### Health Data Accessibility
+```dart
+// Accessible health metric widgets
+Semantics(
+  label: 'Steps today: ${metric.value} out of ${metric.goal}',
+  value: '${(metric.progress * 100).round()}% complete',
+  child: HealthMetricCard(metric: metric),
 )
 ```
 
-### State Optimization
-- Minimize rebuilds with const widgets
-- Use keys for list items
-- Implement AutomaticKeepAliveClientMixin
-- Debounce search and input operations
-
-### Memory Management
-- Dispose controllers and listeners
-- Clear image cache on low memory
-- Paginate large data sets
-- Use compute for heavy processing
-
----
-
-## AI Integration Architecture
-
-### AI Services
-
-#### Nutrition AI Service (Enhanced August 2025)
+### Health Unit Localization
 ```dart
-class NutritionAIService {
-  // Dual-approach Image Analysis Pipeline
-  analyzeFood(imagePath) → 
-    1. Indian Food Service (Primary) →
-       - Google Gemini Vision API →
-       - Indian food detection →
-       - IFCT 2017 Database (50+ foods) →
-       - Accurate Indian nutrition
-    
-    2. Edamam API (Fallback) →
-       - General food detection →
-       - International cuisine →
-       - Basic nutrition facts
+// Support for different health units
+class HealthUnitFormatter {
+  static String formatDistance(double meters, Locale locale) {
+    if (locale.countryCode == 'US') {
+      return '${(meters * 0.000621371).toStringAsFixed(2)} mi';
+    }
+    return '${(meters / 1000).toStringAsFixed(2)} km';
+  }
   
-  // Intelligent Fallback Strategy
-  if (Gemini API succeeds) → Use Indian nutrition data
-  if (Gemini API fails) → Try Edamam API
-  if (No match) → Manual Entry with suggestions
+  static String formatWeight(double kg, Locale locale) {
+    if (locale.countryCode == 'US') {
+      return '${(kg * 2.20462).toStringAsFixed(1)} lbs';
+    }
+    return '${kg.toStringAsFixed(1)} kg';
+  }
 }
 ```
 
-#### Indian Food Recognition Service
-```dart
-class IndianFoodNutritionService {
-  // Comprehensive Indian Food Database
-  - 50+ common Indian dishes
-  - IFCT 2017 nutrition values
-  - Regional cuisine support
-  - Multi-food detection in single image
-  
-  // Analysis Methods
-  analyzeIndianFood(imageFile) → Gemini Vision
-  searchIndianFood(query) → Local database
-  getAllIndianFoods() → Autocomplete list
-}
-```
-
-#### Insights Engine
-```dart
-class InsightsEngine {
-  // Data Analysis
-  analyze(health, nutrition, activity) →
-    Pattern Recognition →
-    Recommendation Generation →
-    Priority Sorting →
-    Personalized Insights
-}
-```
-
-### AI UI Components
-- Loading states during analysis
-- Confidence indicators
-- Correction/feedback options
-- Manual override controls
-
 ---
 
-## Device Integration
-
-### Bluetooth Smartwatch Connection (Implemented August 2025)
-```dart
-class BluetoothSmartwatchService {
-  // BLE Connection Flow
-  1. Check Bluetooth permissions →
-  2. Scan for BLE devices (15 sec) →
-  3. Filter smartwatch devices →
-  4. Connect to selected device →
-  5. Discover services & characteristics →
-  6. Subscribe to notifications →
-  7. Real-time data streaming
-  
-  // Supported Devices
-  - Samsung Galaxy Watch (all models)
-  - Wear OS devices
-  - Generic BLE fitness trackers
-  
-  // Health Data Points
-  - Heart rate (real-time)
-  - Steps count
-  - Sleep duration
-  - Calories burned
-  - Distance traveled
-}
-```
-
-### Real-time Sync Architecture (Implemented August 2025)
-```dart
-class RealtimeSyncService {
-  // Sync Strategy
-  - Auto-sync every 30 seconds (online)
-  - Immediate sync on data changes
-  - Offline queue for disconnected state
-  - Batch sync when connection restored
-  
-  // Data Types Synced
-  - Nutrition entries → Supabase
-  - Health metrics → Supabase
-  - User profile → Supabase
-  - Streak counters → Supabase
-  
-  // Visual Indicators
-  - Green cloud ✓ = Synced
-  - Blue rotating = Syncing
-  - Orange cloud = Offline (with badge count)
-}
-```
-
-### Data Flow Architecture
-```
-Smartwatch → BLE → BluetoothService → HealthProvider → SharedPreferences
-                                           ↓                    ↓
-                                    RealtimeSyncService → Supabase Cloud
-                                           ↑
-                                    Offline Queue (when disconnected)
-```
-
----
-
-## Cloud Synchronization
-
-### Supabase Backend Architecture
-```dart
-// Database Schema (August 2025)
-Tables:
-├── profiles (user data)
-├── nutrition_entries (daily nutrition)
-├── health_metrics (fitness data)
-├── streaks (achievement tracking)
-├── workouts (exercise logs)
-└── weight_logs (weight history)
-
-// Row Level Security
-- Users can only access their own data
-- Automatic user filtering via auth.uid()
-```
-
-### Sync Status Widget
-```dart
-class SyncStatusIndicator {
-  // Visual States
-  CloudDone (green) → All synced
-  Sync (blue, rotating) → Syncing in progress
-  CloudOff (orange) → Offline mode
-  Badge → Number of pending operations
-  
-  // User Actions
-  - Tap to force sync
-  - View offline queue count
-  - See last sync timestamp
-}
-```
-
-### Offline-First Architecture
-```
-1. User Action → Save to SharedPreferences
-2. Trigger sync → Check connectivity
-3. If Online → Sync to Supabase immediately
-4. If Offline → Add to queue → Sync when online
-5. Visual feedback → Update sync indicator
-```
-
----
-
-## Accessibility Features
-
-### Visual Accessibility
-- High contrast mode support
-- Dynamic type support
-- Color blind friendly palettes
-- Focus indicators
-
-### Screen Reader Support
-- Semantic labels
-- Navigation announcements
-- Action hints
-- Content descriptions
-
-### Interaction Accessibility
-- Minimum touch targets (44x44)
-- Gesture alternatives
-- Keyboard navigation
-- Voice control ready
-
----
-
-## Testing Strategies
-
-### UI Testing
-```dart
-testWidgets('Home screen displays metrics', (tester) async {
-  await tester.pumpWidget(MaterialApp(home: HomeScreen()));
-  expect(find.text('Today\'s Steps'), findsOneWidget);
-  expect(find.byType(MetricCard), findsNWidgets(4));
-});
-```
-
-### Golden Tests
-- Screenshot comparisons
-- Theme variation testing
-- Device size testing
-- Accessibility testing
-
-### Integration Testing
-- User flow testing
-- Navigation testing
-- Provider state testing
-- API integration testing
-
----
-
-## Documentation Standards
-
-### Widget Documentation
-```dart
-/// A card displaying a single health metric.
-/// 
-/// Shows the metric name, current value, goal, and progress.
-/// Supports both light and dark themes.
-/// 
-/// Example:
-/// ```dart
-/// MetricCard(
-///   title: 'Steps',
-///   value: 5000,
-///   goal: 10000,
-///   icon: Icons.directions_walk,
-/// )
-/// ```
-class MetricCard extends StatelessWidget {
-  // Implementation
-}
-```
-
-### Style Guide
-- Component usage examples
-- Do's and don'ts
-- Accessibility requirements
-- Performance considerations
-
----
-
-## Version History
-
-### v1.0.0 (August 2025)
-- Initial architecture
-- Core screens implementation
-- Basic provider setup
-- Theme system
-
-### v1.1.0 (August 2025)
-- AI nutrition analysis
-- Smartwatch integration
-- Theme fixes
-- Performance optimizations
-- App icon update
-
----
-
-*Last Updated: August 27, 2025*
-*Maintained by: Development Team*
-*AI Assistance: Claude Code*
+This architecture document reflects the current state of the Streaker Flutter application with comprehensive health integration, modern UI patterns, and robust cross-platform compatibility. The design system prioritizes user health data transparency, seamless device integration, and intuitive user experiences.

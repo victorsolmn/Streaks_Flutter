@@ -20,6 +20,7 @@ import 'providers/user_provider.dart';
 import 'providers/health_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/auth/welcome_screen.dart';
+import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/main/main_screen.dart';
 import 'utils/app_theme.dart';
 
@@ -83,14 +84,28 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => HealthProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider(prefs)),
       ],
-      child: Consumer2<SupabaseAuthProvider, ThemeProvider>(
-        builder: (context, auth, themeProvider, _) {
+      child: Consumer3<SupabaseAuthProvider, UserProvider, ThemeProvider>(
+        builder: (context, auth, userProvider, themeProvider, _) {
+          Widget home;
+          if (auth.isAuthenticated) {
+            // Check if user has completed onboarding and has a profile
+            if (userProvider.hasProfile && userProvider.hasCompletedOnboarding) {
+              home = const MainScreen();
+            } else {
+              // Authenticated but no profile - need onboarding
+              home = const OnboardingScreen();
+            }
+          } else {
+            // Not authenticated
+            home = const WelcomeScreen();
+          }
+          
           return MaterialApp(
             title: 'Streaker',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
-            home: auth.isAuthenticated ? const MainScreen() : const WelcomeScreen(),
+            home: home,
             debugShowCheckedModeBanner: false,
           );
         },

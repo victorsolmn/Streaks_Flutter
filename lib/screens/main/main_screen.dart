@@ -27,19 +27,9 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<BottomNavigationBarItem> _bottomNavItems = [
     const BottomNavigationBarItem(
-      icon: Icon(Icons.dashboard_outlined),
-      activeIcon: Icon(Icons.dashboard_rounded),
+      icon: Icon(Icons.home_outlined),
+      activeIcon: Icon(Icons.home_rounded),
       label: 'Home',
-    ),
-    const BottomNavigationBarItem(
-      icon: Icon(Icons.trending_up_outlined),
-      activeIcon: Icon(Icons.trending_up_rounded),
-      label: 'Progress',
-    ),
-    const BottomNavigationBarItem(
-      icon: Icon(Icons.local_dining_outlined),
-      activeIcon: Icon(Icons.local_dining_rounded),
-      label: 'Nutrition',
     ),
     BottomNavigationBarItem(
       icon: SizedBox(
@@ -64,11 +54,21 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
       ),
-      label: 'Streaker',
+      label: 'Streaks',
     ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.account_circle_outlined),
-      activeIcon: Icon(Icons.account_circle_rounded),
+      icon: Icon(Icons.restaurant_outlined),
+      activeIcon: Icon(Icons.restaurant_rounded),
+      label: 'Nutrition',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.fitness_center_outlined),
+      activeIcon: Icon(Icons.fitness_center_rounded),
+      label: 'Workouts',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.person_outline_rounded),
+      activeIcon: Icon(Icons.person_rounded),
       label: 'Profile',
     ),
   ];

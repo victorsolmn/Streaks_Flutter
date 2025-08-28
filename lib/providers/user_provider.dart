@@ -155,6 +155,7 @@ class UserProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasCompletedOnboarding => _prefs.getBool('onboarding_completed') ?? false;
+  bool get hasProfile => _profile != null;
 
   void _setLoading(bool loading) {
     _isLoading = loading;
@@ -188,6 +189,11 @@ class UserProvider with ChangeNotifier {
     } catch (e) {
       _setError('Failed to load user data');
     }
+  }
+
+  // Public method to reload user data after sign-in
+  Future<void> reloadUserData() async {
+    await _loadUserData();
   }
 
   Future<void> _saveUserProfile() async {

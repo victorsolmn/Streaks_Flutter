@@ -10,9 +10,86 @@
 
 ## Latest Session Updates (August 28, 2025)
 
-### Major Features Implemented
+### Major Health Integration Implementation 🏥
 
-#### 1. Real-time Supabase Synchronization 🔄
+#### 1. Unified Health Service Architecture
+**Implementation:** Cross-platform health data integration supporting iOS HealthKit and Android Health Connect
+**Features:**
+- Automatic data source detection (HealthKit/Health Connect/Bluetooth fallback)
+- Comprehensive health metrics (steps, heart rate, calories, sleep, distance, water, weight, blood oxygen, blood pressure, exercise time, workouts)
+- Real-time data sync with 5-minute intervals
+- Permission management for both platforms
+- Fallback to Bluetooth if health apps unavailable
+
+**Files Created/Modified:**
+- `lib/services/unified_health_service.dart` - Core unified health service
+- `lib/providers/health_provider.dart` - Enhanced with `initializeHealth()` method
+- `android/app/src/main/AndroidManifest.xml` - Added Health Connect permissions and intent filters
+- `ios/Runner/Info.plist` - Added HealthKit usage descriptions
+
+#### 2. Health Connect Integration (Android)
+**Critical Implementation:** Proper Health Connect configuration to make app appear in permissions
+**Features:**
+- Health Connect SDK configuration with `_health.configure()`
+- Comprehensive health permissions (15+ data types)
+- Activity-alias for permission management
+- Package query for Health Connect app
+- Proper intent handling for health permissions
+
+**Health Connect Permissions Added:**
+```xml
+android.permission.health.READ_STEPS
+android.permission.health.READ_HEART_RATE
+android.permission.health.READ_ACTIVE_CALORIES_BURNED
+android.permission.health.READ_DISTANCE
+android.permission.health.READ_SLEEP
+android.permission.health.READ_HYDRATION
+android.permission.health.READ_WEIGHT
+android.permission.health.READ_OXYGEN_SATURATION
+android.permission.health.READ_BLOOD_PRESSURE
+android.permission.health.READ_EXERCISE
+android.permission.health.READ_BASAL_METABOLIC_RATE
+android.permission.ACTIVITY_RECOGNITION
+```
+
+#### 3. Enhanced Smartwatch Integration UI
+**Implementation:** Complete redesign of smartwatch integration dialog with health app priority
+**Features:**
+- Health app connection prioritized over Bluetooth
+- Clear visual hierarchy with "RECOMMENDED" labels
+- Comprehensive error handling with retry options
+- Connection status display
+- Loading states and user feedback
+- Fallback options when health apps fail
+
+**New Dialog Methods:**
+- `_buildCurrentConnectionStatus()` - Shows connected health source
+- `_buildIntegrationOption()` - Creates option cards with CTAs
+- `_connectToHealthApp()` - Handles health app connection flow
+- `_showHealthConnectionError()` - Error handling with retry
+- `_showBluetoothAlternativeDialog()` - Bluetooth fallback option
+- `_showBluetoothScanDialog()` - Bluetooth device scanning
+- `_showNoDevicesFoundDialog()` - No devices found handling
+
+#### 4. UI/UX Fixes Implemented
+**Authentication Flow:**
+- Fixed keyboard overflow on sign-in screen with `SingleChildScrollView`
+- Fixed existing user flow to go directly to home screen
+- Fixed sign-out to redirect to welcome screen instead of onboarding
+- Fixed skip button in onboarding to create default profile and go to home
+
+**Home Screen Enhancements:**
+- Redesigned time period tabs with icons and modern styling
+- Enhanced header with dynamic greeting
+- Improved metrics grid layout and spacing
+- Updated icons: Today (📅), Week (📊), Month (📈), Year (🗓️)
+
+**Navigation Updates:**
+- Changed "Progress" tab to "Streaks" with app logo icon
+- Updated bottom navigation icons for fitness theme
+- Fixed tab alignment and visual consistency
+
+#### 5. Real-time Supabase Synchronization 🔄
 **Implementation:** Complete real-time sync between mobile app and Supabase cloud
 **Features:**
 - Automatic sync every 30 seconds when online
@@ -26,9 +103,8 @@
 - `lib/widgets/sync_status_indicator.dart` - Visual sync status widget
 - `lib/providers/nutrition_provider.dart` - Enhanced with immediate sync
 - `lib/providers/health_provider.dart` - Added SharedPreferences storage and sync
-- `lib/main.dart` - Initialize sync service on app startup
 
-#### 2. Indian Food Recognition System 🍛
+#### 6. Indian Food Recognition System 🍛
 **Implementation:** Dual-approach system for accurate Indian food recognition
 **Features:**
 - Google Gemini Vision API integration (primary)
@@ -43,453 +119,190 @@
 
 **API Key:** Gemini API configured and integrated
 
-#### 3. Bluetooth Smartwatch Integration ⌚
+#### 7. Bluetooth Smartwatch Integration ⌚
 **Implementation:** Complete BLE-based smartwatch connectivity
 **Features:**
 - Device discovery and pairing
 - Real-time health data fetching
-- Samsung Galaxy Watch support
-- Heart rate, steps, sleep tracking
-- Automatic reconnection handling
+- Connection status monitoring
+- Automatic reconnection
+- Data parsing and validation
 
 **Files Created:**
-- `lib/services/bluetooth_smartwatch_service.dart` - BLE connectivity service
+- `lib/services/bluetooth_smartwatch_service.dart` - Core Bluetooth service
+- `lib/services/smartwatch_service.dart` - Smartwatch interface
 
-#### 4. Supabase Database Setup 🗄️
-**Implementation:** Complete database schema for cloud storage
-**Tables Created:**
-- profiles - User profile data
-- nutrition_entries - Daily nutrition tracking
-- health_metrics - Health data from smartwatch
-- streaks - Streak counters
-- workouts - Exercise tracking
-- weight_logs - Weight history
+## Technical Architecture
 
-**Files Created:**
-- `supabase_setup.sql` - Quick setup SQL script
-- `create_supabase_tables.js` - Node.js setup script
-
-## Latest Session Updates (August 27, 2025)
-
-### Major Features Implemented
-
-#### 1. AI-Powered Nutrition Analysis 🤖
-**Implementation:** Complete AI service for food image analysis
-**Features:**
-- Captures food images via camera or gallery
-- Analyzes nutrition facts using AI vision APIs
-- Extracts calories, protein, fat, carbs, and fiber
-- Fallback to comprehensive nutrition database
-- Text recognition for nutrition labels
-
-**Files Created/Modified:**
-- `lib/services/nutrition_ai_service.dart` - New AI analysis service
-- `lib/providers/nutrition_provider.dart` - Integrated AI service
-- `lib/screens/main/nutrition_screen.dart` - Enhanced UI with fiber tracking
-
-#### 2. App Icon Update 🔥
-**Change:** Replaced default Flutter icon with Streaker flame logo
-**Implementation:**
-- Used flutter_launcher_icons package
-- Generated all required sizes for Android and iOS
-- Adaptive icon support for Android
-- Logo stored at: `/assets/logo/streaker_logo.png`
-
-**Files Modified:**
-- All Android mipmap directories
-- iOS AppIcon.appiconset
-- Added `flutter_launcher_icons.yaml` configuration
-
-#### 3. Theme System Fixes 🎨
-**Issue:** Camera popup showed black text on black background in light theme
-**Solution:** Implemented dynamic theme detection for all dialogs
-
-**Improvements:**
-- All dialogs now detect current theme (light/dark)
-- Proper color contrast in all UI elements
-- Consistent theme colors across the app
-
-**Files Modified:**
-- `lib/screens/main/nutrition_screen.dart` - Fixed all dialog themes
-- `lib/utils/app_theme.dart` - Enhanced theme definitions
-
-#### 4. Smartwatch Integration 📱
-**Devices Supported:**
-- Apple Watch
-- Samsung Galaxy Watch
-- Garmin
-- Fitbit
-- Xiaomi Mi Band
-- Amazfit
-- Huawei Watch
-- Google Fit
-
-**Features:**
-- Device connection management
-- Real-time data sync (5-minute intervals)
-- Automatic health metrics updates
-- Visual sync indicator on home screen
-
-**Files Created:**
-- `lib/services/smartwatch_service.dart` - Device integration service
-
-#### 5. Profile & Data Persistence Fixes 🔧
-**Issues Fixed:**
-- Onboarding data not persisting to profile screen
-- Profile using wrong provider (Supabase instead of Local)
-- Dummy data appearing in all sections
-
-**Solutions:**
-- Changed ProfileScreen to use UserProvider (local)
-- Reset all initial values to zero
-- Proper data flow from onboarding → profile
-
-#### 6. UI/UX Enhancements 🎯
-**Home Screen:**
-- Removed non-functional Plus icon
-- Added personalized insights based on real data
-- Added smartwatch sync indicator
-- Dynamic insights generation algorithm
-
-**Progress Screen:**
-- Fixed achievement cards overflow (20 pixels)
-- Adjusted GridView aspect ratio (1.5 → 1.8)
-- Removed all hardcoded dummy data
-
-## Architecture Details
-
-### State Management Pattern
+### Health Data Flow
 ```
-Provider Architecture (Dual-Provider System)
-├── Local Providers (Primary)
-│   ├── UserProvider - User profile & preferences
-│   ├── NutritionProvider - Nutrition tracking with AI
-│   ├── HealthProvider - Health metrics & smartwatch
-│   └── WorkoutProvider - Workout sessions & streaks
-└── Supabase Providers (Cloud Backup)
-    ├── SupabaseUserProvider - Cloud user sync
-    └── SupabaseNutritionProvider - Cloud nutrition backup
+User Request → UI (Profile Screen)
+     ↓
+HealthProvider.initializeHealth()
+     ↓
+UnifiedHealthService.initialize()
+     ↓
+Platform Detection (iOS/Android)
+     ↓
+Health Connect/HealthKit Configuration
+     ↓
+Permission Request (System Dialogs)
+     ↓
+Data Fetching & Sync
+     ↓
+UI Updates & User Feedback
 ```
 
-### Data Flow Architecture
-```
-User Action → Provider → SharedPreferences → UI Update
-     ↓                          ↓
-   Service              Background Sync
-     ↓                          ↓
-External API            Supabase Cloud
-```
+### Data Sources Priority
+1. **iOS:** HealthKit (Apple Health)
+2. **Android:** Health Connect (Samsung Health integration)
+3. **Fallback:** Direct Bluetooth connection to smartwatch
+4. **Unavailable:** Manual data entry
 
-### AI Nutrition Analysis Flow
-```
-Camera/Gallery → Image → NutritionAIService → Vision API
-                   ↓                             ↓
-              Local File                   Food Detection
-                                                ↓
-                                          Nutrition API
-                                                ↓
-                                          NutritionEntry
-                                                ↓
-                                            Provider
-                                                ↓
-                                           UI Update
-```
+### Error Handling Strategy
+- **Permission Denied:** Show retry options and alternative methods
+- **Health App Unavailable:** Offer Bluetooth connection
+- **Bluetooth Failure:** Provide manual data entry
+- **Network Issues:** Offline storage with sync when online
 
-## Technology Stack
+## Key Dependencies
 
-### Core Dependencies
-- **Flutter**: 3.35.2
-- **Dart**: 3.9.0
-- **Provider**: ^6.1.2 (State Management)
-- **SharedPreferences**: ^2.2.3 (Local Storage)
-- **Supabase**: ^2.5.6 (Backend)
-- **Firebase**: Core, Analytics, Crashlytics, Performance
+### Health & Fitness
+- `health: ^11.0.0` - Health data access for both platforms
+- `permission_handler: ^11.3.1` - Runtime permission management
+- `flutter_blue_plus: ^1.32.7` - Bluetooth Low Energy connectivity
 
-### UI/UX Libraries
-- **fl_chart**: ^0.66.0 (Charts)
-- **flutter_svg**: ^2.0.10 (SVG Support)
-- **intl**: ^0.19.0 (Internationalization)
+### Backend & Sync
+- `supabase_flutter: ^2.5.6` - Real-time database and auth
+- `shared_preferences: ^2.2.3` - Local data persistence
+- `connectivity_plus: ^6.0.3` - Network connectivity monitoring
 
-### Media & Device
-- **camera**: ^0.10.5+9
-- **image_picker**: ^1.0.7
-- **permission_handler**: ^11.3.1
-- **connectivity_plus**: ^6.0.3
-- **flutter_blue_plus**: ^1.32.8 (Bluetooth)
-- **google_generative_ai**: ^0.4.5 (Gemini API)
+### AI & Vision
+- `google_generative_ai: ^0.4.3` - Gemini API for food recognition
+- `camera: ^0.10.5+9` - Camera integration for food scanning
+- `image_picker: ^1.0.7` - Image selection and processing
 
-### Development Tools
-- **flutter_launcher_icons**: ^0.13.1
-- **flutter_lints**: ^3.0.0
+### UI & Visualization
+- `fl_chart: ^0.66.0` - Health metrics visualization
+- `flutter_svg: ^2.0.10` - SVG icon support
+- `provider: ^6.1.2` - State management
 
-## Key Features
+### Firebase Services
+- `firebase_core: ^2.24.2` - Firebase initialization
+- `firebase_analytics: ^10.8.0` - User analytics
+- `firebase_crashlytics: ^3.4.9` - Crash reporting
+- `firebase_performance: ^0.9.3` - Performance monitoring
 
-### 1. Nutrition Tracking
-- AI-powered food recognition
-- Manual entry option
-- Comprehensive nutrition facts (calories, protein, fat, carbs, fiber)
-- Daily and weekly tracking
-- Goal setting and progress monitoring
+## Environment Variables & API Keys
 
-### 2. Health Metrics
-- Real-time step counting
-- Calorie burn tracking
-- Heart rate monitoring
-- Sleep pattern analysis
-- Hydration tracking
-- Weight management
+### Supabase Configuration
+- URL: `https://vjubxqaizjcplbxtldqn.supabase.co`
+- Anon Key: Configured in project
 
-### 3. Workout Management
-- Workout session tracking
-- Streak maintenance
-- Exercise library
-- Progress visualization
-- Achievement system
+### Google APIs
+- Gemini API Key: Configured for food recognition
+- Places API: For location services (if needed)
 
-### 4. Personalized Insights
-- AI-generated recommendations
-- Activity pattern analysis
-- Nutrition balance insights
-- Goal achievement tips
-- Health trend notifications
+### Firebase
+- All Firebase services configured with google-services.json
 
-### 5. Device Integration
-- Smartwatch connectivity
-- Automatic data sync
-- Multi-device support
-- Real-time updates
-- Background sync
+## File Structure Overview
 
-## Common Issues & Solutions
+### Core Services
+- `lib/services/unified_health_service.dart` - Cross-platform health integration
+- `lib/services/realtime_sync_service.dart` - Supabase sync with offline support
+- `lib/services/indian_food_nutrition_service.dart` - Indian food recognition
+- `lib/services/bluetooth_smartwatch_service.dart` - Bluetooth connectivity
+- `lib/services/smartwatch_service.dart` - Smartwatch interface
 
-### Issue: Onboarding data not persisting
-**Solution:** Use UserProvider instead of SupabaseUserProvider in ProfileScreen
+### Providers (State Management)
+- `lib/providers/health_provider.dart` - Health metrics management
+- `lib/providers/nutrition_provider.dart` - Food tracking and nutrition
+- `lib/providers/user_provider.dart` - User profile and authentication
+- `lib/providers/supabase_auth_provider.dart` - Supabase authentication
 
-### Issue: Camera popup black on black in light theme
-**Solution:** Implement dynamic theme detection:
-```dart
-final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight
-```
+### Main Screens
+- `lib/screens/main/home_screen.dart` - Dashboard with health metrics
+- `lib/screens/main/profile_screen.dart` - User profile and smartwatch integration
+- `lib/screens/main/main_screen.dart` - Bottom navigation container
+- `lib/screens/auth/signin_screen.dart` - User authentication
+- `lib/screens/onboarding/onboarding_screen.dart` - User setup flow
 
-### Issue: Achievement cards overflow
-**Solution:** Adjust GridView childAspectRatio from 1.5 to 1.8
+### Models
+- `lib/models/health_metric_model.dart` - Health data structures
+- `lib/models/nutrition_model.dart` - Food and nutrition data
+- `lib/models/user_model.dart` - User profile data
+- `lib/models/weight_model.dart` - Weight tracking data
 
-### Issue: Health package compilation errors
-**Solution:** Replaced with flutter_blue_plus for BLE connectivity
+## Testing & Deployment
 
-### Issue: Samsung Galaxy Watch not connecting
-**Solution:** Implemented BluetoothSmartwatchService with proper BLE discovery
-
-### Issue: Indian food recognition 0% accuracy
-**Solution:** Integrated Google Gemini Vision API with local IFCT database
-
-### Issue: Connectivity API changes
-**Solution:** Updated to use List<ConnectivityResult> instead of single result
-
-### Issue: API keys in commits
-**Solution:** Remove sensitive files before committing, use environment variables
-
-## Build Commands
-
-### Debug Build
-```bash
-flutter build apk --debug
-```
-
-### Release Build
-```bash
-flutter build apk --release
-flutter build ios --release
-```
-
-### Run on Device
-```bash
-flutter run
-```
-
-### Clean Build
+### Build Process
 ```bash
 flutter clean
 flutter pub get
-flutter build apk --debug
+flutter build apk --release
 ```
 
-## Testing
+### Health Connect Integration Test
+1. Install Health Connect app on Android device
+2. Install Streaker APK
+3. Open Streaker → Profile → Smartwatch Integration
+4. Tap "Connect via Health App"
+5. Verify Streaker appears in Health Connect permissions list
+6. Grant permissions manually in Health Connect
+7. Test data sync and display
 
-### Run Tests
-```bash
-flutter test
-```
+### Known Issues & Solutions
 
-### Integration Tests
-Located in `test_integrations.dart`:
-- Onboarding flow completion
-- Provider state management
-- Data persistence
-- Navigation flow
+#### Health Connect Not Showing App
+**Solution:** Added proper AndroidManifest.xml declarations:
+- Activity-alias with health permissions intent filter
+- Package query for Health Connect
+- Proper permission declarations
+- Critical: `_health.configure()` call in service
 
-## Deployment
+#### Keyboard Overflow on Sign-in
+**Solution:** Wrapped content in `SingleChildScrollView` with proper padding
 
-### Android APK Distribution
-1. Build debug APK: `flutter build apk --debug`
-2. Start local server: `python3 -m http.server 8080`
-3. Share WiFi IP: `http://192.168.x.x:8080/app-debug.apk`
+#### Authentication Flow Issues
+**Solution:** Added proper profile existence checks and navigation logic
 
-### iOS Distribution
-1. Build iOS: `flutter build ios --release`
-2. Upload to TestFlight or App Store Connect
+## Future Development Roadmap
 
-## Security Considerations
+### Phase 1: Core Stability
+- [ ] Enhanced error handling for edge cases
+- [ ] Improved offline data management
+- [ ] Performance optimization for large datasets
+- [ ] Comprehensive testing suite
 
-### API Keys
-- Store in environment variables
-- Never commit actual keys
-- Use flutter_secure_storage for sensitive data
-- Implement key rotation strategy
+### Phase 2: Advanced Features
+- [ ] Social features and friend connections
+- [ ] Advanced analytics and insights
+- [ ] Workout planning and tracking
+- [ ] Integration with more fitness devices
 
-### Data Protection
-- Encrypt sensitive health data
-- Use secure storage for credentials
-- Implement session management
-- Add biometric authentication
+### Phase 3: AI Enhancement
+- [ ] Personalized coaching recommendations
+- [ ] Predictive health insights
+- [ ] Advanced nutrition planning
+- [ ] Habit formation assistance
 
-## Performance Optimizations
+## Support & Documentation
 
-### Image Processing
-- Compress before uploading
-- Cache analysis results
-- Implement lazy loading
-- Use thumbnail previews
+### Debug Information
+- Extensive logging implemented throughout health services
+- Error tracking with Firebase Crashlytics
+- Performance monitoring enabled
 
-### State Management
-- Use Consumer for targeted rebuilds
-- Implement selector patterns
-- Batch provider updates
-- Avoid unnecessary rebuilds
+### Resources
+- Flutter Health Plugin Documentation
+- Health Connect Developer Guide
+- HealthKit Programming Guide
+- Supabase Flutter Documentation
 
-### Network Optimization
-- Implement offline mode
-- Queue API calls
-- Use caching strategies
-- Compress data transfers
-
-## Future Enhancements
-
-### Planned Features
-1. Real health package integration
-2. Social features for workout buddies
-3. Advanced analytics dashboard
-4. AI workout plan generation
-5. Meal planning with recipes
-6. Voice commands
-7. Wearable app versions
-8. Data export capabilities
-
-### Technical Improvements
-1. Implement dependency injection
-2. Add comprehensive error handling
-3. Implement proper caching
-4. Add offline queue management
-5. Implement CI/CD pipeline
-6. Add automated testing
-7. Implement feature flags
-8. Add performance monitoring
-
-## Development Guidelines
-
-### Code Style
-- Follow Flutter conventions
-- Use meaningful variable names
-- Keep widgets small and focused
-- Extract logic to services
-- Document complex functions
-
-### Git Workflow
-1. Create feature branches
-2. Write descriptive commits
-3. Include Co-Authored-By for AI
-4. Review before merging
-5. Tag releases properly
-
-### Provider Best Practices
-- Initialize at app level
-- Use `listen: false` in callbacks
-- Avoid constructor logic
-- Implement dispose methods
-- Use notifyListeners() efficiently
-
-## Resources
-
-### Documentation
-- [Flutter Docs](https://docs.flutter.dev/)
-- [Provider Package](https://pub.dev/packages/provider)
-- [Supabase Flutter](https://supabase.com/docs/guides/flutter)
-- [Firebase Flutter](https://firebase.google.com/docs/flutter/setup)
-
-### APIs Used
-- Google Vision API (Food recognition)
-- Edamam API (Nutrition data)
-- Health Connect API (Device integration)
-
-## Project Structure
-```
-lib/
-├── main.dart
-├── models/
-│   ├── user_model.dart
-│   ├── nutrition_model.dart
-│   └── workout_model.dart
-├── providers/
-│   ├── user_provider.dart
-│   ├── health_provider.dart
-│   ├── nutrition_provider.dart
-│   ├── workout_provider.dart
-│   └── supabase_*.dart
-├── screens/
-│   ├── auth/
-│   ├── main/
-│   └── onboarding/
-├── services/
-│   ├── smartwatch_service.dart
-│   ├── nutrition_ai_service.dart
-│   └── supabase_service.dart
-├── utils/
-│   └── app_theme.dart
-└── widgets/
-```
-
-## Maintenance Notes
-
-### Regular Updates
-- Flutter SDK updates
-- Package dependencies
-- Security patches
-- API key rotation
-- Performance reviews
-
-### Monitoring
-- Crash reports
-- User analytics
-- API usage
-- Performance metrics
-- User feedback
-
-## Contact & Support
-
-### Repository
-https://github.com/victorsolmn/Streaks_Flutter
-
-### Local Development
-/Users/Vicky/Streaks_Flutter
-
-### AI Assistance
-Generated with Claude Code
-Co-Authored-By: Claude <noreply@anthropic.com>
-
----
-
-*Last Updated: August 27, 2025*
-*Version: 1.0.0*
-*Session Duration: Multiple sessions*
-*Total Features Implemented: 15+*
+## Recent Build Information
+**Latest APK:** Built on August 28, 2025
+**Size:** 57.3MB
+**Target:** Android API Level 33
+**Features:** Complete health integration with Health Connect support
+**Status:** All health permissions properly configured and tested
