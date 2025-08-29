@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+// import 'package:firebase_crashlytics/firebase_crashlytics.dart'; // Temporarily disabled
 import 'firebase_options.dart';
 import 'services/supabase_service.dart';
 import 'services/firebase_analytics_service.dart';
@@ -46,13 +46,14 @@ void main() async {
     FirebaseAnalyticsService().initialize();
     
     // Set up Crashlytics (only for non-web platforms)
-    if (!kIsWeb) {
-      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-      PlatformDispatcher.instance.onError = (error, stack) {
-        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-        return true;
-      };
-    }
+    // Temporarily disabled due to iOS build issue
+    // if (!kIsWeb) {
+    //   FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    //   PlatformDispatcher.instance.onError = (error, stack) {
+    //     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    //     return true;
+    //   };
+    // }
     
     debugPrint('✅ Firebase initialized successfully');
   } catch (e) {
@@ -86,8 +87,19 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer3<SupabaseAuthProvider, UserProvider, ThemeProvider>(
         builder: (context, auth, userProvider, themeProvider, _) {
+          print('Auth state: authenticated=${auth.isAuthenticated}, loading=${auth.isLoading}');
+          print('User profile: hasProfile=${userProvider.hasProfile}, onboarding=${userProvider.hasCompletedOnboarding}');
+          
           Widget home;
-          if (auth.isAuthenticated) {
+          
+          // Show loading if auth is in loading state
+          if (auth.isLoading) {
+            home = const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          } else if (auth.isAuthenticated) {
             // Check if user has completed onboarding and has a profile
             if (userProvider.hasProfile && userProvider.hasCompletedOnboarding) {
               home = const MainScreen();

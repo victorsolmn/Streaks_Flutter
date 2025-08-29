@@ -136,19 +136,26 @@ class _FeatureItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
         Container(
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            color: AppTheme.secondaryBackground,
+            gradient: AppTheme.primaryGradient,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryAccent.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Icon(
             icon,
-            color: AppTheme.primaryAccent,
+            color: Colors.white,
             size: 28,
           ),
         ),

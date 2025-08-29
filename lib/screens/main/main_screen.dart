@@ -4,7 +4,7 @@ import '../../utils/app_theme.dart';
 import 'home_screen_new.dart';
 import 'progress_screen_new.dart';
 import 'nutrition_screen.dart';
-import 'chat_screen.dart';
+import 'chat_screen_enhanced.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -21,7 +21,7 @@ class _MainScreenState extends State<MainScreen> {
     const HomeScreenNew(),
     const ProgressScreenNew(),
     const NutritionScreen(),
-    const ChatScreen(),
+    const ChatScreenEnhanced(),
     const ProfileScreen(),
   ];
 

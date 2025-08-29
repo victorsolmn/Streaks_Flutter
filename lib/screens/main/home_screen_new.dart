@@ -120,17 +120,20 @@ class _HomeScreenNewState extends State<HomeScreenNew>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${_getGreeting()}, $userName 👋',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 28,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_getGreeting()}, $userName 👋',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 28,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         Row(
           children: [
@@ -142,7 +145,7 @@ class _HomeScreenNewState extends State<HomeScreenNew>
               builder: (context, healthProvider, _) {
                 if (healthProvider.isHealthSourceConnected) {
                   return Container(
-                    margin: EdgeInsets.only(right: 8),
+                    margin: const EdgeInsets.only(right: 8),
                     child: InkWell(
                       onTap: () async {
                         // Show syncing

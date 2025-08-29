@@ -494,12 +494,28 @@ class _GoalOption extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: isSelected ? AppTheme.primaryAccent : Theme.of(context).dividerColor,
+                gradient: isSelected 
+                    ? AppTheme.primaryGradient
+                    : LinearGradient(
+                        colors: [
+                          AppTheme.primaryAccent.withOpacity(0.8),
+                          AppTheme.primaryHover.withOpacity(0.8),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                 borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryAccent.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Icon(
                 icon,
-                color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyMedium?.color,
+                color: Colors.white,
                 size: 24,
               ),
             ),
@@ -527,10 +543,25 @@ class _GoalOption extends StatelessWidget {
             ),
             
             if (isSelected)
-              Icon(
-                Icons.check_circle,
-                color: AppTheme.primaryAccent,
-                size: 24,
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryAccent.withOpacity(0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ),
           ],
         ),
@@ -578,6 +609,7 @@ class _ActivityOption extends StatelessWidget {
                     title,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: isSelected ? AppTheme.primaryAccent : Theme.of(context).textTheme.bodyLarge?.color,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                   SizedBox(height: 4),
@@ -592,10 +624,25 @@ class _ActivityOption extends StatelessWidget {
             ),
             
             if (isSelected)
-              Icon(
-                Icons.check_circle,
-                color: AppTheme.primaryAccent,
-                size: 24,
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryAccent.withOpacity(0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ),
           ],
         ),

@@ -576,33 +576,48 @@ class _NutritionScreenState extends State<NutritionScreen>
   }
 
   Widget _buildEmptyState() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Colors.grey[800],
+        color: isDarkMode 
+            ? AppTheme.darkCardBackground 
+            : AppTheme.cardBackgroundLight,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[700]!),
+        border: Border.all(
+          color: isDarkMode 
+              ? AppTheme.dividerDark 
+              : AppTheme.dividerLight,
+        ),
       ),
       child: Column(
         children: [
-          Icon(
-            Icons.camera_alt_outlined,
-            color: Theme.of(context).textTheme.bodyMedium?.color,
-            size: 64,
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              borderRadius: BorderRadius.circular(40),
+            ),
+            child: const Icon(
+              Icons.camera_alt_outlined,
+              color: Colors.white,
+              size: 40,
+            ),
           ),
           SizedBox(height: 16),
           Text(
             'No meals logged today',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: Theme.of(context).textTheme.bodyMedium?.color,
+              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
             ),
           ),
           SizedBox(height: 8),
           Text(
             'Tap the camera button to scan your first meal',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).textTheme.bodyMedium?.color,
+              color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),

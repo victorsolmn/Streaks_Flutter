@@ -113,7 +113,7 @@ class NutritionOverviewCard extends StatelessWidget {
                           goal: carbGoal,
                           unit: 'g',
                           progress: carbProgress,
-                          color: Colors.blue,
+                          color: AppTheme.primaryAccent,
                         ),
                         const SizedBox(height: 12),
                         
@@ -123,7 +123,7 @@ class NutritionOverviewCard extends StatelessWidget {
                           goal: fatGoal,
                           unit: 'g',
                           progress: fatProgress,
-                          color: Colors.purple,
+                          color: AppTheme.accentPink,
                         ),
                       ],
                     ),
@@ -138,9 +138,15 @@ class NutritionOverviewCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[800],
+                  color: Theme.of(context).brightness == Brightness.dark 
+                      ? AppTheme.darkCardBackground 
+                      : AppTheme.cardBackgroundLight,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[700]!),
+                  border: Border.all(
+                    color: Theme.of(context).brightness == Brightness.dark 
+                        ? AppTheme.dividerDark 
+                        : AppTheme.dividerLight,
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -378,7 +384,7 @@ class MacroBreakdownCard extends StatelessWidget {
                     label: 'Carbs',
                     value: '${dailyNutrition.totalCarbs.round()}g',
                     percentage: '${(carbPercent * 100).round()}%',
-                    color: Colors.blue,
+                    color: AppTheme.primaryAccent,
                   ),
                 ),
                 Expanded(
@@ -386,7 +392,7 @@ class MacroBreakdownCard extends StatelessWidget {
                     label: 'Fat',
                     value: '${dailyNutrition.totalFat.round()}g',
                     percentage: '${(fatPercent * 100).round()}%',
-                    color: Colors.purple,
+                    color: AppTheme.accentPink,
                   ),
                 ),
               ],
@@ -420,7 +426,7 @@ class MacroBreakdownCard extends StatelessWidget {
                     Expanded(
                       flex: (carbPercent * 100).round(),
                       child: Container(
-                        color: Colors.blue,
+                        color: AppTheme.primaryAccent,
                       ),
                     ),
                   if (fatPercent > 0)
@@ -428,7 +434,7 @@ class MacroBreakdownCard extends StatelessWidget {
                       flex: (fatPercent * 100).round(),
                       child: Container(
                         decoration: const BoxDecoration(
-                          color: Colors.purple,
+                          color: AppTheme.accentPink,
                           borderRadius: BorderRadius.only(
                             topRight: Radius.circular(4),
                             bottomRight: Radius.circular(4),

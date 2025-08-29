@@ -177,14 +177,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Icon(
           icon,
           size: 16,
-          color: Colors.grey[600],
+          color: Theme.of(context).brightness == Brightness.dark 
+              ? AppTheme.textSecondaryDark 
+              : AppTheme.textSecondary,
         ),
         SizedBox(width: 8),
         Text(
           text,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey[600],
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? AppTheme.textSecondaryDark 
+                : AppTheme.textSecondary,
           ),
         ),
       ],
@@ -209,7 +213,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: ElevatedButton.icon(
               onPressed: () => _showAddWeightDialog(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.secondaryLight,
+                backgroundColor: AppTheme.primaryAccent,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -295,8 +299,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: OutlinedButton.icon(
               onPressed: () => _showLogoutDialog(),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
+                foregroundColor: AppTheme.errorRed,
+                side: const BorderSide(color: AppTheme.errorRed),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -352,7 +356,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Switch between light and dark mode',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).brightness == Brightness.dark 
+                        ? AppTheme.textSecondaryDark 
+                        : AppTheme.textSecondary,
                   ),
                 ),
               ],
@@ -385,12 +391,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppTheme.secondaryLight.withOpacity(0.1),
+                gradient: LinearGradient(
+                  colors: [AppTheme.primaryAccent.withOpacity(0.1), AppTheme.primaryHover.withOpacity(0.1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
-                color: AppTheme.secondaryLight,
+                color: AppTheme.primaryAccent,
                 size: 20,
               ),
             ),
@@ -412,7 +422,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     subtitle,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).brightness == Brightness.dark 
+                          ? AppTheme.textSecondaryDark 
+                          : AppTheme.textSecondary,
                     ),
                   ),
                 ],
@@ -421,7 +433,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: Colors.grey[400],
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? AppTheme.dividerDark 
+                  : AppTheme.dividerLight,
             ),
           ],
         ),
@@ -735,12 +749,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (context) => Center(
+                builder: (context) => const Center(
                   child: CircularProgressIndicator(),
                 ),
               );
               
               try {
+                print('Starting logout process...');
+                
                 // Clear all provider data FIRST
                 await userProvider.clearUserData();
                 await nutritionProvider.clearNutritionData();
@@ -749,8 +765,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await authProvider.signOut();
                 await supabaseAuthProvider.signOut();
                 
-                // Navigate to Welcome screen explicitly
+                print('Logout successful, navigating to welcome screen...');
+                
+                // Close loading dialog and navigate to Welcome screen
                 if (mounted) {
+                  Navigator.of(context).pop(); // Close loading dialog
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => const WelcomeScreen()),
                     (route) => false,
@@ -758,9 +777,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
               } catch (e) {
                 print('Logout error: $e');
-                // Still try to navigate even if there's an error
+                // Close loading dialog and still navigate
                 if (mounted) {
-                  Navigator.of(context).pop(); // Close loading
+                  Navigator.of(context).pop(); // Close loading dialog
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => const WelcomeScreen()),
                     (route) => false,
