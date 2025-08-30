@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
+import '../../providers/nutrition_provider.dart';
+import '../../providers/health_provider.dart';
 import 'home_screen_new.dart';
 import 'progress_screen_new.dart';
 import 'nutrition_screen.dart';
@@ -16,6 +19,29 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  bool _isDataLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    if (_isDataLoaded) return;
+    
+    // Load nutrition data from Supabase
+    final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
+    await nutritionProvider.loadDataFromSupabase();
+    
+    // Load health data if available
+    final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+    await healthProvider.loadHealthDataFromSupabase();
+    
+    setState(() {
+      _isDataLoaded = true;
+    });
+  }
 
   final List<Widget> _screens = [
     const HomeScreenNew(),

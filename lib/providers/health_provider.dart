@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/health_metric_model.dart';
 import '../services/unified_health_service.dart';
 import '../services/realtime_sync_service.dart';
+import '../services/supabase_service.dart';
 
 class HealthProvider with ChangeNotifier {
   Map<MetricType, HealthMetric> _metrics = {};
@@ -10,8 +11,12 @@ class HealthProvider with ChangeNotifier {
   bool _isInitialized = false;
   final UnifiedHealthService _healthService = UnifiedHealthService();
   final RealtimeSyncService _syncService = RealtimeSyncService();
+  final SupabaseService _supabaseService = SupabaseService();
   SharedPreferences? _prefs;
   HealthDataSource _currentDataSource = HealthDataSource.unavailable;
+  
+  // Expose health service for direct access
+  UnifiedHealthService get healthService => _healthService;
   
   // Today's data
   double _todaySteps = 0;
@@ -70,8 +75,8 @@ class HealthProvider with ChangeNotifier {
       await fetchMetrics();
     } else {
       // Try to request permissions for platform health APIs
-      bool authorized = await _healthService.requestHealthPermissions();
-      if (authorized) {
+      final result = await _healthService.requestHealthPermissions();
+      if (result.success) {
         _currentDataSource = _healthService.currentSource;
         await fetchMetrics();
       }
@@ -189,12 +194,12 @@ class HealthProvider with ChangeNotifier {
   
   // Request health permissions
   Future<bool> requestHealthPermissions() async {
-    bool authorized = await _healthService.requestHealthPermissions();
-    if (authorized) {
+    final result = await _healthService.requestHealthPermissions();
+    if (result.success) {
       _currentDataSource = _healthService.currentSource;
       await fetchMetrics();
     }
-    return authorized;
+    return result.success;
   }
 
   // Initialize health service connection (for UI calls)
@@ -212,8 +217,8 @@ class HealthProvider with ChangeNotifier {
         return true;
       } else {
         // Try to request permissions
-        bool authorized = await _healthService.requestHealthPermissions();
-        if (authorized) {
+        final result = await _healthService.requestHealthPermissions();
+        if (result.success) {
           _currentDataSource = _healthService.currentSource;
           await fetchMetrics();
           return true;
@@ -266,6 +271,9 @@ class HealthProvider with ChangeNotifier {
     await _prefs!.setDouble('today_sleep', _todaySleep);
     await _prefs!.setInt('today_calories_burned', _todayCaloriesBurned.toInt());
     
+    // Save to Supabase directly
+    await saveHealthDataToSupabase();
+    
     // Trigger immediate sync to Supabase
     await _syncService.syncAll();
   }
@@ -282,5 +290,122 @@ class HealthProvider with ChangeNotifier {
     _todayWorkouts++;
     await _saveHealthData();
     notifyListeners();
+  }
+  
+  // Update health connection status
+  Future<void> updateHealthConnectionStatus(bool connected) async {
+    if (connected) {
+      _currentDataSource = _healthService.currentSource;
+      await fetchMetrics();
+    } else {
+      _currentDataSource = HealthDataSource.unavailable;
+    }
+    notifyListeners();
+  }
+
+  // Load health data from Supabase
+  Future<void> loadHealthDataFromSupabase() async {
+    final userId = _supabaseService.currentUser?.id;
+    if (userId == null) {
+      // If not logged in, just load from local storage
+      await _loadHealthData();
+      return;
+    }
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // Get today's date
+      final today = DateTime.now();
+      final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      
+      // Load today's health metrics from Supabase
+      final healthData = await _supabaseService.getHealthMetrics(
+        userId: userId,
+        date: todayStr,
+      );
+
+      if (healthData != null) {
+        // Update local data with Supabase data
+        _todaySteps = (healthData['steps'] ?? 0).toDouble();
+        _todayCaloriesBurned = (healthData['calories_burned'] ?? 0).toDouble();
+        _todayHeartRate = (healthData['heart_rate'] ?? 0).toDouble();
+        _todaySleep = (healthData['sleep_hours'] ?? 0).toDouble();
+        _todayDistance = (healthData['distance'] ?? 0).toDouble();
+        
+        // Update metrics
+        _metrics[MetricType.steps] = HealthMetric(
+          value: _todaySteps,
+          timestamp: DateTime.now(),
+          type: MetricType.steps,
+          currentValue: _todaySteps,
+          goalValue: 10000,
+        );
+        
+        _metrics[MetricType.caloriesIntake] = HealthMetric(
+          value: _todayCaloriesBurned,
+          timestamp: DateTime.now(),
+          type: MetricType.caloriesIntake,
+          currentValue: _todayCaloriesBurned,
+          goalValue: 2200,
+        );
+        
+        _metrics[MetricType.sleep] = HealthMetric(
+          value: _todaySleep,
+          timestamp: DateTime.now(),
+          type: MetricType.sleep,
+          currentValue: _todaySleep,
+          goalValue: 8.0,
+        );
+        
+        _metrics[MetricType.restingHeartRate] = HealthMetric(
+          value: _todayHeartRate,
+          timestamp: DateTime.now(),
+          type: MetricType.restingHeartRate,
+          currentValue: _todayHeartRate,
+          goalValue: 60,
+        );
+        
+        // Save to local storage
+        await _saveHealthData();
+      } else {
+        // No data in Supabase, load from local
+        await _loadHealthData();
+      }
+    } catch (e) {
+      debugPrint('Error loading health data from Supabase: $e');
+      // Fallback to local data
+      await _loadHealthData();
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  // Save health data to Supabase
+  Future<void> saveHealthDataToSupabase() async {
+    final userId = _supabaseService.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      final today = DateTime.now();
+      final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      
+      await _supabaseService.saveHealthMetrics(
+        userId: userId,
+        date: todayStr,
+        metrics: {
+          'steps': _todaySteps.toInt(),
+          'heart_rate': _todayHeartRate.toInt(),
+          'sleep_hours': _todaySleep,
+          'calories_burned': _todayCaloriesBurned.toInt(),
+          'distance': _todayDistance,
+          'active_minutes': _todayWorkouts * 30, // Approximate
+        },
+      );
+    } catch (e) {
+      debugPrint('Error saving health data to Supabase: $e');
+    }
   }
 }

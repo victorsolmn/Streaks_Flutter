@@ -149,7 +149,9 @@ class SupabaseService {
         'protein': nutritionData['protein'] ?? 0,
         'carbs': nutritionData['carbs'] ?? 0,
         'fat': nutritionData['fat'] ?? 0,
+        'fiber': nutritionData['fiber'] ?? 0,
         'water': nutritionData['water'] ?? 0,
+        'food_items': nutritionData['food_items'] ?? [],
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'user_id,date');
     } catch (e) {

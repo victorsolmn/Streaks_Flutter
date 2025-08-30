@@ -16,8 +16,10 @@ import '../../providers/health_provider.dart';
 import '../../services/smartwatch_service.dart';
 import '../../services/unified_health_service.dart';
 import '../../services/bluetooth_smartwatch_service.dart';
+import '../../services/native_health_connect_service.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../health_debug_screen.dart';
 import '../../models/weight_model.dart';
 import '../../widgets/weight_progress_card.dart';
 import '../../utils/app_theme.dart';
@@ -904,13 +906,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildIntegrationOption(
                     context,
                     icon: Icons.favorite,
-                    title: 'Connect via Health App',
-                    subtitle: 'Recommended • Samsung Health, Apple Health',
-                    description: 'Your watch stays connected to Samsung Health. We sync data automatically.',
+                    title: 'Native Health Connect (TEST)',
+                    subtitle: 'Direct Android SDK Implementation',
+                    description: 'Uses native Android SDK as recommended by Google. Most reliable method.',
                     isRecommended: true,
                     onTap: () async {
                       Navigator.pop(context);
-                      _connectToHealthApp();
+                      _connectNativeHealthConnect();
+                    },
+                    isDarkMode: isDarkMode,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildIntegrationOption(
+                    context,
+                    icon: Icons.bug_report,
+                    title: 'Debug & Diagnostic Tool',
+                    subtitle: 'Troubleshoot connection issues',
+                    description: 'Run comprehensive diagnostic to identify why data is not syncing correctly.',
+                    isRecommended: false,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => HealthDebugScreen(),
+                        ),
+                      );
                     },
                     isDarkMode: isDarkMode,
                   ),
@@ -1701,11 +1722,265 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Method to connect using native Health Connect implementation
+  Future<void> _connectNativeHealthConnect() async {
+    if (!Platform.isAndroid) {
+      _showDetailedError(
+        'Android Only',
+        'Native Health Connect is only available on Android devices',
+        [],
+      );
+      return;
+    }
+    
+    final nativeService = NativeHealthConnectService();
+    
+    // Show testing dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Testing Native Health Connect'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppTheme.primaryAccent),
+            const SizedBox(height: 16),
+            Text('Running native implementation...'),
+            const SizedBox(height: 8),
+            Text(
+              'This uses the proper native Android SDK',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      // Run the complete test flow
+      final testResults = await nativeService.testHealthConnectFlow();
+      
+      // Close loading dialog
+      Navigator.pop(context);
+      
+      if (testResults['success'] == true) {
+        // Success! Show the health data
+        final healthData = testResults['healthData'] ?? {};
+        
+        // Start background sync automatically
+        await nativeService.startBackgroundSync();
+        
+        // Get last sync info
+        final syncInfo = await nativeService.getLastSyncInfo();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Native Health Connect works! Background sync enabled.'),
+            backgroundColor: AppTheme.successGreen,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Update health provider with the data
+        final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+        healthProvider.updateMetricsFromHealth(healthData);
+        
+        // Extract data sources
+        final dataSources = (healthData['dataSources'] as List<dynamic>?) ?? [];
+        // Samsung Health uses com.sec.android.app.shealth
+        final hasSamsungData = dataSources.any((source) => 
+          source.toString().contains('samsung') || 
+          source.toString().contains('shealth') || 
+          source.toString().contains('com.sec.android') || 
+          source.toString().contains('gear'));
+        
+        // Show success dialog with data
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: AppTheme.successGreen),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Connected Successfully!'),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (hasSamsungData) ...[
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.successGreen.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.successGreen),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.watch, color: AppTheme.successGreen, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Samsung Health/Galaxy Watch detected!',
+                              style: TextStyle(
+                                color: AppTheme.successGreen,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ] else ...[
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info, color: Colors.orange, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'No Samsung Health data found',
+                              style: TextStyle(color: Colors.orange),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  
+                  Text('Today\'s Data:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text('Steps: ${healthData['steps'] ?? 0}'),
+                  if (healthData['stepsBySource'] != null) ...[
+                    Text(
+                      'Data Source: ${(healthData['stepsBySource'] as Map)['dataSource'] ?? 'Unknown'}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    Text(
+                      'Samsung: ${(healthData['stepsBySource'] as Map)['samsung'] ?? 0} | Google Fit: ${(healthData['stepsBySource'] as Map)['googleFit'] ?? 0}',
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                  ],
+                  Text('Heart Rate: ${healthData['heartRate'] ?? 0} bpm ${healthData['heartRateType'] == 'resting' ? '(resting)' : ''}'),
+                  Text('Calories: ${healthData['calories'] ?? 0}'),
+                  Text('Distance: ${(healthData['distance'] ?? 0.0).toStringAsFixed(2)} km'),
+                  if (healthData['sleep'] != null && healthData['sleep'] > 0) ...[
+                    Text('Sleep: ${(healthData['sleep'] as double).toStringAsFixed(1)} hours'),
+                    if (healthData['sleepStages'] != null) 
+                      Text(
+                        'Sleep Stages: ${(healthData['sleepStages'] as Map).entries.map((e) => '${e.key}: ${e.value}m').join(', ')}',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                  ] else
+                    Text('Sleep: No data'),
+                  
+                  const SizedBox(height: 16),
+                  Divider(),
+                  const SizedBox(height: 8),
+                  
+                  Text('Sync Status:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.sync, size: 16, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text('Last sync: ${healthData['lastSync'] != null ? healthData['lastSync'].toString().substring(0, 19) : 'Just now'}'),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Icon(Icons.schedule, size: 16, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text('Auto-sync: Every hour'),
+                    ],
+                  ),
+                  
+                  if (dataSources.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text('Data sources:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    ...dataSources.map((source) => Padding(
+                      padding: EdgeInsets.only(left: 16, top: 2),
+                      child: Text(
+                        '• ${source}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    )),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryAccent,
+                ),
+                child: Text('Great!', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // Show detailed error with debug logs
+        _showDetailedError(
+          'Native Health Connect Failed',
+          testResults['error'] ?? 'Unknown error occurred',
+          nativeService.debugLogs,
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      _showDetailedError(
+        'Unexpected Error',
+        e.toString(),
+        nativeService.debugLogs,
+      );
+    }
+  }
+
   // Method to connect to health app
   Future<void> _connectToHealthApp() async {
     final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+    final healthService = healthProvider.healthService;
     
-    // Show loading dialog
+    // First ensure the health service is initialized
+    if (!healthService.isInitialized) {
+      // Show initializing dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: AppTheme.primaryAccent),
+              const SizedBox(height: 16),
+              Text('Initializing health service...'),
+            ],
+          ),
+        ),
+      );
+      
+      await healthService.initialize();
+      Navigator.pop(context);
+    }
+    
+    // Show connecting dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1716,45 +1991,237 @@ class _ProfileScreenState extends State<ProfileScreen> {
             CircularProgressIndicator(color: AppTheme.primaryAccent),
             const SizedBox(height: 16),
             Text('Connecting to health app...'),
+            const SizedBox(height: 8),
+            Text(
+              'Please grant all permissions when prompted',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ],
         ),
       ),
     );
 
     try {
-      // Initialize health service
-      final success = await healthProvider.initializeHealth();
+      // Request health permissions with detailed error handling
+      final result = await healthService.requestHealthPermissions();
       
       // Close loading dialog
       Navigator.pop(context);
       
-      if (success) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('Successfully connected to health app!'),
-                ),
-              ],
-            ),
-            backgroundColor: AppTheme.successGreen,
-            duration: Duration(seconds: 3),
-          ),
-        );
+      if (result.success) {
+        // Test data fetching
+        final canFetchData = await healthService.testHealthDataFetch();
         
-        // Sync initial data
-        await healthProvider.syncWithHealth();
+        if (canFetchData) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Successfully connected to health app!'),
+                  ),
+                ],
+              ),
+              backgroundColor: AppTheme.successGreen,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          
+          // Update provider state
+          await healthProvider.updateHealthConnectionStatus(true);
+          
+          // Sync initial data
+          await healthProvider.syncWithHealth();
+        } else {
+          _showDetailedError(
+            'Connection Partially Successful',
+            'Connected to health app but unable to fetch data. Please check permissions in your device settings.',
+            healthService.debugLogs,
+          );
+        }
       } else {
-        _showHealthConnectionError();
+        // Show detailed error based on error type
+        _showDetailedError(
+          result.error == HealthConnectionError.healthConnectNotInstalled
+              ? 'Health Connect Not Installed'
+              : result.error == HealthConnectionError.healthConnectNeedsUpdate
+                  ? 'Health Connect Needs Update'
+                  : result.error == HealthConnectionError.permissionsDenied
+                      ? 'Permissions Denied'
+                      : 'Connection Failed',
+          result.errorMessage ?? 'An unknown error occurred',
+          healthService.debugLogs,
+        );
       }
     } catch (e) {
-      // Close loading dialog
-      Navigator.pop(context);
-      _showHealthConnectionError();
+      // Close loading dialog if still open
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      _showDetailedError(
+        'Unexpected Error',
+        'An unexpected error occurred: ${e.toString()}',
+        healthService.debugLogs,
+      );
+    }
+  }
+
+  // Show detailed error with debug info
+  void _showDetailedError(String title, String message, List<String> debugLogs) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.orange),
+            const SizedBox(width: 12),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              
+              // Show debug logs in development mode
+              if (debugLogs.isNotEmpty) ...[
+                ExpansionTile(
+                  title: Text(
+                    'Debug Information',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                  children: [
+                    Container(
+                      constraints: BoxConstraints(maxHeight: 200),
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.black26 : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Text(
+                          debugLogs.take(20).join('\n'),
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              
+              const SizedBox(height: 16),
+              Text(
+                'What to try:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              
+              // Specific suggestions based on error
+              if (title.contains('Not Installed')) ...[
+                _buildSuggestion('1. Install Health Connect from Play Store'),
+                _buildSuggestion('2. Open Health Connect and set it up'),
+                _buildSuggestion('3. Come back and try again'),
+              ] else if (title.contains('Permissions')) ...[
+                _buildSuggestion('1. Open Settings > Apps > Streaker'),
+                _buildSuggestion('2. Tap Permissions'),
+                _buildSuggestion('3. Grant all health-related permissions'),
+                _buildSuggestion('4. Try connecting again'),
+              ] else ...[
+                _buildSuggestion('1. Make sure Health Connect is installed'),
+                _buildSuggestion('2. Check if your device is compatible'),
+                _buildSuggestion('3. Try restarting the app'),
+                _buildSuggestion('4. Use Bluetooth connection as alternative'),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          if (title.contains('Not Installed'))
+            OutlinedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Open Play Store for Health Connect
+                _openHealthConnectInStore();
+              },
+              child: Text('Open Play Store'),
+            )
+          else
+            OutlinedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _showBluetoothAlternativeDialog();
+              },
+              child: Text('Try Bluetooth'),
+            ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _connectToHealthApp(); // Retry
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryAccent,
+            ),
+            child: Text(
+              'Try Again',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildSuggestion(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('• ', style: TextStyle(color: AppTheme.primaryAccent)),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _openHealthConnectInStore() async {
+    try {
+      final url = 'https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata';
+      // You'll need to add url_launcher to open the URL
+      // For now, just show a message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please search for "Health Connect" in Play Store'),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error opening Play Store: $e');
     }
   }
 

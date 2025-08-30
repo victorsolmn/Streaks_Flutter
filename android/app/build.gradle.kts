@@ -44,3 +44,19 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Health Connect native SDK
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha10")
+    
+    // Coroutines for async operations
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    
+    // Required for Health Connect
+    implementation("androidx.activity:activity-ktx:1.9.0")
+    implementation("androidx.fragment:fragment-ktx:1.7.0")
+    
+    // WorkManager for background sync
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+}

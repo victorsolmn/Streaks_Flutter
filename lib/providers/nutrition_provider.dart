@@ -5,6 +5,7 @@ import 'dart:io';
 import '../services/nutrition_ai_service.dart';
 import '../services/indian_food_nutrition_service.dart';
 import '../services/realtime_sync_service.dart';
+import '../services/supabase_service.dart';
 
 class NutritionEntry {
   final String id;
@@ -73,6 +74,7 @@ class NutritionProvider with ChangeNotifier {
   String? _error;
   final IndianFoodNutritionService _indianFoodService = IndianFoodNutritionService();
   final RealtimeSyncService _syncService = RealtimeSyncService();
+  final SupabaseService _supabaseService = SupabaseService();
 
   // Daily goals
   int _calorieGoal = 2000;
@@ -81,8 +83,12 @@ class NutritionProvider with ChangeNotifier {
   double _fatGoal = 67.0;
 
   NutritionProvider(this._prefs) {
-    _loadNutritionData();
-    _loadGoals();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await _loadGoals();
+    await loadDataFromSupabase();
   }
 
   List<NutritionEntry> get entries => _entries;
@@ -125,6 +131,56 @@ class NutritionProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _setError('Failed to load nutrition data');
+    }
+  }
+
+  Future<void> loadDataFromSupabase() async {
+    final userId = _supabaseService.currentUser?.id;
+    if (userId == null) {
+      // If not logged in, load from local storage
+      await _loadNutritionData();
+      return;
+    }
+
+    _setLoading(true);
+    try {
+      // Load nutrition history from Supabase (last 30 days)
+      final history = await _supabaseService.getNutritionHistory(
+        userId: userId,
+        days: 30,
+      );
+
+      _entries.clear();
+      
+      for (final entry in history) {
+        final foodItems = entry['food_items'] as List?;
+        if (foodItems != null && foodItems.isNotEmpty) {
+          // Load individual food items from the JSON array
+          for (final item in foodItems) {
+            _entries.add(NutritionEntry(
+              id: item['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+              foodName: item['foodName'] ?? 'Unknown',
+              calories: item['calories'] ?? 0,
+              protein: (item['protein'] ?? 0).toDouble(),
+              carbs: (item['carbs'] ?? 0).toDouble(),
+              fat: (item['fat'] ?? 0).toDouble(),
+              fiber: (item['fiber'] ?? 0).toDouble(),
+              timestamp: DateTime.parse(item['timestamp'] ?? entry['date']),
+            ));
+          }
+        }
+      }
+
+      // Save to local storage as well
+      await _saveNutritionData();
+      
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading from Supabase: $e');
+      // Fallback to local data
+      await _loadNutritionData();
+      _setLoading(false);
     }
   }
 
@@ -178,14 +234,73 @@ class NutritionProvider with ChangeNotifier {
       _entries.add(entry);
       await _saveNutritionData();
       
-      // Sync to Supabase immediately
-      await _syncService.syncNutritionEntry(entry);
+      // Save to Supabase if user is logged in
+      final userId = _supabaseService.currentUser?.id;
+      if (userId != null) {
+        await _syncToSupabase();
+      }
       
       _setLoading(false);
       notifyListeners();
     } catch (e) {
       _setError('Failed to add nutrition entry');
       _setLoading(false);
+    }
+  }
+
+  Future<void> _syncToSupabase() async {
+    final userId = _supabaseService.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      // Group entries by date
+      final Map<String, List<NutritionEntry>> entriesByDate = {};
+      
+      for (final entry in _entries) {
+        final dateStr = '${entry.timestamp.year}-${entry.timestamp.month.toString().padLeft(2, '0')}-${entry.timestamp.day.toString().padLeft(2, '0')}';
+        entriesByDate[dateStr] ??= [];
+        entriesByDate[dateStr]!.add(entry);
+      }
+
+      // Save each day's data to Supabase
+      for (final date in entriesByDate.keys) {
+        final dayEntries = entriesByDate[date]!;
+        
+        // Calculate totals for the day
+        int totalCalories = 0;
+        double totalProtein = 0;
+        double totalCarbs = 0;
+        double totalFat = 0;
+        double totalFiber = 0;
+        
+        final foodItems = [];
+        
+        for (final entry in dayEntries) {
+          totalCalories += entry.calories;
+          totalProtein += entry.protein;
+          totalCarbs += entry.carbs;
+          totalFat += entry.fat;
+          totalFiber += entry.fiber;
+          
+          foodItems.add(entry.toJson());
+        }
+
+        await _supabaseService.saveNutritionEntry(
+          userId: userId,
+          date: date,
+          nutritionData: {
+            'calories': totalCalories,
+            'protein': totalProtein,
+            'carbs': totalCarbs,
+            'fat': totalFat,
+            'fiber': totalFiber,
+            'water': 0, // TODO: Add water tracking
+            'food_items': foodItems,
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('Error syncing to Supabase: $e');
     }
   }
 
@@ -196,6 +311,13 @@ class NutritionProvider with ChangeNotifier {
     try {
       _entries.removeWhere((entry) => entry.id == entryId);
       await _saveNutritionData();
+      
+      // Sync to Supabase if user is logged in
+      final userId = _supabaseService.currentUser?.id;
+      if (userId != null) {
+        await _syncToSupabase();
+      }
+      
       _setLoading(false);
       notifyListeners();
     } catch (e) {
