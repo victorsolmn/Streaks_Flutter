@@ -1,6 +1,6 @@
 # Frontend Architecture & UI Design System
 ## Streaks Flutter Application
-### Last Updated: August 29, 2025
+### Last Updated: August 30, 2025
 
 ## Table of Contents
 1. [Design System Overview](#design-system-overview)
@@ -50,19 +50,66 @@
 
 ## Health Integration UI Architecture
 
+### Native Android Implementation (Updated August 30, 2025)
+
+#### Architecture Overview
+```
+Flutter UI Layer
+    ↓
+MethodChannel Bridge (com.streaker/health_connect)
+    ↓
+Native Android Layer (Kotlin)
+    ↓
+Google Health Connect API
+    ↓
+Samsung Health / Google Fit / Other Sources
+```
+
+#### Native Components
+1. **MainActivity.kt**: Core Health Connect implementation
+   - Direct SDK integration
+   - Data source prioritization logic
+   - Samsung Health detection (`com.sec.android.app.shealth`)
+   
+2. **HealthSyncWorker.kt**: Background sync
+   - WorkManager for hourly sync
+   - Runs when app is closed
+   - SharedPreferences for sync state
+
+3. **NativeHealthConnectService.dart**: Flutter bridge
+   - Async/await pattern
+   - Debug logging system
+   - Error handling with fallbacks
+
+#### Data Source Priority System
+```kotlin
+// Priority logic in MainActivity.kt
+val finalSteps = when {
+    samsungSteps > 0 -> samsungSteps  // First priority
+    googleFitSteps > 0 -> googleFitSteps  // Fallback
+    else -> otherSteps  // Last resort
+}
+```
+
 ### Health Connection Flow UI
 ```
 Profile Screen
     ↓ 
 Smartwatch Integration Dialog
     ↓
-[Priority 1] Health App Connection
+[Priority 1] Native Health Connect (NEW)
+    ├── Samsung Health Detection
+    ├── Data Source Display
+    ├── Hourly Background Sync  
+    └── Debug & Diagnostic Tool
+    
+[Priority 2] Health App Connection (Legacy)
     ├── Connection Status Display
     ├── Permission Request Flow  
     ├── Success/Error Feedback
     └── Data Sync Indicators
     
-[Priority 2] Bluetooth Fallback
+[Priority 3] Bluetooth Fallback
     ├── Device Scanning Interface
     ├── Connection Progress  
     ├── Device Selection

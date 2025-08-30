@@ -6,7 +6,101 @@
 **Repository:** https://github.com/victorsolmn/Streaks_Flutter.git  
 **Version:** 1.0.0+1  
 **Flutter SDK:** 3.35.2 (Dart 3.9.0)
-**Last Major Update:** August 29, 2025
+**Last Major Update:** August 30, 2025
+
+## Latest Session Updates (August 30, 2025)
+
+### Native Health Connect Integration 🏥
+
+#### 1. Complete Native Android Implementation
+**Problem Solved:** Flutter health plugin was failing to connect with Samsung Health/Health Connect
+**Solution:** Implemented native Android SDK using Kotlin with MethodChannel bridge
+
+**Key Features:**
+- Direct communication with Google Health Connect API
+- Proper Samsung Health data detection (`com.sec.android.app.shealth`)
+- No dependency on Flutter health plugin
+- Full control over data reading and permissions
+
+**Files Created:**
+- `android/app/src/main/kotlin/com/streaker/streaker/MainActivity.kt` - Main native implementation
+- `android/app/src/main/kotlin/com/streaker/streaker/HealthSyncWorker.kt` - Background sync worker
+- `lib/services/native_health_connect_service.dart` - Flutter-Native bridge service
+- `lib/screens/health_debug_screen.dart` - Comprehensive diagnostic tool
+
+#### 2. Data Source Prioritization
+**Problem Solved:** App was double-counting steps (4134 + 4169 = 8303)
+**Solution:** Implemented smart prioritization system
+
+**Priority Logic:**
+1. **Samsung Health** (`com.sec.android.app.shealth`) - Always first priority
+2. **Google Fit** - Only used if Samsung Health has no data
+3. **Other sources** - Last resort fallback
+
+**Implementation:**
+- Separate data by source before aggregation
+- Never sum data from multiple sources
+- Clear indication of which source is being used
+- Applied to all metrics (steps, heart rate, calories, distance, sleep)
+
+#### 3. Sleep Tracking Implementation
+**Features:**
+- Reads sleep sessions from last 24 hours
+- Prioritizes Samsung Health sleep data
+- Shows total sleep in hours and minutes
+- Includes sleep session details (start/end times)
+
+**Code Example:**
+```kotlin
+val sleepResponse = healthConnectClient.readRecords(
+    ReadRecordsRequest(
+        SleepSessionRecord::class,
+        timeRangeFilter = TimeRangeFilter.between(
+            now.minus(24, ChronoUnit.HOURS), 
+            now
+        )
+    )
+)
+```
+
+#### 4. Resting Heart Rate
+**Implementation:** Fetches all heart rate samples from the day and uses minimum as resting
+**Rationale:** Lowest heart rate during the day typically represents resting state
+
+#### 5. Hourly Background Sync
+**Technology:** Android WorkManager
+**Features:**
+- Syncs health data every hour automatically
+- Continues when app is closed
+- Stores last sync time and data sources
+- Samsung Health prioritization in background
+
+#### 6. Debug & Diagnostic Tool
+**Purpose:** Comprehensive troubleshooting for health data sync issues
+**Features:**
+- Full diagnostic of Health Connect status
+- Permission verification
+- Data source identification
+- Real-time log display
+- Copy logs to clipboard
+- Automatic issue analysis with solutions
+
+### Data Persistence Improvements 🗄️
+
+#### 1. Supabase Integration for Nutrition
+**Problem Solved:** Nutrition data was lost on logout
+**Solution:** Full Supabase persistence for all nutrition data
+
+**Implementation:**
+- Save nutrition entries with complete food_items array
+- Load historical data on app startup
+- Sync across devices with same account
+- 30-day history retention
+
+**Files Modified:**
+- `lib/services/supabase_service.dart` - Enhanced nutrition saving
+- `lib/providers/nutrition_provider.dart` - Supabase sync integration
+- `lib/screens/main/main_screen.dart` - Load data on startup
 
 ## Latest Session Updates (August 29, 2025)
 
