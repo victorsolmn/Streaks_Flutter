@@ -1,6 +1,6 @@
 # Frontend Architecture & UI Design System
 ## Streaks Flutter Application
-### Last Updated: August 30, 2025
+### Last Updated: September 1, 2025
 
 ## Table of Contents
 1. [Design System Overview](#design-system-overview)
@@ -474,6 +474,84 @@ All UI elements now consistently use the orange gradient theme:
 
 ---
 
+## Authentication & Onboarding Architecture (Updated September 1, 2025)
+
+### Authentication Flow
+```
+Welcome Screen
+    ↓
+[Sign Up] → Email Validation → Create Account
+[Sign In] → Email/Password → Main Screen
+    ↓
+Onboarding (if new user)
+    ↓
+Smartwatch Connection
+    ↓
+Main Screen with Fitness Goal Summary
+```
+
+### Email Duplicate Validation
+```dart
+// Enhanced email checking in SupabaseService
+Future<bool> checkEmailExists(String email) async {
+  // 1. Try sign-in with dummy password (most reliable)
+  try {
+    await signInWithPassword(email, 'dummy_password');
+  } catch (error) {
+    if (error.contains('invalid login credentials')) {
+      return true; // Email exists
+    }
+  }
+  
+  // 2. Check profiles table
+  final profile = await from('profiles')
+    .select('id')
+    .eq('email', email.toLowerCase())
+    .maybeSingle();
+  
+  return profile != null;
+}
+```
+
+### Sign-Out Flow (Fixed)
+```dart
+// Profile Screen - Improved sign-out
+onPressed: () async {
+  // 1. Clear local data first
+  await userProvider.clearUserData();
+  await nutritionProvider.clearNutritionData();
+  
+  // 2. Navigate immediately (no loading dialog)
+  Navigator.pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => WelcomeScreen()),
+    (route) => false,
+  );
+  
+  // 3. Sign out from auth providers in background
+  await supabaseAuthProvider.signOut();
+}
+```
+
+### Onboarding Components
+
+1. **Profile Setup Screen**
+   - Basic info (age, height, weight)
+   - Fitness goals selection
+   - Activity level selection
+
+2. **Smartwatch Connection Screen**
+   - Fixed permission handling
+   - Uses unified health service
+   - Proper error messages for different failures
+   - Connection state persistence
+
+3. **Fitness Goal Summary Dialog**
+   - Shows after onboarding completion
+   - Displays selected goals and targets
+   - One-time display (tracked with hasSeenFitnessGoalSummary)
+
+---
+
 ## Performance Optimization
 
 ### Health Data Caching Strategy
@@ -494,7 +572,65 @@ class HealthDataCache {
 
 ---
 
-## Cloud Synchronization Architecture
+## Cloud Synchronization Architecture (Updated September 1, 2025)
+
+### Automatic Bidirectional Sync Implementation
+
+#### Architecture Overview
+```
+App State Changes
+    ↓
+Local Storage (SharedPreferences)
+    ↓
+Connectivity Monitor (connectivity_plus)
+    ↓
+[Online] → Immediate Supabase Sync
+[Offline] → Queue for Later Sync
+    ↓
+Background Sync (Timer-based)
+```
+
+#### Key Components
+
+1. **Connectivity Monitoring**
+```dart
+// Health Provider Example
+StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+_connectivity.onConnectivityChanged.listen((results) {
+  _isOnline = !results.contains(ConnectivityResult.none);
+  if (wasOffline && _isOnline) {
+    // Auto-sync when coming back online
+    syncToSupabase();
+  }
+});
+```
+
+2. **Periodic Sync**
+- Every 5 minutes when online
+- Throttled to prevent excessive API calls (min 60s between syncs)
+- Runs in both Health and Nutrition providers
+
+3. **Lifecycle-based Sync**
+```dart
+// Main Screen
+void didChangeAppLifecycleState(AppLifecycleState state) {
+  if (state == AppLifecycleState.resumed) {
+    // Sync when app comes to foreground
+    healthProvider.loadHealthDataFromSupabase();
+    nutritionProvider.loadDataFromSupabase();
+  } else if (state == AppLifecycleState.paused) {
+    // Sync when app goes to background
+    healthProvider.syncOnPause();
+    nutritionProvider.syncOnPause();
+  }
+}
+```
+
+4. **Visual Sync Status Indicator**
+- **Green "Synced"**: Data up to date (shows time since last sync)
+- **Blue "Syncing"**: Currently synchronizing (rotating icon)
+- **Orange "Offline"**: No internet (shows pending items count)
+- Tap to manually trigger sync
 
 ### Real-time Health Data Sync
 ```dart

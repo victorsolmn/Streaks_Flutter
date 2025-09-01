@@ -6,9 +6,69 @@
 **Repository:** https://github.com/victorsolmn/Streaks_Flutter.git  
 **Version:** 1.0.0+1  
 **Flutter SDK:** 3.35.2 (Dart 3.9.0)
-**Last Major Update:** August 30, 2025
+**Last Major Update:** September 1, 2025
 
-## Latest Session Updates (August 30, 2025)
+## Latest Session Updates (September 1, 2025)
+
+### Critical Bug Fixes and Improvements 🔧
+
+#### 1. Sign-Out Functionality Fix
+**Problem:** Sign-out was showing infinite loading spinner instead of navigating to Welcome screen
+**Solution:** 
+- Removed loading dialog that was blocking navigation
+- Navigate to Welcome screen first, then clean up auth in background
+- Removed loading state from auth providers during sign-out
+- Even on error, app navigates to Welcome screen
+
+**Files Modified:**
+- `lib/screens/main/profile_screen.dart` - Updated sign-out flow
+- `lib/providers/supabase_auth_provider.dart` - Removed loading state from signOut
+- `lib/providers/auth_provider.dart` - Fixed loading state handling
+
+#### 2. Email Duplicate Validation Fix
+**Problem:** App allowed duplicate account creation with existing emails
+**Solution:**
+- Improved email checking against Supabase auth.users table
+- Try sign-in with dummy password to detect existing emails
+- Fallback to profiles table check
+- Show proper error: "This email is already registered"
+
+**Files Modified:**
+- `lib/services/supabase_service.dart` - Enhanced checkEmailExists method
+- `lib/screens/auth/signup_screen.dart` - Proper duplicate handling
+
+#### 3. Smartwatch Integration in Onboarding
+**Problem:** "Permission not granted" error when connecting to Health Connect/Samsung Health
+**Solution:**
+- Use unified health service like profile page does
+- Initialize health provider before requesting permissions
+- Use `healthProvider.healthService.requestHealthPermissions()`
+- Show specific error messages for different failure types
+
+**Files Modified:**
+- `lib/screens/onboarding/smartwatch_connection_screen.dart` - Fixed permission flow
+- Added proper error handling for different connection failures
+
+#### 4. Automatic Supabase Synchronization
+**Features Implemented:**
+- Bidirectional sync between local storage and Supabase
+- Connectivity monitoring using connectivity_plus
+- Auto-sync when coming back online
+- Periodic sync every 5 minutes
+- Sync on app lifecycle changes (pause/resume)
+- Visual sync status indicators
+
+**Files Modified:**
+- `lib/providers/health_provider.dart` - Added connectivity monitoring and auto-sync
+- `lib/providers/nutrition_provider.dart` - Added similar sync functionality
+- `lib/screens/main/main_screen.dart` - Added lifecycle sync handling
+- `lib/widgets/sync_status_indicator.dart` - Enhanced UI feedback
+
+#### 5. Connectivity Plus API Update
+**Problem:** API changed from single ConnectivityResult to List<ConnectivityResult>
+**Solution:** Updated all connectivity listeners to handle list of results
+
+## Previous Session Updates (August 30, 2025)
 
 ### Native Health Connect Integration 🏥
 
