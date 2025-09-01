@@ -141,8 +141,6 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    _setLoading(true);
-    
     try {
       // Clear authentication data
       await _prefs.remove('auth_token');
@@ -159,12 +157,16 @@ class AuthProvider with ChangeNotifier {
       _isAuthenticated = false;
       _currentUserId = null;
       _error = null;
+      _isLoading = false;
       
-      _setLoading(false);
       notifyListeners();
     } catch (e) {
       _setError(e.toString());
-      _setLoading(false);
+      // Even on error, clear authentication state
+      _isAuthenticated = false;
+      _currentUserId = null;
+      _isLoading = false;
+      notifyListeners();
     }
   }
 

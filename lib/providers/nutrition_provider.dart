@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../services/nutrition_ai_service.dart';
 import '../services/indian_food_nutrition_service.dart';
 import '../services/realtime_sync_service.dart';
@@ -75,6 +77,14 @@ class NutritionProvider with ChangeNotifier {
   final IndianFoodNutritionService _indianFoodService = IndianFoodNutritionService();
   final RealtimeSyncService _syncService = RealtimeSyncService();
   final SupabaseService _supabaseService = SupabaseService();
+  
+  // Connectivity and sync management
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool _isOnline = true;
+  Timer? _syncTimer;
+  DateTime? _lastSyncTime;
+  bool _isSyncing = false;
 
   // Daily goals
   int _calorieGoal = 2000;
@@ -84,11 +94,47 @@ class NutritionProvider with ChangeNotifier {
 
   NutritionProvider(this._prefs) {
     _initializeData();
+    _setupConnectivityMonitoring();
+    _setupPeriodicSync();
   }
 
   Future<void> _initializeData() async {
     await _loadGoals();
     await loadDataFromSupabase();
+    
+    // Check initial connectivity
+    final connectivityResult = await _connectivity.checkConnectivity();
+    _isOnline = !connectivityResult.contains(ConnectivityResult.none);
+  }
+  
+  void _setupConnectivityMonitoring() {
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      final wasOffline = !_isOnline;
+      _isOnline = !results.contains(ConnectivityResult.none);
+      
+      if (wasOffline && _isOnline) {
+        debugPrint('NutritionProvider: Connection restored - syncing data with Supabase');
+        _syncToSupabase();
+        loadDataFromSupabase();
+      }
+    });
+  }
+  
+  void _setupPeriodicSync() {
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(Duration(minutes: 5), (timer) {
+      if (_isOnline && !_isSyncing) {
+        debugPrint('NutritionProvider: Periodic sync triggered');
+        _syncToSupabase();
+      }
+    });
+  }
+  
+  Future<void> syncOnPause() async {
+    if (_isOnline && !_isSyncing) {
+      debugPrint('NutritionProvider: Syncing on app pause');
+      await _syncToSupabase();
+    }
   }
 
   List<NutritionEntry> get entries => _entries;
@@ -234,9 +280,10 @@ class NutritionProvider with ChangeNotifier {
       _entries.add(entry);
       await _saveNutritionData();
       
-      // Save to Supabase if user is logged in
+      // Auto-sync to Supabase if user is logged in and online
       final userId = _supabaseService.currentUser?.id;
-      if (userId != null) {
+      if (userId != null && _isOnline) {
+        debugPrint('NutritionProvider: Auto-syncing after adding entry');
         await _syncToSupabase();
       }
       
@@ -250,9 +297,21 @@ class NutritionProvider with ChangeNotifier {
 
   Future<void> _syncToSupabase() async {
     final userId = _supabaseService.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null || _isSyncing) return;
+    
+    // Throttle syncing - don't sync more than once per minute
+    if (_lastSyncTime != null) {
+      final timeSinceLastSync = DateTime.now().difference(_lastSyncTime!);
+      if (timeSinceLastSync.inSeconds < 60) {
+        debugPrint('NutritionProvider: Skipping sync, last sync was ${timeSinceLastSync.inSeconds} seconds ago');
+        return;
+      }
+    }
+    
+    _isSyncing = true;
 
     try {
+      debugPrint('NutritionProvider: Starting sync to Supabase');
       // Group entries by date
       final Map<String, List<NutritionEntry>> entriesByDate = {};
       
@@ -299,8 +358,13 @@ class NutritionProvider with ChangeNotifier {
           },
         );
       }
+      
+      _lastSyncTime = DateTime.now();
+      debugPrint('NutritionProvider: Sync to Supabase completed successfully');
     } catch (e) {
       debugPrint('Error syncing to Supabase: $e');
+    } finally {
+      _isSyncing = false;
     }
   }
 
@@ -312,9 +376,10 @@ class NutritionProvider with ChangeNotifier {
       _entries.removeWhere((entry) => entry.id == entryId);
       await _saveNutritionData();
       
-      // Sync to Supabase if user is logged in
+      // Auto-sync to Supabase if user is logged in and online
       final userId = _supabaseService.currentUser?.id;
-      if (userId != null) {
+      if (userId != null && _isOnline) {
+        debugPrint('NutritionProvider: Auto-syncing after removing entry');
         await _syncToSupabase();
       }
       
@@ -456,5 +521,12 @@ class NutritionProvider with ChangeNotifier {
       _error = 'Failed to clear nutrition data';
       notifyListeners();
     }
+  }
+  
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    _syncTimer?.cancel();
+    super.dispose();
   }
 }

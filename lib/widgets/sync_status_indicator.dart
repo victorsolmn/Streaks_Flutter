@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/realtime_sync_service.dart';
+import '../providers/health_provider.dart';
+import '../providers/nutrition_provider.dart';
+import '../utils/app_theme.dart';
 
 class SyncStatusIndicator extends StatefulWidget {
   const SyncStatusIndicator({Key? key}) : super(key: key);
@@ -14,6 +18,7 @@ class _SyncStatusIndicatorState extends State<SyncStatusIndicator> with SingleTi
   bool _isSyncing = false;
   bool _isOnline = true;
   int _offlineQueueSize = 0;
+  DateTime? _lastSyncTime;
 
   @override
   void initState() {
@@ -71,87 +76,172 @@ class _SyncStatusIndicatorState extends State<SyncStatusIndicator> with SingleTi
 
   @override
   Widget build(BuildContext context) {
+    // Listen to providers for sync status
+    final healthProvider = Provider.of<HealthProvider>(context);
+    final nutritionProvider = Provider.of<NutritionProvider>(context);
+    
+    // Update sync status based on providers
+    final isProviderSyncing = healthProvider.isLoading || nutritionProvider.isLoading;
+    if (isProviderSyncing != _isSyncing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() {
+          _isSyncing = isProviderSyncing;
+          if (_isSyncing) {
+            _animationController.repeat();
+          } else {
+            _animationController.stop();
+            _lastSyncTime = DateTime.now();
+          }
+        });
+      });
+    }
     if (!_isOnline) {
-      return IconButton(
-        icon: Stack(
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.cloud_off,
               color: Colors.orange,
+              size: 16,
             ),
-            if (_offlineQueueSize > 0)
-              Positioned(
-                right: 0,
-                top: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  constraints: const BoxConstraints(
-                    minWidth: 14,
-                    minHeight: 14,
-                  ),
-                  child: Text(
-                    '$_offlineQueueSize',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+            SizedBox(width: 6),
+            Text(
+              _offlineQueueSize > 0 ? 'Offline ($_offlineQueueSize)' : 'Offline',
+              style: TextStyle(
+                color: Colors.orange,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
+            ),
           ],
         ),
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Offline Mode'),
-              content: Text(
-                _offlineQueueSize > 0
-                    ? 'You are currently offline. $_offlineQueueSize changes will sync when connection is restored.'
-                    : 'You are currently offline. Changes will sync when connection is restored.',
+      );
+    }
+    
+    if (_isSyncing) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryAccent.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.primaryAccent.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RotationTransition(
+              turns: _animationController,
+              child: Icon(
+                Icons.sync,
+                color: AppTheme.primaryAccent,
+                size: 16,
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
+            ),
+            SizedBox(width: 6),
+            Text(
+              'Syncing',
+              style: TextStyle(
+                color: AppTheme.primaryAccent,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return GestureDetector(
+      onTap: () async {
+        setState(() {
+          _isSyncing = true;
+        });
+        _animationController.repeat();
+        
+        // Trigger manual sync
+        await Future.wait([
+          healthProvider.syncWithHealth(),
+          nutritionProvider.loadDataFromSupabase(),
+        ]);
+        
+        setState(() {
+          _isSyncing = false;
+          _lastSyncTime = DateTime.now();
+        });
+        _animationController.stop();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('Data synced successfully'),
+                ],
+              ),
+              backgroundColor: AppTheme.successGreen,
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.all(16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           );
-        },
-        tooltip: 'Offline - $_offlineQueueSize pending',
-      );
-    }
-
-    if (_isSyncing) {
-      return IconButton(
-        icon: RotationTransition(
-          turns: _animationController,
-          child: const Icon(
-            Icons.sync,
-            color: Colors.blue,
-          ),
-        ),
-        onPressed: null,
-        tooltip: 'Syncing...',
-      );
-    }
-
-    return IconButton(
-      icon: const Icon(
-        Icons.cloud_done,
-        color: Colors.green,
-      ),
-      onPressed: () async {
-        await _syncService.forceSyncNow();
+        }
       },
-      tooltip: 'Synced - Tap to sync now',
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.successGreen.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.successGreen.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.cloud_done,
+              color: AppTheme.successGreen,
+              size: 16,
+            ),
+            SizedBox(width: 6),
+            Text(
+              _lastSyncTime != null
+                  ? 'Synced ${_getTimeSinceSync()}'
+                  : 'Synced',
+              style: TextStyle(
+                color: AppTheme.successGreen,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
+  }
+  
+  String _getTimeSinceSync() {
+    if (_lastSyncTime == null) return '';
+    
+    final difference = DateTime.now().difference(_lastSyncTime!);
+    if (difference.inSeconds < 60) {
+      return 'now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
+    }
   }
 }

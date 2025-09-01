@@ -8,6 +8,7 @@ import '../../models/health_metric_model.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/circular_progress_widget.dart';
 import '../../widgets/sync_status_indicator.dart';
+import '../../widgets/fitness_goal_summary_dialog.dart';
 import 'dart:math' as math;
 
 class HomeScreenNew extends StatefulWidget {
@@ -38,6 +39,7 @@ class _HomeScreenNewState extends State<HomeScreenNew>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<UserProvider>(context, listen: false).logActivity();
       _initializeHealthData();
+      _checkAndShowFitnessGoalSummary();
     });
   }
 
@@ -45,6 +47,32 @@ class _HomeScreenNewState extends State<HomeScreenNew>
     final healthProvider = Provider.of<HealthProvider>(context, listen: false);
     if (!healthProvider.isInitialized) {
       await healthProvider.initialize();
+    }
+  }
+
+  Future<void> _checkAndShowFitnessGoalSummary() async {
+    // Wait a bit for the screen to settle
+    await Future.delayed(Duration(milliseconds: 500));
+    
+    if (!mounted) return;
+    
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final profile = userProvider.profile;
+    
+    // Show popup if user hasn't seen it yet
+    if (profile != null && !profile.hasSeenFitnessGoalSummary) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => FitnessGoalSummaryDialog(
+          onAgree: () async {
+            // Mark as seen and save
+            await userProvider.updateProfile(
+              hasSeenFitnessGoalSummary: true,
+            );
+          },
+        ),
+      );
     }
   }
 
@@ -96,7 +124,7 @@ class _HomeScreenNewState extends State<HomeScreenNew>
                       const SizedBox(height: 32),
                       _buildPrimaryMetrics(healthProvider, nutritionProvider),
                       const SizedBox(height: 24),
-                      _buildSecondaryMetrics(healthProvider),
+                      _buildSecondaryMetrics(healthProvider, nutritionProvider),
                       const SizedBox(height: 32),
                       _buildInsightsSection(healthProvider, nutritionProvider, userProvider),
                       // Removed floating action button as it has no functionality
@@ -387,10 +415,10 @@ class _HomeScreenNewState extends State<HomeScreenNew>
 
   Widget _buildHeartRateCard(HealthProvider healthProvider) {
     final heartRateData = healthProvider.metrics[MetricType.restingHeartRate];
-    final heartRate = heartRateData?.currentValue?.toInt() ?? 68;
+    final heartRate = heartRateData?.currentValue?.toInt() ?? 0;
     
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -406,39 +434,100 @@ class _HomeScreenNewState extends State<HomeScreenNew>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Heart Rate',
+            'Avg Resting Heart Rate',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
           
-          // Heart rate wave
-          Container(
-            height: 40,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: HeartRateWavePainter(),
-            ),
-          ),
-          
-          const SizedBox(height: 8),
-          
-          Text(
-            '$heartRate bpm',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              // Heart icon with pulse effect
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Icon(
+                  Icons.favorite,
+                  color: Colors.red,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 20),
+              
+              // Heart rate value
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        heartRate > 0 ? heartRate.toString() : '--',
+                        style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 36,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'bpm',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    heartRate > 0 ? _getHeartRateStatus(heartRate) : 'No data',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: _getHeartRateColor(heartRate),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+  
+  String _getHeartRateStatus(int heartRate) {
+    if (heartRate < 60) return 'Below normal';
+    if (heartRate <= 100) return 'Normal';
+    return 'Above normal';
+  }
+  
+  Color _getHeartRateColor(int heartRate) {
+    if (heartRate == 0) return AppTheme.textSecondary;
+    if (heartRate < 60) return Colors.blue;
+    if (heartRate <= 100) return Colors.green;
+    return Colors.orange;
+  }
 
-  Widget _buildSecondaryMetrics(HealthProvider healthProvider) {
+  Widget _buildSecondaryMetrics(HealthProvider healthProvider, NutritionProvider nutritionProvider) {
     final sleepData = healthProvider.metrics[MetricType.sleep];
-    final sleepMinutes = sleepData?.currentValue ?? 0; // Start from 0
-    final sleepHours = (sleepMinutes / 60).toStringAsFixed(1);
+    final sleepHours = sleepData?.currentValue ?? 0; // Already in hours from health provider
+    final sleepHoursFormatted = sleepHours.toStringAsFixed(1);
+    
+    // Get actual calories burned from health provider (active calories from exercise)
+    final caloriesBurned = healthProvider.todayCaloriesBurned.toInt();
+    
+    // Get calories consumed today from nutrition provider
+    final todayNutrition = nutritionProvider.todayNutrition;
+    final caloriesConsumed = todayNutrition?.totalCalories ?? 0;
+    
+    // Calculate calories left based on daily goal
+    final dailyCalorieGoal = 2000; // This could be customized per user
+    final caloriesLeft = (dailyCalorieGoal - caloriesConsumed).clamp(0, dailyCalorieGoal).toInt();
     
     return Row(
       children: [
@@ -483,7 +572,7 @@ class _HomeScreenNewState extends State<HomeScreenNew>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          sleepHours,
+                          sleepHoursFormatted,
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -551,13 +640,13 @@ class _HomeScreenNewState extends State<HomeScreenNew>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '18',
+                          caloriesBurned.toString(),
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          'Calories',
+                          'Calories burned',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.textSecondary,
                           ),
@@ -570,7 +659,7 @@ class _HomeScreenNewState extends State<HomeScreenNew>
                 const SizedBox(height: 16),
                 
                 Text(
-                  '229',
+                  caloriesLeft.toString(),
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -840,32 +929,3 @@ class _HomeScreenNewState extends State<HomeScreenNew>
   }
 }
 
-class HeartRateWavePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.blue
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    final waveHeight = size.height * 0.3;
-    final centerY = size.height / 2;
-
-    path.moveTo(0, centerY);
-
-    // Create heart rate wave pattern
-    for (double x = 0; x < size.width; x += size.width / 8) {
-      final y1 = centerY + math.sin(x / size.width * 4 * math.pi) * waveHeight;
-      final y2 = centerY + math.sin((x + size.width / 16) / size.width * 4 * math.pi) * waveHeight * 0.7;
-      
-      path.lineTo(x, y1);
-      path.lineTo(x + size.width / 16, y2);
-    }
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

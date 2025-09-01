@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../main/main_screen.dart';
 import '../auth/welcome_screen.dart';
+import 'smartwatch_connection_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
@@ -23,6 +24,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _ageController = TextEditingController();
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
+  final _targetWeightController = TextEditingController();
 
   FitnessGoal? _selectedGoal;
   ActivityLevel? _selectedActivityLevel;
@@ -32,6 +34,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _ageController.dispose();
     _heightController.dispose();
     _weightController.dispose();
+    _targetWeightController.dispose();
     super.dispose();
   }
 
@@ -53,14 +56,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         age: int.parse(_ageController.text),
         height: double.parse(_heightController.text),
         weight: double.parse(_weightController.text),
+        targetWeight: double.parse(_targetWeightController.text),
         goal: _selectedGoal!,
         activityLevel: _selectedActivityLevel!,
       );
 
       if (mounted) {
+        // Navigate to smartwatch connection screen instead of main screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const MainScreen(),
+            builder: (context) => const SmartwatchConnectionScreen(),
           ),
         );
       }
@@ -93,14 +98,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 age: 25, // Default age
                 height: 170.0, // Default height in cm
                 weight: 70.0, // Default weight in kg
+                targetWeight: 65.0, // Default target weight
                 goal: FitnessGoal.maintenance, // Default goal
                 activityLevel: ActivityLevel.moderatelyActive, // Default activity level
               );
 
-              // Navigate to main screen
+              // Navigate to smartwatch connection screen
               if (mounted) {
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const MainScreen()),
+                  MaterialPageRoute(builder: (context) => const SmartwatchConnectionScreen()),
                 );
               }
             },
@@ -406,12 +412,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             controller: _weightController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
-              labelText: 'Weight',
+              labelText: 'Current Weight',
               suffixText: 'kg',
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Please enter your weight';
+              }
+              final weight = double.tryParse(value);
+              if (weight == null || weight < 30 || weight > 300) {
+                return 'Please enter a valid weight (30-300 kg)';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 24),
+          
+          TextFormField(
+            controller: _targetWeightController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Target Weight',
+              suffixText: 'kg',
+              helperText: 'Your goal weight',
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your target weight';
               }
               final weight = double.tryParse(value);
               if (weight == null || weight < 30 || weight > 300) {

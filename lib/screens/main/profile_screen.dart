@@ -24,6 +24,7 @@ import '../../models/weight_model.dart';
 import '../../widgets/weight_progress_card.dart';
 import '../../utils/app_theme.dart';
 import '../auth/welcome_screen.dart';
+import 'edit_goals_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -68,6 +69,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildHeader(),
               _buildProfileInfo(),
               _buildWeightProgressSection(),
+              _buildFitnessGoalsSection(),
               _buildSettingsSection(),
             ],
           ),
@@ -232,6 +234,275 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildFitnessGoalsSection() {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final profile = userProvider.profile;
+        if (profile == null) return SizedBox.shrink();
+        
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        
+        return Container(
+          margin: const EdgeInsets.only(top: 16),
+          padding: const EdgeInsets.all(20),
+          color: isDarkMode ? AppTheme.darkCardBackground : Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Fitness Goals',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => EditGoalsScreen(),
+                        ),
+                      );
+                    },
+                    icon: Icon(
+                      Icons.edit,
+                      color: AppTheme.primaryAccent,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16),
+              
+              // Current Goal
+              _buildGoalItem(
+                icon: Icons.flag,
+                title: 'Fitness Goal',
+                value: _formatGoal(profile.goal),
+                color: AppTheme.primaryAccent,
+              ),
+              
+              // BMI
+              if (profile.bmiValue != null) ...[
+                SizedBox(height: 12),
+                _buildGoalItem(
+                  icon: Icons.monitor_weight,
+                  title: 'BMI',
+                  value: '${profile.bmiValue!.toStringAsFixed(1)} (${profile.bmiCategoryValue ?? ""})',
+                  color: _getBMIColor(profile.bmiValue!),
+                ),
+              ],
+              
+              // Daily Targets
+              if (profile.dailyCaloriesTarget != null || 
+                  profile.dailyStepsTarget != null ||
+                  profile.dailySleepTarget != null ||
+                  profile.dailyWaterTarget != null) ...[
+                SizedBox(height: 20),
+                Text(
+                  'Daily Targets',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                SizedBox(height: 12),
+                
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    if (profile.dailyCaloriesTarget != null)
+                      _buildTargetChip(
+                        icon: Icons.local_fire_department,
+                        label: '${profile.dailyCaloriesTarget} kcal',
+                        color: Colors.orange,
+                      ),
+                    if (profile.dailyStepsTarget != null)
+                      _buildTargetChip(
+                        icon: Icons.directions_walk,
+                        label: '${profile.dailyStepsTarget} steps',
+                        color: Colors.blue,
+                      ),
+                    if (profile.dailySleepTarget != null)
+                      _buildTargetChip(
+                        icon: Icons.bedtime,
+                        label: '${profile.dailySleepTarget!.toStringAsFixed(1)}h sleep',
+                        color: Colors.purple,
+                      ),
+                    if (profile.dailyWaterTarget != null)
+                      _buildTargetChip(
+                        icon: Icons.water_drop,
+                        label: '${profile.dailyWaterTarget!.toStringAsFixed(1)}L water',
+                        color: Colors.cyan,
+                      ),
+                  ],
+                ),
+              ],
+              
+              // Weight Progress
+              if (profile.targetWeight != profile.weight) ...[
+                SizedBox(height: 20),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryAccent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.primaryAccent.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        profile.targetWeight > profile.weight 
+                          ? Icons.trending_up 
+                          : Icons.trending_down,
+                        color: AppTheme.primaryAccent,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Target Weight',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              '${profile.targetWeight.toStringAsFixed(1)} kg',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryAccent,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              '${(profile.targetWeight - profile.weight).abs().toStringAsFixed(1)} kg to go',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  Widget _buildGoalItem({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildTargetChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 16),
+          SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Color _getBMIColor(double bmi) {
+    if (bmi < 18.5) return Colors.blue;
+    if (bmi < 25) return Colors.green;
+    if (bmi < 30) return Colors.orange;
+    return Colors.red;
+  }
+  
+  String _formatGoal(FitnessGoal goal) {
+    switch (goal) {
+      case FitnessGoal.weightLoss:
+        return 'Weight Loss';
+      case FitnessGoal.muscleGain:
+        return 'Muscle Gain';
+      case FitnessGoal.maintenance:
+        return 'Maintenance';
+      case FitnessGoal.endurance:
+        return 'Endurance';
+    }
   }
 
   Widget _buildSettingsSection() {
@@ -739,49 +1010,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
+              // Get providers before closing dialog
               final supabaseAuthProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
               final authProvider = Provider.of<AuthProvider>(context, listen: false);
               final userProvider = Provider.of<UserProvider>(context, listen: false);
               final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
+              final healthProvider = Provider.of<HealthProvider>(context, listen: false);
               
-              // Close dialog first
+              // Close the confirmation dialog
               Navigator.of(context).pop();
-              
-              // Show loading indicator
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => const Center(
-                  child: CircularProgressIndicator(),
-                ),
-              );
               
               try {
                 print('Starting logout process...');
                 
-                // Clear all provider data FIRST
+                // Clear all local data first
                 await userProvider.clearUserData();
                 await nutritionProvider.clearNutritionData();
                 
-                // Sign out from both auth providers
-                await authProvider.signOut();
-                await supabaseAuthProvider.signOut();
+                // Clear health provider connections
+                if (healthProvider.isInitialized) {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.remove('health_connect_connected');
+                  await prefs.remove('health_kit_connected');
+                  await prefs.remove('connected_health_source');
+                }
                 
-                print('Logout successful, navigating to welcome screen...');
-                
-                // Close loading dialog and navigate to Welcome screen
+                // Navigate to welcome screen first
                 if (mounted) {
-                  Navigator.of(context).pop(); // Close loading dialog
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => const WelcomeScreen()),
                     (route) => false,
                   );
                 }
+                
+                // Then sign out from auth providers (this won't affect navigation)
+                await authProvider.signOut();
+                await supabaseAuthProvider.signOut();
+                
+                print('Logout successful');
               } catch (e) {
                 print('Logout error: $e');
-                // Close loading dialog and still navigate
+                // Still navigate to welcome screen even if there's an error
                 if (mounted) {
-                  Navigator.of(context).pop(); // Close loading dialog
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => const WelcomeScreen()),
                     (route) => false,

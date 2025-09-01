@@ -87,6 +87,76 @@ class SupabaseService {
     }
   }
 
+  Future<bool> checkEmailExists(String email) async {
+    try {
+      // First, check in auth.users table using a more reliable approach
+      // Try to sign in with a wrong password to check if email exists
+      try {
+        await _supabase.auth.signInWithPassword(
+          email: email.toLowerCase(),
+          password: 'dummy_password_to_check_email_12345',
+        );
+        // If we get here, somehow the password was correct (unlikely)
+        // Sign out immediately
+        await _supabase.auth.signOut();
+        return true;
+      } catch (authError) {
+        final errorMessage = authError.toString().toLowerCase();
+        // If error contains "invalid login credentials", the email exists
+        if (errorMessage.contains('invalid login credentials') ||
+            errorMessage.contains('invalid password') ||
+            errorMessage.contains('incorrect password')) {
+          print('Email exists in auth: $email');
+          return true;
+        }
+        // If error contains "user not found" or similar, email doesn't exist
+        if (errorMessage.contains('user not found') ||
+            errorMessage.contains('no user found') ||
+            errorMessage.contains('email not found')) {
+          print('Email not found in auth: $email');
+          return false;
+        }
+      }
+      
+      // Fallback: Check in profiles table
+      try {
+        final profileResponse = await _supabase
+            .from('profiles')
+            .select('id, email')
+            .eq('email', email.toLowerCase())
+            .maybeSingle();
+        
+        if (profileResponse != null) {
+          print('Email found in profiles table: $email');
+          return true;
+        }
+      } catch (profileError) {
+        print('Profile check error: $profileError');
+      }
+      
+      // Try RPC function if available
+      try {
+        final response = await _supabase.rpc('check_email_exists', params: {
+          'email_input': email.toLowerCase(),
+        });
+        if (response != null) {
+          print('Email check via RPC: $response for $email');
+          return response as bool;
+        }
+      } catch (rpcError) {
+        print('RPC function not available: $rpcError');
+      }
+      
+      print('Email not found, can proceed with signup: $email');
+      return false;
+    } catch (e) {
+      print('Error checking email existence: $e');
+      // On error, return false to allow signup to proceed
+      // Supabase will handle duplicate email validation
+      return false;
+    }
+  }
+
   // User Profile Methods
   Future<void> createUserProfile({
     required String userId,

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
 import '../models/health_metric_model.dart';
 import '../services/unified_health_service.dart';
 import '../services/realtime_sync_service.dart';
@@ -14,6 +16,12 @@ class HealthProvider with ChangeNotifier {
   final SupabaseService _supabaseService = SupabaseService();
   SharedPreferences? _prefs;
   HealthDataSource _currentDataSource = HealthDataSource.unavailable;
+  
+  // Connectivity monitoring
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool _isOnline = true;
+  Timer? _syncTimer;
   
   // Expose health service for direct access
   UnifiedHealthService get healthService => _healthService;
@@ -51,6 +59,12 @@ class HealthProvider with ChangeNotifier {
     // Load saved data from SharedPreferences
     await _loadHealthData();
     
+    // Setup connectivity monitoring
+    _setupConnectivityMonitoring();
+    
+    // Setup periodic sync (every 5 minutes)
+    _setupPeriodicSync();
+    
     // Initialize unified health service
     await _healthService.initialize();
     
@@ -59,10 +73,12 @@ class HealthProvider with ChangeNotifier {
       updateMetricsFromHealth(data);
     });
     
-    // Get current data source
-    _currentDataSource = _healthService.currentSource;
+    // Get current data source (prefer saved one over detected)
+    if (_currentDataSource == HealthDataSource.unavailable) {
+      _currentDataSource = _healthService.currentSource;
+    }
     
-    // Initialize with saved or zero values - will be populated from health service
+    // Initialize with saved values - will be updated from health service if available
     _metrics = {
       MetricType.steps: HealthMetric(value: _todaySteps, timestamp: DateTime.now(), type: MetricType.steps, currentValue: _todaySteps, goalValue: 10000),
       MetricType.caloriesIntake: HealthMetric(value: _todayCaloriesBurned, timestamp: DateTime.now(), type: MetricType.caloriesIntake, currentValue: _todayCaloriesBurned, goalValue: 2200),
@@ -70,11 +86,16 @@ class HealthProvider with ChangeNotifier {
       MetricType.restingHeartRate: HealthMetric(value: _todayHeartRate, timestamp: DateTime.now(), type: MetricType.restingHeartRate, currentValue: _todayHeartRate, goalValue: 60),
     };
     
+    // If we have a saved connection, try to reconnect
+    if (_currentDataSource != HealthDataSource.unavailable) {
+      await connectToHealthSource(_currentDataSource);
+    }
+    
     // Request permissions and fetch initial data if source available
     if (_healthService.isDataSourceAvailable) {
       await fetchMetrics();
-    } else {
-      // Try to request permissions for platform health APIs
+    } else if (_currentDataSource == HealthDataSource.unavailable) {
+      // Only try to request permissions if we don't have a saved connection
       final result = await _healthService.requestHealthPermissions();
       if (result.success) {
         _currentDataSource = _healthService.currentSource;
@@ -151,10 +172,41 @@ class HealthProvider with ChangeNotifier {
     
     // Save to SharedPreferences and sync to Supabase
     _saveHealthData();
+    
+    // Automatically sync with Supabase
+    saveHealthDataToSupabase();
+    
     notifyListeners();
   }
   
   // Method to manually sync data
+  Future<void> connectToHealthSource(HealthDataSource source) async {
+    _currentDataSource = source;
+    
+    // Save the connection state
+    if (_prefs != null) {
+      String sourceString = '';
+      switch (source) {
+        case HealthDataSource.healthConnect:
+          sourceString = 'healthConnect';
+          break;
+        case HealthDataSource.healthKit:
+          sourceString = 'healthKit';
+          break;
+        case HealthDataSource.bluetooth:
+          sourceString = 'bluetooth';
+          break;
+        default:
+          sourceString = '';
+      }
+      if (sourceString.isNotEmpty) {
+        await _prefs!.setString('connected_health_source', sourceString);
+      }
+    }
+    
+    notifyListeners();
+  }
+  
   Future<void> syncWithHealth() async {
     await _healthService.syncNow();
     await fetchMetrics();
@@ -247,6 +299,18 @@ class HealthProvider with ChangeNotifier {
     _todayDistance = _prefs!.getDouble('distance_$todayKey') ?? 0;
     _todayWater = _prefs!.getInt('water_$todayKey') ?? 0;
     _todayWorkouts = _prefs!.getInt('workouts_$todayKey') ?? 0;
+    
+    // Check for saved health source connection
+    final connectedSource = _prefs!.getString('connected_health_source');
+    if (connectedSource != null) {
+      // Restore the connection state
+      if (connectedSource == 'healthConnect') {
+        _currentDataSource = HealthDataSource.healthConnect;
+      } else if (connectedSource == 'healthKit') {
+        _currentDataSource = HealthDataSource.healthKit;
+      }
+      debugPrint('Restored health source connection: $connectedSource');
+    }
   }
   
   // Save health data to SharedPreferences and sync to Supabase
@@ -388,6 +452,12 @@ class HealthProvider with ChangeNotifier {
     final userId = _supabaseService.currentUser?.id;
     if (userId == null) return;
 
+    // Check if online
+    if (!_isOnline) {
+      debugPrint('Offline - data will sync when connection restored');
+      return;
+    }
+
     try {
       final today = DateTime.now();
       final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
@@ -404,8 +474,55 @@ class HealthProvider with ChangeNotifier {
           'active_minutes': _todayWorkouts * 30, // Approximate
         },
       );
+      
+      debugPrint('Health data synced to Supabase successfully');
     } catch (e) {
       debugPrint('Error saving health data to Supabase: $e');
     }
+  }
+  
+  // Setup connectivity monitoring
+  void _setupConnectivityMonitoring() {
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      final wasOffline = !_isOnline;
+      _isOnline = !results.contains(ConnectivityResult.none);
+      
+      if (wasOffline && _isOnline) {
+        debugPrint('Connection restored - syncing data with Supabase');
+        // Sync data when coming back online
+        saveHealthDataToSupabase();
+        loadHealthDataFromSupabase();
+      }
+    });
+    
+    // Check initial connectivity
+    _connectivity.checkConnectivity().then((results) {
+      _isOnline = !results.contains(ConnectivityResult.none);
+    });
+  }
+  
+  // Setup periodic sync
+  void _setupPeriodicSync() {
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(Duration(minutes: 5), (timer) {
+      if (_isOnline && _isInitialized) {
+        debugPrint('Periodic sync triggered');
+        saveHealthDataToSupabase();
+      }
+    });
+  }
+  
+  // Ensure data is synced when app is paused
+  Future<void> syncOnPause() async {
+    if (_isOnline) {
+      await saveHealthDataToSupabase();
+    }
+  }
+  
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    _syncTimer?.cancel();
+    super.dispose();
   }
 }

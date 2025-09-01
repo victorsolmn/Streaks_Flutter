@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../providers/supabase_auth_provider.dart';
+import '../../services/supabase_service.dart';
 import '../../utils/app_theme.dart';
 import '../onboarding/onboarding_screen.dart';
 import 'signin_screen.dart';
@@ -22,6 +23,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
+  bool _isCheckingEmail = false;
 
   @override
   void dispose() {
@@ -30,6 +32,78 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<bool> _checkEmailExists() async {
+    final email = _emailController.text.trim();
+    
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your email'),
+          backgroundColor: AppTheme.errorRed,
+        ),
+      );
+      return false;
+    }
+    
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid email'),
+          backgroundColor: AppTheme.errorRed,
+        ),
+      );
+      return false;
+    }
+    
+    setState(() {
+      _isCheckingEmail = true;
+    });
+    
+    try {
+      final supabaseService = SupabaseService();
+      final emailExists = await supabaseService.checkEmailExists(email);
+      
+      setState(() {
+        _isCheckingEmail = false;
+      });
+      
+      if (emailExists) {
+        // Show snackbar with option to go to sign in
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('This email is already registered'),
+              backgroundColor: AppTheme.errorRed,
+              action: SnackBarAction(
+                label: 'Sign In',
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) => const SignInScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        }
+        return false;
+      }
+      
+      return true;
+    } catch (e) {
+      setState(() {
+        _isCheckingEmail = false;
+      });
+      
+      // If we can't check, allow signup to proceed
+      // Supabase will handle duplicate email error
+      print('Email check failed, proceeding with signup: $e');
+      return true;
+    }
   }
 
   Future<void> _signUp() async {
@@ -44,6 +118,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
         return;
       }
 
+      // Check if email already exists
+      final canProceed = await _checkEmailExists();
+      if (!canProceed) {
+        return; // Email already exists, don't proceed
+      }
+
       final authProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
       
       final success = await authProvider.signUp(
@@ -56,6 +136,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => const OnboardingScreen(),
+          ),
+        );
+      } else if (mounted && authProvider.error != null) {
+        // Show specific error message
+        String errorMessage = authProvider.error!;
+        
+        // Check for duplicate email error
+        if (errorMessage.toLowerCase().contains('already registered') || 
+            errorMessage.toLowerCase().contains('already exists') ||
+            errorMessage.toLowerCase().contains('duplicate')) {
+          errorMessage = 'This email is already registered. Please sign in instead.';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: AppTheme.errorRed,
+            action: errorMessage.contains('already registered') 
+              ? SnackBarAction(
+                  label: 'Sign In',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => const SignInScreen(),
+                      ),
+                    );
+                  },
+                )
+              : null,
           ),
         );
       }
@@ -139,7 +249,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Email',
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
@@ -313,8 +423,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: auth.isLoading ? null : _signUp,
-                        child: auth.isLoading
+                        onPressed: auth.isLoading || _isCheckingEmail ? null : _signUp,
+                        child: auth.isLoading || _isCheckingEmail
                             ? SizedBox(
                                 height: 20,
                                 width: 20,

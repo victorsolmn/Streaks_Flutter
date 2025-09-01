@@ -24,10 +24,20 @@ class UserProfile {
   final int age;
   final double height; // in cm
   final double weight; // in kg
+  final double targetWeight; // in kg
   final FitnessGoal goal;
   final ActivityLevel activityLevel;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool hasSeenFitnessGoalSummary;
+  
+  // Fitness targets
+  final int? dailyCaloriesTarget;
+  final int? dailyStepsTarget;
+  final double? dailySleepTarget;
+  final double? dailyWaterTarget;
+  final double? bmiValue;
+  final String? bmiCategoryValue;
 
   UserProfile({
     required this.id,
@@ -36,10 +46,18 @@ class UserProfile {
     required this.age,
     required this.height,
     required this.weight,
+    required this.targetWeight,
     required this.goal,
     required this.activityLevel,
     required this.createdAt,
     required this.updatedAt,
+    this.hasSeenFitnessGoalSummary = false,
+    this.dailyCaloriesTarget,
+    this.dailyStepsTarget,
+    this.dailySleepTarget,
+    this.dailyWaterTarget,
+    this.bmiValue,
+    this.bmiCategoryValue,
   });
 
   Map<String, dynamic> toJson() {
@@ -50,10 +68,18 @@ class UserProfile {
       'age': age,
       'height': height,
       'weight': weight,
+      'targetWeight': targetWeight,
       'goal': goal.index,
       'activityLevel': activityLevel.index,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'hasSeenFitnessGoalSummary': hasSeenFitnessGoalSummary,
+      'dailyCaloriesTarget': dailyCaloriesTarget,
+      'dailyStepsTarget': dailyStepsTarget,
+      'dailySleepTarget': dailySleepTarget,
+      'dailyWaterTarget': dailyWaterTarget,
+      'bmiValue': bmiValue,
+      'bmiCategoryValue': bmiCategoryValue,
     };
   }
 
@@ -65,10 +91,18 @@ class UserProfile {
       age: json['age'],
       height: json['height'].toDouble(),
       weight: json['weight'].toDouble(),
+      targetWeight: json['targetWeight']?.toDouble() ?? json['weight'].toDouble(),
       goal: FitnessGoal.values[json['goal']],
       activityLevel: ActivityLevel.values[json['activityLevel']],
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
+      hasSeenFitnessGoalSummary: json['hasSeenFitnessGoalSummary'] ?? false,
+      dailyCaloriesTarget: json['dailyCaloriesTarget'],
+      dailyStepsTarget: json['dailyStepsTarget'],
+      dailySleepTarget: json['dailySleepTarget']?.toDouble(),
+      dailyWaterTarget: json['dailyWaterTarget']?.toDouble(),
+      bmiValue: json['bmiValue']?.toDouble(),
+      bmiCategoryValue: json['bmiCategoryValue'],
     );
   }
 
@@ -78,8 +112,16 @@ class UserProfile {
     int? age,
     double? height,
     double? weight,
+    double? targetWeight,
     FitnessGoal? goal,
     ActivityLevel? activityLevel,
+    bool? hasSeenFitnessGoalSummary,
+    int? dailyCaloriesTarget,
+    int? dailyStepsTarget,
+    double? dailySleepTarget,
+    double? dailyWaterTarget,
+    double? bmiValue,
+    String? bmiCategoryValue,
   }) {
     return UserProfile(
       id: id,
@@ -88,10 +130,18 @@ class UserProfile {
       age: age ?? this.age,
       height: height ?? this.height,
       weight: weight ?? this.weight,
+      targetWeight: targetWeight ?? this.targetWeight,
       goal: goal ?? this.goal,
       activityLevel: activityLevel ?? this.activityLevel,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
+      hasSeenFitnessGoalSummary: hasSeenFitnessGoalSummary ?? this.hasSeenFitnessGoalSummary,
+      dailyCaloriesTarget: dailyCaloriesTarget ?? this.dailyCaloriesTarget,
+      dailyStepsTarget: dailyStepsTarget ?? this.dailyStepsTarget,
+      dailySleepTarget: dailySleepTarget ?? this.dailySleepTarget,
+      dailyWaterTarget: dailyWaterTarget ?? this.dailyWaterTarget,
+      bmiValue: bmiValue ?? this.bmiValue,
+      bmiCategoryValue: bmiCategoryValue ?? this.bmiCategoryValue,
     );
   }
 
@@ -224,6 +274,7 @@ class UserProvider with ChangeNotifier {
     required int age,
     required double height,
     required double weight,
+    required double targetWeight,
     required FitnessGoal goal,
     required ActivityLevel activityLevel,
   }) async {
@@ -240,10 +291,12 @@ class UserProvider with ChangeNotifier {
         age: age,
         height: height,
         weight: weight,
+        targetWeight: targetWeight,
         goal: goal,
         activityLevel: activityLevel,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        hasSeenFitnessGoalSummary: false,
       );
 
       await _saveUserProfile();
@@ -263,8 +316,16 @@ class UserProvider with ChangeNotifier {
     int? age,
     double? height,
     double? weight,
+    double? targetWeight,
     FitnessGoal? goal,
     ActivityLevel? activityLevel,
+    bool? hasSeenFitnessGoalSummary,
+    int? dailyCaloriesTarget,
+    int? dailyStepsTarget,
+    double? dailySleepTarget,
+    double? dailyWaterTarget,
+    double? bmiValue,
+    String? bmiCategoryValue,
   }) async {
     if (_profile == null) return;
 
@@ -278,8 +339,16 @@ class UserProvider with ChangeNotifier {
         age: age,
         height: height,
         weight: weight,
+        targetWeight: targetWeight,
         goal: goal,
         activityLevel: activityLevel,
+        hasSeenFitnessGoalSummary: hasSeenFitnessGoalSummary,
+        dailyCaloriesTarget: dailyCaloriesTarget,
+        dailyStepsTarget: dailyStepsTarget,
+        dailySleepTarget: dailySleepTarget,
+        dailyWaterTarget: dailyWaterTarget,
+        bmiValue: bmiValue,
+        bmiCategoryValue: bmiCategoryValue,
       );
 
       await _saveUserProfile();

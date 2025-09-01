@@ -102,17 +102,17 @@ class SupabaseAuthProvider with ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    _setLoading(true);
     _setError(null);
 
     try {
       await _supabaseService.signOut();
       _currentUser = null;
-      _setLoading(false);
       notifyListeners();
     } catch (e) {
       _setError(e.toString());
-      _setLoading(false);
+      // Even on error, clear the user
+      _currentUser = null;
+      notifyListeners();
     }
   }
 
