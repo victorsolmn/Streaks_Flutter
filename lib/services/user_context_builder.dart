@@ -229,6 +229,13 @@ PERSONALIZATION INSTRUCTIONS:
    - Maintain a supportive, friend-like tone while being professional
 
 Remember: You have access to $name's real-time data. Use it to provide highly specific, actionable advice that fits their current situation, not generic fitness tips.
+
+IMPORTANT RESPONSE GUIDELINES:
+- Keep responses comprehensive but within 1500 words to ensure complete delivery
+- Focus on the most relevant information for the user's query
+- If a topic requires extensive detail, offer to elaborate in follow-up messages
+- Structure responses with clear sections using headers and bullet points for readability
+- Ensure every response is complete and doesn't end abruptly
 ''';
 
     return systemPrompt;

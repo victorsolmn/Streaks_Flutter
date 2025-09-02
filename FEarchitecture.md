@@ -1,6 +1,6 @@
 # Frontend Architecture & UI Design System
 ## Streaks Flutter Application
-### Last Updated: September 1, 2025
+### Last Updated: September 2, 2025
 
 ## Table of Contents
 1. [Design System Overview](#design-system-overview)
@@ -654,4 +654,132 @@ class HealthDataSyncService {
 
 ---
 
-This architecture document reflects the current state of the Streaker Flutter application with comprehensive health integration, modern UI patterns (including ChatGPT-style chat interface), and robust cross-platform compatibility. The design system prioritizes user health data transparency, seamless device integration, and intuitive user experiences with consistent brand identity throughout.
+## Latest Updates (September 2, 2025)
+
+### Comprehensive Streak System Architecture
+
+#### Overview
+Implemented a complete streak tracking system where users earn daily streaks only when ALL fitness goals are achieved.
+
+#### Database Architecture
+```sql
+-- Core Tables
+1. user_daily_metrics
+   - Tracks all daily health and nutrition data
+   - Fields: steps, calories, sleep, water, protein, etc.
+   - Goal achievement boolean flags
+   
+2. user_streaks
+   - Current streak counter
+   - Longest streak record
+   - Total days completed
+   - Last streak date
+   
+3. streak_history
+   - Historical streak records
+   - Streak changes over time
+   
+4. user_goals
+   - User-specific daily targets
+   - Customizable per user
+```
+
+#### Streak Calculation Logic
+```dart
+// Provider Architecture
+StreakProvider
+  ├── syncMetricsFromProviders()
+  │   ├── Fetches from HealthProvider
+  │   ├── Fetches from NutritionProvider
+  │   └── Calculates goal achievements
+  ├── checkAndUpdateStreak()
+  │   └── Updates streak if all goals met
+  └── Real-time Supabase sync
+```
+
+#### UI Components
+
+##### Streak Display Widget
+```dart
+class StreakDisplayWidget extends StatelessWidget {
+  // Compact mode: Small badge with fire icon and count
+  // Full mode: Complete stats with progress bars
+  
+  Widget _buildFullView() {
+    return Container(
+      // Current streak with fire icon
+      // Today's goals progress (0-5 completed)
+      // Motivational message
+      // Stats: Longest, Total, Monthly
+    );
+  }
+  
+  Widget _buildStreakBadge(int streak) {
+    // Dynamic badges based on streak:
+    // 3+ days: Trending up (green)
+    // 7+ days: Star (amber)
+    // 30+ days: Fire (orange)
+    // 100+ days: Purple fire
+  }
+}
+```
+
+### Enhanced Nutrition Tracking
+
+#### Food Input Dialog
+```dart
+Future<Map<String, String>?> _showFoodDetailsDialog() async {
+  // Two-field dialog:
+  // 1. Food name input (TextField)
+  // 2. Quantity selector with units:
+  //    - grams, kg
+  //    - cups, pieces, servings
+  //    - plates, bowls
+  //    - ml, liters
+  
+  // Returns: {"name": "Rice", "quantity": "2 cups"}
+  // Both image + user input sent to AI for accuracy
+}
+```
+
+### Navigation Improvements
+
+#### Sync Button Behavior
+```dart
+// Changed from syncing to navigation
+GestureDetector(
+  onTap: () {
+    // Navigate to Profile page (index 4)
+    // Open smartwatch integration dialog
+    Navigator.pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => MainScreen(initialIndex: 4),
+      ),
+      (route) => false,
+    );
+  },
+  child: Text('Sync now'), // Changed from "Synced now"
+)
+```
+
+### UI Cleanup
+
+#### Home Screen Simplification
+- Removed duplicate StreakDisplayWidget from home page
+- Streak display now only in dedicated Streaks tab
+- Removed pull-to-refresh that was resetting data
+- Cleaner layout without redundant elements
+
+### AI Chat Enhancement
+
+#### Token Limit Fix
+```dart
+// config/api_config.dart
+static const int maxTokens = 2000; // Increased from 500
+// Prevents response truncation
+// Added system prompt for length awareness
+```
+
+---
+
+This architecture document reflects the current state of the Streaker Flutter application with comprehensive health integration, modern UI patterns (including ChatGPT-style chat interface), complete streak tracking system, and robust cross-platform compatibility. The design system prioritizes user health data transparency, seamless device integration, goal achievement tracking, and intuitive user experiences with consistent brand identity throughout.

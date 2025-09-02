@@ -5,6 +5,8 @@ import '../../providers/health_provider.dart';
 import '../../providers/nutrition_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/fitness_goal_summary_dialog.dart';
+import '../../widgets/streak_display_widget.dart';
+import '../../providers/streak_provider.dart';
 import 'dart:math' as math;
 
 class HomeScreenClean extends StatefulWidget {
@@ -40,17 +42,25 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
   }
 
   Future<void> _initializeHealthData() async {
+    // Sync metrics to streak provider
+    await _syncMetricsToStreak();
+    
+    // Original health initialization
     final healthProvider = Provider.of<HealthProvider>(context, listen: false);
     if (!healthProvider.isInitialized) {
       await healthProvider.initialize();
     }
     
-    // Force sync health data on page load to get latest values
-    try {
-      await healthProvider.syncWithHealth();
-      print('Home page: Health data synced - Calories: ${healthProvider.todayCaloriesBurned}, HR: ${healthProvider.todayHeartRate}');
-    } catch (e) {
-      print('Home page: Error syncing health data: $e');
+    // Only sync if we have a connected health source, otherwise use saved data
+    if (healthProvider.isHealthSourceConnected) {
+      try {
+        await healthProvider.syncWithHealth();
+        print('Home page: Health data synced - Steps: ${healthProvider.todaySteps}, Calories: ${healthProvider.todayCaloriesBurned}, HR: ${healthProvider.todayHeartRate}, Sleep: ${healthProvider.todaySleep}');
+      } catch (e) {
+        print('Home page: Error syncing health data: $e');
+      }
+    } else {
+      print('Home page: Using saved health data - Steps: ${healthProvider.todaySteps}, Calories: ${healthProvider.todayCaloriesBurned}, HR: ${healthProvider.todayHeartRate}, Sleep: ${healthProvider.todaySleep}');
     }
   }
 
@@ -77,6 +87,20 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
     }
   }
 
+  Future<void> _syncMetricsToStreak() async {
+    final streakProvider = Provider.of<StreakProvider>(context, listen: false);
+    final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+    final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    
+    // Sync all metrics to streak provider
+    await streakProvider.syncMetricsFromProviders(
+      healthProvider,
+      nutritionProvider,
+      userProvider,
+    );
+  }
+  
   @override
   void dispose() {
     _animationController.dispose();
@@ -85,7 +109,19 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
 
   Future<void> _refreshHealthData() async {
     final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+    
+    // Initialize health if not already done
+    if (!healthProvider.isInitialized) {
+      await healthProvider.initializeHealth();
+    }
+    
+    // Sync with health sources
     await healthProvider.syncWithHealth();
+    
+    // Force a rebuild to show updated data
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -97,13 +133,12 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: Consumer3<UserProvider, HealthProvider, NutritionProvider>(
-            builder: (context, userProvider, healthProvider, nutritionProvider, child) {
-              return RefreshIndicator(
-                onRefresh: _refreshHealthData,
-                color: AppTheme.primaryAccent,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
+          child: Consumer4<UserProvider, HealthProvider, NutritionProvider, StreakProvider>(
+            builder: (context, userProvider, healthProvider, nutritionProvider, streakProvider, child) {
+              // Sync metrics whenever providers update
+              _syncMetricsToStreak();
+              return SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(), // Changed from AlwaysScrollableScrollPhysics to prevent pull-to-refresh
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,8 +175,7 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
                     _buildInsightsSection(healthProvider, nutritionProvider, userProvider, isDarkMode),
                   ],
                   ),
-                ),
-              );
+                );
             },
           ),
         ),

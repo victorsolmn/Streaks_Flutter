@@ -4,6 +4,7 @@ import '../services/realtime_sync_service.dart';
 import '../providers/health_provider.dart';
 import '../providers/nutrition_provider.dart';
 import '../utils/app_theme.dart';
+import '../screens/main/main_screen.dart';
 
 class SyncStatusIndicator extends StatefulWidget {
   const SyncStatusIndicator({Key? key}) : super(key: key);
@@ -159,44 +160,14 @@ class _SyncStatusIndicatorState extends State<SyncStatusIndicator> with SingleTi
     }
     
     return GestureDetector(
-      onTap: () async {
-        setState(() {
-          _isSyncing = true;
-        });
-        _animationController.repeat();
-        
-        // Trigger manual sync
-        await Future.wait([
-          healthProvider.syncWithHealth(),
-          nutritionProvider.loadDataFromSupabase(),
-        ]);
-        
-        setState(() {
-          _isSyncing = false;
-          _lastSyncTime = DateTime.now();
-        });
-        _animationController.stop();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text('Data synced successfully'),
-                ],
-              ),
-              backgroundColor: AppTheme.successGreen,
-              duration: Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              margin: EdgeInsets.all(16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
+      onTap: () {
+        // Navigate to profile page (index 4) and open smartwatch integration
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => MainScreen(initialIndex: 4),
+          ),
+          (route) => false,
+        );
       },
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -215,9 +186,7 @@ class _SyncStatusIndicatorState extends State<SyncStatusIndicator> with SingleTi
             ),
             SizedBox(width: 6),
             Text(
-              _lastSyncTime != null
-                  ? 'Synced ${_getTimeSinceSync()}'
-                  : 'Synced',
+              'Sync now',
               style: TextStyle(
                 color: AppTheme.successGreen,
                 fontSize: 12,

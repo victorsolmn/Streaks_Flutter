@@ -93,6 +93,147 @@ class IndianFoodNutritionService {
     }
   }
   
+  // Main function to analyze food image with user-provided details
+  Future<Map<String, dynamic>> analyzeIndianFoodWithDetails(
+    File imageFile,
+    String foodName,
+    String quantity,
+  ) async {
+    try {
+      debugPrint('\n📸 Starting Indian food analysis with user input...');
+      debugPrint('User provided: $foodName, Quantity: $quantity');
+      debugPrint('Image path: ${imageFile.path}');
+      
+      // Parse quantity to extract numeric value and unit
+      final quantityParts = _parseQuantity(quantity);
+      final quantityValue = quantityParts['value'] as double;
+      final quantityUnit = quantityParts['unit'] as String;
+      
+      // Step 1: Use user-provided food name primarily
+      List<String> foodItems = [foodName];
+      
+      // Also try to identify from image for verification
+      final identifiedFoods = await _identifyFoodWithGemini(imageFile);
+      if (identifiedFoods.isNotEmpty) {
+        // Merge user input with identified foods
+        for (var food in identifiedFoods) {
+          if (!foodItems.contains(food)) {
+            foodItems.add(food);
+          }
+        }
+      }
+      
+      debugPrint('Foods to process: $foodItems');
+      
+      // Step 2: Get nutrition from database
+      var result = _getNutritionFromDatabase(foodItems);
+      
+      // Step 3: Adjust nutrition based on quantity
+      result = _adjustNutritionForQuantity(
+        result,
+        quantityValue,
+        quantityUnit,
+      );
+      
+      debugPrint('Final nutrition result (adjusted): ${result['nutrition']}');
+      return result;
+    } catch (e) {
+      debugPrint('❌ Error in analyzeIndianFoodWithDetails: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+  
+  // Helper method to parse quantity string
+  Map<String, dynamic> _parseQuantity(String quantity) {
+    // Extract number and unit from quantity string like "100 grams" or "2 cups"
+    final parts = quantity.split(' ');
+    double value = 100; // default
+    String unit = 'grams'; // default
+    
+    if (parts.isNotEmpty) {
+      value = double.tryParse(parts[0]) ?? 100;
+      if (parts.length > 1) {
+        unit = parts.sublist(1).join(' ');
+      }
+    }
+    
+    return {'value': value, 'unit': unit};
+  }
+  
+  // Adjust nutrition values based on quantity
+  Map<String, dynamic> _adjustNutritionForQuantity(
+    Map<String, dynamic> nutritionData,
+    double quantity,
+    String unit,
+  ) {
+    if (!nutritionData['success']) return nutritionData;
+    
+    // Convert quantity to grams if needed
+    double gramsMultiplier = 1.0;
+    
+    switch (unit.toLowerCase()) {
+      case 'kg':
+      case 'kilogram':
+      case 'kilograms':
+        gramsMultiplier = quantity * 1000 / 100; // Convert to grams then to per 100g
+        break;
+      case 'g':
+      case 'gram':
+      case 'grams':
+        gramsMultiplier = quantity / 100; // Nutrition is per 100g
+        break;
+      case 'cup':
+      case 'cups':
+        gramsMultiplier = quantity * 250 / 100; // Approximate 1 cup = 250g
+        break;
+      case 'bowl':
+      case 'bowls':
+        gramsMultiplier = quantity * 300 / 100; // Approximate 1 bowl = 300g
+        break;
+      case 'plate':
+      case 'plates':
+        gramsMultiplier = quantity * 400 / 100; // Approximate 1 plate = 400g
+        break;
+      case 'serving':
+      case 'servings':
+        gramsMultiplier = quantity * 150 / 100; // Approximate 1 serving = 150g
+        break;
+      case 'piece':
+      case 'pieces':
+        gramsMultiplier = quantity * 100 / 100; // Approximate 1 piece = 100g
+        break;
+      case 'ml':
+      case 'milliliter':
+      case 'milliliters':
+        gramsMultiplier = quantity / 100; // Approximate 1ml = 1g for liquids
+        break;
+      case 'l':
+      case 'liter':
+      case 'liters':
+        gramsMultiplier = quantity * 1000 / 100; // 1L = 1000ml = 1000g approx
+        break;
+      default:
+        gramsMultiplier = quantity / 100; // Default assumption
+    }
+    
+    // Adjust all nutrition values
+    if (nutritionData['nutrition'] != null) {
+      final nutrition = nutritionData['nutrition'] as Map<String, dynamic>;
+      nutritionData['nutrition'] = {
+        'calories': ((nutrition['calories'] ?? 0) * gramsMultiplier).round(),
+        'protein': ((nutrition['protein'] ?? 0) * gramsMultiplier).round(),
+        'carbs': ((nutrition['carbs'] ?? 0) * gramsMultiplier).round(),
+        'fat': ((nutrition['fat'] ?? 0) * gramsMultiplier).round(),
+        'fiber': ((nutrition['fiber'] ?? 0) * gramsMultiplier).round(),
+      };
+    }
+    
+    return nutritionData;
+  }
+  
   // Main function to analyze food image
   Future<Map<String, dynamic>> analyzeIndianFood(File imageFile) async {
     try {

@@ -7,6 +7,113 @@ class NutritionAIService {
   static const String _apiKey = 'YOUR_API_KEY';
   static const String _apiUrl = 'https://vision.googleapis.com/v1/images:annotate';
   
+  static Future<NutritionEntry?> analyzeFoodWithDetails(
+    String imagePath,
+    String foodName,
+    String quantity,
+  ) async {
+    try {
+      // Use the user-provided food name directly for nutrition lookup
+      final nutritionData = await _getNutritionFromFoodNameAndQuantity(
+        foodName,
+        quantity,
+      );
+      
+      if (nutritionData != null) {
+        return nutritionData;
+      }
+      
+      // Fallback to image analysis if direct lookup fails
+      return analyzeFood(imagePath);
+    } catch (e) {
+      print('Error analyzing food with details: $e');
+      return _getFallbackNutrition(imagePath);
+    }
+  }
+  
+  static Future<NutritionEntry?> _getNutritionFromFoodNameAndQuantity(
+    String foodName,
+    String quantity,
+  ) async {
+    try {
+      // Parse quantity
+      final parts = quantity.split(' ');
+      double quantityValue = double.tryParse(parts[0]) ?? 100;
+      String unit = parts.length > 1 ? parts.sublist(1).join(' ') : 'grams';
+      
+      // Convert to grams for API
+      double grams = _convertToGrams(quantityValue, unit);
+      
+      // Use Edamam API for nutrition data
+      final response = await http.get(
+        Uri.parse(
+          'https://api.edamam.com/api/nutrition-data'
+          '?app_id=YOUR_APP_ID'
+          '&app_key=YOUR_APP_KEY'
+          '&ingr=${Uri.encodeComponent("$grams grams $foodName")}'
+        ),
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data['calories'] != null) {
+          return NutritionEntry(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            foodName: '$foodName ($quantity)',
+            calories: data['calories'] ?? 0,
+            protein: (data['totalNutrients']?['PROCNT']?['quantity'] ?? 0).toDouble(),
+            carbs: (data['totalNutrients']?['CHOCDF']?['quantity'] ?? 0).toDouble(),
+            fat: (data['totalNutrients']?['FAT']?['quantity'] ?? 0).toDouble(),
+            fiber: (data['totalNutrients']?['FIBTG']?['quantity'] ?? 0).toDouble(),
+            timestamp: DateTime.now(),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error getting nutrition from food name: $e');
+    }
+    return null;
+  }
+  
+  static double _convertToGrams(double value, String unit) {
+    switch (unit.toLowerCase()) {
+      case 'kg':
+      case 'kilogram':
+      case 'kilograms':
+        return value * 1000;
+      case 'g':
+      case 'gram':
+      case 'grams':
+        return value;
+      case 'cup':
+      case 'cups':
+        return value * 250; // Approximate
+      case 'bowl':
+      case 'bowls':
+        return value * 300; // Approximate
+      case 'plate':
+      case 'plates':
+        return value * 400; // Approximate
+      case 'serving':
+      case 'servings':
+        return value * 150; // Approximate
+      case 'piece':
+      case 'pieces':
+        return value * 100; // Approximate
+      case 'ml':
+      case 'milliliter':
+      case 'milliliters':
+        return value; // 1ml ≈ 1g for liquids
+      case 'l':
+      case 'liter':
+      case 'liters':
+        return value * 1000;
+      default:
+        return value; // Assume grams
+    }
+  }
+  
   static Future<NutritionEntry?> analyzeFood(String imagePath) async {
     try {
       final imageBytes = await File(imagePath).readAsBytes();

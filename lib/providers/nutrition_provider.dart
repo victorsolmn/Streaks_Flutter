@@ -67,6 +67,7 @@ class DailyNutrition {
   double get totalProtein => entries.fold(0, (sum, entry) => sum + entry.protein);
   double get totalCarbs => entries.fold(0, (sum, entry) => sum + entry.carbs);
   double get totalFat => entries.fold(0, (sum, entry) => sum + entry.fat);
+  double get totalFiber => entries.fold(0, (sum, entry) => sum + entry.fiber);
 }
 
 class NutritionProvider with ChangeNotifier {
@@ -388,6 +389,74 @@ class NutritionProvider with ChangeNotifier {
     } catch (e) {
       _setError('Failed to remove nutrition entry');
       _setLoading(false);
+    }
+  }
+
+  Future<NutritionEntry?> scanFoodWithDetails(String imagePath, String foodName, String quantity) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      // First try Indian food recognition with user input for better accuracy
+      final imageFile = File(imagePath);
+      debugPrint('Analyzing food: $foodName, Quantity: $quantity');
+      
+      // Try Indian food service with user-provided details
+      final indianResult = await _indianFoodService.analyzeIndianFoodWithDetails(
+        imageFile,
+        foodName,
+        quantity,
+      );
+      
+      if (indianResult['success'] == true && indianResult['nutrition'] != null) {
+        final nutrition = indianResult['nutrition'];
+        
+        // Create nutrition entry from Indian food result with user-provided name
+        final entry = NutritionEntry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          foodName: '$foodName ($quantity)',
+          calories: nutrition['calories'] ?? 0,
+          protein: (nutrition['protein'] ?? 0).toDouble(),
+          carbs: (nutrition['carbs'] ?? 0).toDouble(),
+          fat: (nutrition['fat'] ?? 0).toDouble(),
+          fiber: (nutrition['fiber'] ?? 0).toDouble(),
+          timestamp: DateTime.now(),
+        );
+        
+        _setLoading(false);
+        return entry;
+      }
+      
+      // Fallback to original AI service with user details
+      debugPrint('Falling back to Edamam API with user input...');
+      final entry = await NutritionAIService.analyzeFoodWithDetails(
+        imagePath,
+        foodName,
+        quantity,
+      );
+      
+      _setLoading(false);
+      
+      if (entry != null) {
+        // Create new entry with updated name to include quantity
+        return NutritionEntry(
+          id: entry.id,
+          foodName: '$foodName ($quantity)',
+          calories: entry.calories,
+          protein: entry.protein,
+          carbs: entry.carbs,
+          fat: entry.fat,
+          fiber: entry.fiber,
+          timestamp: entry.timestamp,
+        );
+      } else {
+        _setError('Could not analyze food. Please try again.');
+        return null;
+      }
+    } catch (e) {
+      _setError('Failed to analyze food: ${e.toString()}');
+      _setLoading(false);
+      return null;
     }
   }
 

@@ -7,7 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../main/main_screen.dart';
 import '../auth/welcome_screen.dart';
-import 'smartwatch_connection_screen.dart';
+// Smartwatch connection removed from onboarding flow
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
@@ -62,10 +62,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
 
       if (mounted) {
-        // Navigate to smartwatch connection screen instead of main screen
+        // Navigate directly to main screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const SmartwatchConnectionScreen(),
+            builder: (context) => const MainScreen(),
           ),
         );
       }
@@ -103,10 +103,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 activityLevel: ActivityLevel.moderatelyActive, // Default activity level
               );
 
-              // Navigate to smartwatch connection screen
+              // Navigate directly to main screen when skipping
               if (mounted) {
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const SmartwatchConnectionScreen()),
+                  MaterialPageRoute(builder: (context) => const MainScreen()),
                 );
               }
             },

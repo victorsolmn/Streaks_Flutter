@@ -310,6 +310,22 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+  // Update weight directly
+  Future<void> updateWeight(double weight) async {
+    if (_profile == null) return;
+    
+    _profile = _profile!.copyWith(weight: weight);
+    await _saveUserProfile();
+    notifyListeners();
+  }
+  
+  // Update profile from object
+  Future<void> updateProfileFromObject(UserProfile updatedProfile) async {
+    _profile = updatedProfile;
+    await _saveUserProfile();
+    notifyListeners();
+  }
+  
   Future<void> updateProfile({
     String? name,
     String? email,

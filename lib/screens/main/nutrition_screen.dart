@@ -52,8 +52,16 @@ class _NutritionScreenState extends State<NutritionScreen>
       final XFile? image = await _picker.pickImage(source: source);
       if (image == null) return;
 
+      // Get food details from user
+      final foodDetails = await _showFoodDetailsDialog();
+      if (foodDetails == null) return;
+
       final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
-      final entry = await nutritionProvider.scanFood(image.path);
+      final entry = await nutritionProvider.scanFoodWithDetails(
+        image.path,
+        foodDetails['name']!,
+        foodDetails['quantity']!,
+      );
 
       if (entry != null && mounted) {
         final shouldAdd = await _showNutritionPreview(entry);
@@ -167,6 +175,184 @@ class _NutritionScreenState extends State<NutritionScreen>
       ),
     );
     return result ?? false;
+  }
+
+  Future<Map<String, String>?> _showFoodDetailsDialog() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final nameController = TextEditingController();
+    final quantityController = TextEditingController(text: '100');
+    String selectedUnit = 'grams';
+    
+    return await showDialog<Map<String, String>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+          title: Text(
+            'Food Details',
+            style: TextStyle(
+              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Help us identify your food more accurately',
+                  style: TextStyle(
+                    color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 20),
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Food Name',
+                    hintText: 'e.g., Chicken Biryani, Apple, Sandwich',
+                    prefixIcon: Icon(Icons.restaurant_menu, color: AppTheme.primaryAccent),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppTheme.primaryAccent, width: 2),
+                    ),
+                  ),
+                  style: TextStyle(
+                    color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: quantityController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Quantity',
+                          prefixIcon: Icon(Icons.scale, color: AppTheme.primaryAccent),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primaryAccent, width: 2),
+                          ),
+                        ),
+                        style: TextStyle(
+                          color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      flex: 3,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: isDarkMode ? AppTheme.dividerDark : AppTheme.dividerLight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: selectedUnit,
+                            isExpanded: true,
+                            dropdownColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+                            style: TextStyle(
+                              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                            ),
+                            items: [
+                              'grams',
+                              'kg',
+                              'cups',
+                              'pieces',
+                              'servings',
+                              'plates',
+                              'bowls',
+                              'ml',
+                              'liters',
+                            ].map((unit) => DropdownMenuItem(
+                              value: unit,
+                              child: Text(unit),
+                            )).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                selectedUnit = value!;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'Tip: Be specific with the food name for better nutrition accuracy',
+                  style: TextStyle(
+                    color: AppTheme.primaryAccent,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (nameController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Please enter food name'),
+                      backgroundColor: AppTheme.errorRed,
+                    ),
+                  );
+                  return;
+                }
+                if (quantityController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Please enter quantity'),
+                      backgroundColor: AppTheme.errorRed,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop({
+                  'name': nameController.text.trim(),
+                  'quantity': '${quantityController.text.trim()} $selectedUnit',
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text('Analyze Food'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showErrorDialog(String message) {

@@ -43,16 +43,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeWeightData();
+    // Delay initialization to ensure context is available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeWeightData();
+      setState(() {});
+    });
   }
 
   void _initializeWeightData() {
-    // Initialize with empty data - will be populated from user input
+    // Get weight data from user profile
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final profile = userProvider.profile;
+    
+    // Initialize with profile data from onboarding
+    final startWeight = profile?.weight ?? 70.0;
+    final currentWeight = profile?.weight ?? 70.0;
+    final targetWeight = profile?.targetWeight ?? 65.0;
+    
     _weightProgress = WeightProgress(
-      startWeight: 0,
-      currentWeight: 0,
-      targetWeight: 0,
-      entries: [], // Start with empty entries
+      startWeight: startWeight,
+      currentWeight: currentWeight,
+      targetWeight: targetWeight,
+      entries: [
+        // Add initial entry from profile
+        WeightEntry(
+          id: 'initial',
+          weight: startWeight,
+          timestamp: DateTime.now().subtract(Duration(days: 30)), // Assume started 30 days ago
+        ),
+        // Add current weight entry if different from start
+        if (currentWeight != startWeight)
+          WeightEntry(
+            id: 'current',
+            weight: currentWeight,
+            timestamp: DateTime.now(),
+          ),
+      ],
       unit: 'kg',
     );
   }
@@ -528,7 +554,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.watch,
             title: 'Smartwatch Integration',
             subtitle: 'Connect your fitness tracker',
-            onTap: () => _showSmartwatchIntegrationDialog(),
+            onTap: () => showSmartwatchIntegrationDialog(),
           ),
           _buildSettingItem(
             icon: Icons.track_changes,
@@ -853,6 +879,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
                 });
                 
+                // Update user profile with new current weight
+                final userProvider = Provider.of<UserProvider>(context, listen: false);
+                userProvider.updateWeight(weight);
+                
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -1069,7 +1099,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showSmartwatchIntegrationDialog() async {
+  void showSmartwatchIntegrationDialog() async {
     final healthProvider = Provider.of<HealthProvider>(context, listen: false);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
@@ -1720,7 +1750,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop();
-              _showSmartwatchIntegrationDialog();
+              showSmartwatchIntegrationDialog();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryAccent,

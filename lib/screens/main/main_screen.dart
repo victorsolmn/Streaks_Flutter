@@ -12,7 +12,9 @@ import 'chat_screen_enhanced.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  final int initialIndex;
+  
+  const MainScreen({Key? key, this.initialIndex = 0}) : super(key: key);
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -23,14 +25,34 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   bool _isDataLoaded = false;
   bool _isSyncing = false;
   DateTime? _lastSyncTime;
+  GlobalKey? _profileKey;
 
   @override
   void initState() {
     super.initState();
+    // Set initial index from widget parameter
+    _currentIndex = widget.initialIndex;
+    _profileKey = GlobalKey();
     // Add observer for app lifecycle events
     WidgetsBinding.instance.addObserver(this);
     // Load data and sync health on startup
     _loadUserDataAndSyncHealth();
+    
+    // If navigating to profile page, show smartwatch integration after delay
+    if (widget.initialIndex == 4) {
+      Future.delayed(Duration(milliseconds: 800), () {
+        if (mounted && _profileKey?.currentState != null) {
+          // Trigger smartwatch integration dialog in profile screen
+          // Try to call the method if the state exists
+          try {
+            final profileState = _profileKey?.currentState as dynamic;
+            profileState?.showSmartwatchIntegrationDialog();
+          } catch (e) {
+            debugPrint('Could not trigger smartwatch dialog: $e');
+          }
+        }
+      });
+    }
   }
 
   @override
@@ -204,12 +226,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     }
   }
 
-  final List<Widget> _screens = [
+  List<Widget> get _screens => [
     const HomeScreenClean(),
     const ProgressScreenNew(),
     const NutritionScreen(),
     const ChatScreenEnhanced(),
-    const ProfileScreen(),
+    ProfileScreen(key: _profileKey),
   ];
 
   final List<BottomNavigationBarItem> _bottomNavItems = [
