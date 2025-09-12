@@ -53,5 +53,16 @@
 	<string>This app needs camera access to scan food for nutrition tracking.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs photo library access to select food images for nutrition tracking.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.streaker.streaker</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.streaker.streaker</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

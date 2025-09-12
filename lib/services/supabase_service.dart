@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../models/user_model.dart';
@@ -87,35 +88,57 @@ class SupabaseService {
     }
   }
 
+  /// Check if email already exists in Supabase auth
+  /// Returns true if email exists, false if it doesn't
   Future<bool> checkEmailExists(String email) async {
     try {
-      // First, check in auth.users table using a more reliable approach
-      // Try to sign in with a wrong password to check if email exists
+      final cleanEmail = email.toLowerCase().trim();
+      
+      // Method 1: Check profiles table first (faster)
+      final profileResponse = await _supabase
+          .from('profiles')
+          .select('email')
+          .eq('email', cleanEmail)
+          .maybeSingle();
+      
+      if (profileResponse != null) {
+        print('Email exists in profiles: $cleanEmail');
+        return true;
+      }
+      
+      // Method 2: Try sign-in with dummy password to check auth.users table
       try {
         await _supabase.auth.signInWithPassword(
-          email: email.toLowerCase(),
-          password: 'dummy_password_to_check_email_12345',
+          email: cleanEmail,
+          password: 'invalid_dummy_password_check_12345',
         );
-        // If we get here, somehow the password was correct (unlikely)
-        // Sign out immediately
+        // If successful (shouldn't happen), sign out and return true
         await _supabase.auth.signOut();
         return true;
-      } catch (authError) {
-        final errorMessage = authError.toString().toLowerCase();
-        // If error contains "invalid login credentials", the email exists
+      } on AuthException catch (authError) {
+        final errorMessage = authError.message.toLowerCase();
+        
+        // Email exists if we get invalid login credentials
         if (errorMessage.contains('invalid login credentials') ||
             errorMessage.contains('invalid password') ||
+            errorMessage.contains('wrong password') ||
             errorMessage.contains('incorrect password')) {
-          print('Email exists in auth: $email');
+          print('Email exists in auth.users: $cleanEmail');
           return true;
         }
-        // If error contains "user not found" or similar, email doesn't exist
+        
+        // Email doesn't exist if we get user not found errors
         if (errorMessage.contains('user not found') ||
             errorMessage.contains('no user found') ||
-            errorMessage.contains('email not found')) {
-          print('Email not found in auth: $email');
+            errorMessage.contains('email not found') ||
+            errorMessage.contains('user does not exist')) {
+          print('Email not found: $cleanEmail');
           return false;
         }
+        
+        // For any other auth error, assume email doesn't exist
+        print('Auth check inconclusive for $cleanEmail: ${authError.message}');
+        return false;
       }
       
       // Fallback: Check in profiles table
@@ -154,6 +177,93 @@ class SupabaseService {
       // On error, return false to allow signup to proceed
       // Supabase will handle duplicate email validation
       return false;
+    }
+  }
+
+  // Nutrition Entry Methods
+  Future<void> saveNutritionEntry({
+    required String userId,
+    required String foodName,
+    required int calories,
+    required double protein,
+    required double carbs,
+    required double fat,
+    double fiber = 0.0,
+    int quantityGrams = 100,
+    String mealType = 'snack',
+    String? foodSource,
+  }) async {
+    try {
+      await _supabase.from('nutrition_entries').insert({
+        'user_id': userId,
+        'food_name': foodName,
+        'calories': calories,
+        'protein': protein,
+        'carbs': carbs,
+        'fat': fat,
+        'fiber': fiber,
+        'quantity_grams': quantityGrams,
+        'meal_type': mealType,
+        'food_source': foodSource,
+      });
+      debugPrint('Nutrition entry saved: $foodName');
+    } catch (e) {
+      debugPrint('Error saving nutrition entry: $e');
+      throw e;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getNutritionHistory({
+    required String userId,
+    int days = 30,
+  }) async {
+    try {
+      final startDate = DateTime.now().subtract(Duration(days: days));
+      
+      final response = await _supabase
+          .from('nutrition_entries')
+          .select()
+          .eq('user_id', userId)
+          .gte('created_at', startDate.toIso8601String())
+          .order('created_at', ascending: false);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error loading nutrition history: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTodayNutritionEntries({
+    required String userId,
+  }) async {
+    try {
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = startOfDay.add(Duration(days: 1));
+      
+      final response = await _supabase
+          .from('nutrition_entries')
+          .select()
+          .eq('user_id', userId)
+          .gte('created_at', startOfDay.toIso8601String())
+          .lt('created_at', endOfDay.toIso8601String())
+          .order('created_at', ascending: false);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error loading today\'s nutrition: $e');
+      return [];
+    }
+  }
+
+  Future<void> deleteNutritionEntry(String entryId) async {
+    try {
+      await _supabase.from('nutrition_entries').delete().eq('id', entryId);
+      debugPrint('Nutrition entry deleted: $entryId');
+    } catch (e) {
+      debugPrint('Error deleting nutrition entry: $e');
+      throw e;
     }
   }
 
@@ -205,69 +315,6 @@ class SupabaseService {
     }
   }
 
-  // Nutrition Methods
-  Future<void> saveNutritionEntry({
-    required String userId,
-    required String date,
-    required Map<String, dynamic> nutritionData,
-  }) async {
-    try {
-      await _supabase.from('nutrition_entries').upsert({
-        'user_id': userId,
-        'date': date,
-        'calories': nutritionData['calories'] ?? 0,
-        'protein': nutritionData['protein'] ?? 0,
-        'carbs': nutritionData['carbs'] ?? 0,
-        'fat': nutritionData['fat'] ?? 0,
-        'fiber': nutritionData['fiber'] ?? 0,
-        'water': nutritionData['water'] ?? 0,
-        'food_items': nutritionData['food_items'] ?? [],
-        'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'user_id,date');
-    } catch (e) {
-      throw Exception('Failed to save nutrition data: $e');
-    }
-  }
-
-  Future<Map<String, dynamic>?> getNutritionEntry({
-    required String userId,
-    required String date,
-  }) async {
-    try {
-      final response = await _supabase
-          .from('nutrition_entries')
-          .select()
-          .eq('user_id', userId)
-          .eq('date', date)
-          .maybeSingle();
-      
-      return response;
-    } catch (e) {
-      print('Error fetching nutrition: $e');
-      return null;
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> getNutritionHistory({
-    required String userId,
-    required int days,
-  }) async {
-    try {
-      final startDate = DateTime.now().subtract(Duration(days: days));
-      
-      final response = await _supabase
-          .from('nutrition_entries')
-          .select()
-          .eq('user_id', userId)
-          .gte('date', startDate.toIso8601String().split('T')[0])
-          .order('date', ascending: false);
-      
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      print('Error fetching nutrition history: $e');
-      return [];
-    }
-  }
 
   // Health Metrics Methods
   Future<void> saveHealthMetrics({

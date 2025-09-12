@@ -239,9 +239,17 @@ class UserStreak {
   final int currentStreak;
   final int longestStreak;
   final int totalDaysCompleted;
+  
+  // Grace Period System (NEW)
+  final int consecutiveMissedDays;
+  final int graceDaysUsed;
+  final int graceDaysAvailable;
+  final DateTime? lastGraceResetDate;
+  
   final DateTime? streakStartDate;
   final DateTime? lastCompletedDate;
   final DateTime? lastCheckedDate;
+  final DateTime? lastAttemptedDate; // NEW: Last day user tried
   final int totalSteps;
   final int totalCaloriesBurned;
   final int totalWorkouts;
@@ -257,9 +265,17 @@ class UserStreak {
     this.currentStreak = 0,
     this.longestStreak = 0,
     this.totalDaysCompleted = 0,
+    
+    // Grace Period fields
+    this.consecutiveMissedDays = 0,
+    this.graceDaysUsed = 0,
+    this.graceDaysAvailable = 2,
+    this.lastGraceResetDate,
+    
     this.streakStartDate,
     this.lastCompletedDate,
     this.lastCheckedDate,
+    this.lastAttemptedDate,
     this.totalSteps = 0,
     this.totalCaloriesBurned = 0,
     this.totalWorkouts = 0,
@@ -271,24 +287,60 @@ class UserStreak {
   });
 
   bool get isStreakActive {
+    if (currentStreak == 0) return false;
     if (lastCompletedDate == null) return false;
+    
     final today = DateTime.now();
-    final yesterday = today.subtract(Duration(days: 1));
+    final todayDate = DateTime(today.year, today.month, today.day);
     final lastDate = DateTime(
       lastCompletedDate!.year,
       lastCompletedDate!.month,
       lastCompletedDate!.day,
     );
-    final todayDate = DateTime(today.year, today.month, today.day);
-    final yesterdayDate = DateTime(yesterday.year, yesterday.month, yesterday.day);
     
-    return lastDate == todayDate || lastDate == yesterdayDate;
+    final daysSinceCompletion = todayDate.difference(lastDate).inDays;
+    
+    // Streak is active if:
+    // 1. Completed today (daysSinceCompletion = 0)
+    // 2. Within grace period and hasn't exceeded grace days available
+    return daysSinceCompletion <= graceDaysAvailable;
+  }
+  
+  // New getter for grace period status
+  bool get isInGracePeriod {
+    if (currentStreak == 0) return false;
+    if (lastCompletedDate == null) return false;
+    
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final lastDate = DateTime(
+      lastCompletedDate!.year,
+      lastCompletedDate!.month,
+      lastCompletedDate!.day,
+    );
+    
+    final daysSinceCompletion = todayDate.difference(lastDate).inDays;
+    
+    return daysSinceCompletion > 0 && daysSinceCompletion <= graceDaysAvailable;
+  }
+  
+  // Get remaining grace days
+  int get remainingGraceDays {
+    return graceDaysAvailable - graceDaysUsed;
   }
 
   String get streakMessage {
     if (currentStreak == 0) {
       return "Start your streak today!";
-    } else if (currentStreak == 1) {
+    }
+    
+    // Check if in grace period
+    if (isInGracePeriod) {
+      return "$currentStreak days streak protected! ${remainingGraceDays} grace days left ⏳";
+    }
+    
+    // Normal streak messages
+    if (currentStreak == 1) {
       return "Great start! Keep it up!";
     } else if (currentStreak < 7) {
       return "$currentStreak days! Building momentum!";
@@ -307,9 +359,17 @@ class UserStreak {
     'current_streak': currentStreak,
     'longest_streak': longestStreak,
     'total_days_completed': totalDaysCompleted,
+    
+    // Grace Period fields
+    'consecutive_missed_days': consecutiveMissedDays,
+    'grace_days_used': graceDaysUsed,
+    'grace_days_available': graceDaysAvailable,
+    if (lastGraceResetDate != null) 'last_grace_reset_date': DateFormat('yyyy-MM-dd').format(lastGraceResetDate!),
+    
     if (streakStartDate != null) 'streak_start_date': DateFormat('yyyy-MM-dd').format(streakStartDate!),
     if (lastCompletedDate != null) 'last_completed_date': DateFormat('yyyy-MM-dd').format(lastCompletedDate!),
     if (lastCheckedDate != null) 'last_checked_date': DateFormat('yyyy-MM-dd').format(lastCheckedDate!),
+    if (lastAttemptedDate != null) 'last_attempted_date': DateFormat('yyyy-MM-dd').format(lastAttemptedDate!),
     'total_steps': totalSteps,
     'total_calories_burned': totalCaloriesBurned,
     'total_workouts': totalWorkouts,
@@ -325,9 +385,17 @@ class UserStreak {
       currentStreak: json['current_streak'] ?? 0,
       longestStreak: json['longest_streak'] ?? 0,
       totalDaysCompleted: json['total_days_completed'] ?? 0,
+      
+      // Grace Period fields
+      consecutiveMissedDays: json['consecutive_missed_days'] ?? 0,
+      graceDaysUsed: json['grace_days_used'] ?? 0,
+      graceDaysAvailable: json['grace_days_available'] ?? 2,
+      lastGraceResetDate: json['last_grace_reset_date'] != null ? DateTime.parse(json['last_grace_reset_date']) : null,
+      
       streakStartDate: json['streak_start_date'] != null ? DateTime.parse(json['streak_start_date']) : null,
       lastCompletedDate: json['last_completed_date'] != null ? DateTime.parse(json['last_completed_date']) : null,
       lastCheckedDate: json['last_checked_date'] != null ? DateTime.parse(json['last_checked_date']) : null,
+      lastAttemptedDate: json['last_attempted_date'] != null ? DateTime.parse(json['last_attempted_date']) : null,
       totalSteps: json['total_steps'] ?? 0,
       totalCaloriesBurned: json['total_calories_burned'] ?? 0,
       totalWorkouts: json['total_workouts'] ?? 0,

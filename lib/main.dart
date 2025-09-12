@@ -9,6 +9,7 @@ import 'services/supabase_service.dart';
 import 'services/firebase_analytics_service.dart';
 import 'services/bluetooth_smartwatch_service.dart';
 import 'services/realtime_sync_service.dart';
+import 'services/daily_reset_service.dart';
 // Using Supabase providers for cloud storage
 import 'providers/supabase_auth_provider.dart';
 import 'providers/supabase_nutrition_provider.dart';
@@ -36,6 +37,9 @@ void main() async {
   
   // Initialize Real-time Sync Service
   await RealtimeSyncService().initialize();
+  
+  // Initialize Daily Reset Service
+  await DailyResetService().initialize();
   
   // Initialize Firebase
   try {
@@ -87,15 +91,22 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider(prefs)),
         ChangeNotifierProvider(create: (_) => StreakProvider()),
       ],
-      child: Consumer3<SupabaseAuthProvider, UserProvider, ThemeProvider>(
+      child: Consumer3<SupabaseAuthProvider, SupabaseUserProvider, ThemeProvider>(
         builder: (context, auth, userProvider, themeProvider, _) {
           print('Auth state: authenticated=${auth.isAuthenticated}, loading=${auth.isLoading}');
           print('User profile: hasProfile=${userProvider.hasProfile}, onboarding=${userProvider.hasCompletedOnboarding}');
           
+          // Load user profile when authenticated and profile is not loaded (only once)
+          if (auth.isAuthenticated && !userProvider.hasProfile && !userProvider.isLoading && !userProvider.hasTriedLoading) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              userProvider.loadUserProfile();
+            });
+          }
+          
           Widget home;
           
-          // Show loading if auth is in loading state
-          if (auth.isLoading) {
+          // Show loading if auth is in loading state or user profile is loading
+          if (auth.isLoading || (auth.isAuthenticated && userProvider.isLoading)) {
             home = const Scaffold(
               body: Center(
                 child: CircularProgressIndicator(),

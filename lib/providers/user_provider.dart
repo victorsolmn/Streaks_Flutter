@@ -195,6 +195,7 @@ class UserProvider with ChangeNotifier {
   StreakData? _streakData;
   bool _isLoading = false;
   String? _error;
+  bool _justCompletedOnboarding = false; // Temporary flag for current session
 
   UserProvider(this._prefs) {
     _loadUserData();
@@ -205,6 +206,12 @@ class UserProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasCompletedOnboarding => _prefs.getBool('onboarding_completed') ?? false;
+  bool get justCompletedOnboarding => _justCompletedOnboarding;
+  
+  void clearJustCompletedOnboardingFlag() {
+    _justCompletedOnboarding = false;
+    notifyListeners();
+  }
   bool get hasProfile => _profile != null;
 
   void _setLoading(bool loading) {
@@ -301,9 +308,9 @@ class UserProvider with ChangeNotifier {
 
       await _saveUserProfile();
       await _prefs.setBool('onboarding_completed', true);
+      _justCompletedOnboarding = true; // Set the flag when onboarding is completed
       
       _setLoading(false);
-      notifyListeners();
     } catch (e) {
       _setError('Failed to create profile');
       _setLoading(false);
@@ -369,7 +376,6 @@ class UserProvider with ChangeNotifier {
 
       await _saveUserProfile();
       _setLoading(false);
-      notifyListeners();
     } catch (e) {
       _setError('Failed to update profile');
       _setLoading(false);

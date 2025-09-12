@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/supabase_auth_provider.dart';
 import '../../providers/supabase_user_provider.dart';
-import '../../providers/user_provider.dart';
+import '../../providers/user_provider.dart' hide UserProfile;
 import '../../providers/auth_provider.dart';
+import '../../models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../main/main_screen.dart';
 import '../auth/welcome_screen.dart';
@@ -19,6 +20,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   int _currentStep = 0;
   final _formKey = GlobalKey<FormState>();
+  bool _isProcessing = false; // Prevent multiple button clicks
 
   // Form controllers
   final _ageController = TextEditingController();
@@ -28,6 +30,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   FitnessGoal? _selectedGoal;
   ActivityLevel? _selectedActivityLevel;
+  String? _selectedExperienceLevel;
+  String? _selectedWorkoutConsistency;
 
   @override
   void dispose() {
@@ -40,7 +44,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _completeOnboarding() async {
     if (_formKey.currentState?.validate() ?? false) {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      // Validate new required fields
+      if (_selectedExperienceLevel == null || _selectedWorkoutConsistency == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Please select both experience level and workout consistency'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final supabaseUserProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
       final supabaseAuth = Provider.of<SupabaseAuthProvider>(context, listen: false);
       
       // Get name and email from Supabase auth or use defaults
@@ -49,17 +64,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                    currentUser?.email?.split('@')[0] ?? 'User';
       final email = currentUser?.email ?? 'user@example.com';
 
-      // Create profile in local storage
-      await userProvider.createProfile(
+      // Create comprehensive user profile with new fields using user_model.dart UserProfile
+      final userProfile = UserProfile(
         name: name,
         email: email,
         age: int.parse(_ageController.text),
         height: double.parse(_heightController.text),
         weight: double.parse(_weightController.text),
         targetWeight: double.parse(_targetWeightController.text),
-        goal: _selectedGoal!,
-        activityLevel: _selectedActivityLevel!,
+        fitnessGoal: _selectedGoal == FitnessGoal.weightLoss ? 'Lose Weight' :
+                    _selectedGoal == FitnessGoal.muscleGain ? 'Gain Muscle' :
+                    _selectedGoal == FitnessGoal.maintenance ? 'Maintain Weight' :
+                    'Improve Endurance',
+        activityLevel: _selectedActivityLevel == ActivityLevel.sedentary ? 'Sedentary' :
+                      _selectedActivityLevel == ActivityLevel.lightlyActive ? 'Lightly Active' :
+                      _selectedActivityLevel == ActivityLevel.moderatelyActive ? 'Moderately Active' :
+                      _selectedActivityLevel == ActivityLevel.veryActive ? 'Very Active' :
+                      'Extra Active',
+        experienceLevel: _selectedExperienceLevel!,
+        workoutConsistency: _selectedWorkoutConsistency!,
+        hasCompletedOnboarding: true,
       );
+
+      // Save profile to Supabase
+      await supabaseUserProvider.updateProfile(userProfile);
 
       if (mounted) {
         // Navigate directly to main screen
@@ -82,7 +110,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         actions: [
           TextButton(
             onPressed: () async {
-              final userProvider = Provider.of<UserProvider>(context, listen: false);
+              final supabaseUserProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
               final supabaseAuth = Provider.of<SupabaseAuthProvider>(context, listen: false);
               
               // Get current user info for creating a basic profile
@@ -91,17 +119,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                            currentUser?.email?.split('@')[0] ?? 'User';
               final email = currentUser?.email ?? 'user@example.com';
 
-              // Create a basic profile with default values when skipping
-              await userProvider.createProfile(
+              // Create a basic profile with default values when skipping using user_model.dart UserProfile
+              final defaultProfile = UserProfile(
                 name: name,
                 email: email,
                 age: 25, // Default age
                 height: 170.0, // Default height in cm
                 weight: 70.0, // Default weight in kg
                 targetWeight: 65.0, // Default target weight
-                goal: FitnessGoal.maintenance, // Default goal
-                activityLevel: ActivityLevel.moderatelyActive, // Default activity level
+                fitnessGoal: 'Maintain Weight', // Default goal
+                activityLevel: 'Moderately Active', // Default activity level
+                experienceLevel: 'Beginner', // Default experience level
+                workoutConsistency: '0-1 year', // Default workout consistency
+                hasCompletedOnboarding: true,
               );
+
+              // Save profile to Supabase
+              await supabaseUserProvider.updateProfile(defaultProfile);
 
               // Navigate directly to main screen when skipping
               if (mounted) {
@@ -181,7 +215,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           style: ElevatedButton.styleFrom(
                             padding: EdgeInsets.symmetric(vertical: 16),
                           ),
-                          onPressed: user.isLoading ? null : _handleNext,
+                          onPressed: (user.isLoading || _isProcessing) ? null : _handleNext,
                           child: user.isLoading
                               ? SizedBox(
                                   height: 20,
@@ -447,12 +481,320 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               return null;
             },
           ),
+          SizedBox(height: 24),
+          
+          // Experience Level Dropdown
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Theme.of(context).dividerColor,
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedExperienceLevel,
+                hint: Text(
+                  'Experience Level',
+                  style: TextStyle(
+                    color: Theme.of(context).hintColor,
+                    fontSize: 16,
+                  ),
+                ),
+                icon: Icon(
+                  Icons.arrow_drop_down,
+                  color: Theme.of(context).iconTheme.color,
+                ),
+                iconSize: 24,
+                isExpanded: true,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  fontSize: 16,
+                ),
+                dropdownColor: Theme.of(context).cardColor,
+                items: [
+                  DropdownMenuItem(
+                    value: 'Beginner',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.school,
+                          color: AppTheme.primaryAccent,
+                          size: 20,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Beginner',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'New to fitness and exercise',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).hintColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Intermediate',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.trending_up,
+                          color: AppTheme.primaryAccent,
+                          size: 20,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Intermediate',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Some fitness experience',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).hintColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Expert',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.star,
+                          color: AppTheme.primaryAccent,
+                          size: 20,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Expert',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Advanced fitness knowledge',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).hintColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedExperienceLevel = value;
+                  });
+                },
+              ),
+            ),
+          ),
+          SizedBox(height: 24),
+          
+          // Workout Consistency Dropdown
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Theme.of(context).dividerColor,
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedWorkoutConsistency,
+                hint: Text(
+                  'Consistent Workout',
+                  style: TextStyle(
+                    color: Theme.of(context).hintColor,
+                    fontSize: 16,
+                  ),
+                ),
+                icon: Icon(
+                  Icons.arrow_drop_down,
+                  color: Theme.of(context).iconTheme.color,
+                ),
+                iconSize: 24,
+                isExpanded: true,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  fontSize: 16,
+                ),
+                dropdownColor: Theme.of(context).cardColor,
+                items: [
+                  DropdownMenuItem(
+                    value: '0-1 year',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.access_time,
+                          color: AppTheme.primaryAccent,
+                          size: 20,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '0-1 year',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Just started or inconsistent',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).hintColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: '1-3 years',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.schedule,
+                          color: AppTheme.primaryAccent,
+                          size: 20,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '1-3 years',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Building consistency',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).hintColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: '> 3 years',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.timer,
+                          color: AppTheme.primaryAccent,
+                          size: 20,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '> 3 years',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Established routine',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).hintColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedWorkoutConsistency = value;
+                  });
+                },
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   void _handleNext() {
+    // Prevent multiple rapid calls
+    if (_isProcessing) return;
+    
+    setState(() {
+      _isProcessing = true;
+    });
+
+    // Reset processing flag after a short delay
+    Future.delayed(Duration(milliseconds: 1000), () {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    });
+
     if (_currentStep == 0 && _selectedGoal == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -474,6 +816,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
 
     if (_currentStep == 2) {
+      if (_selectedExperienceLevel == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select your experience level'),
+            backgroundColor: AppTheme.errorRed,
+          ),
+        );
+        return;
+      }
+      
+      if (_selectedWorkoutConsistency == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select your workout consistency'),
+            backgroundColor: AppTheme.errorRed,
+          ),
+        );
+        return;
+      }
+      
       _completeOnboarding();
       return;
     }

@@ -36,6 +36,14 @@ class StreakProvider extends ChangeNotifier {
   bool get allGoalsAchievedToday => _todayMetrics?.allGoalsAchieved ?? false;
   double get todayProgress => _todayMetrics?.goalsCompletionPercentage ?? 0.0;
   
+  // Grace Period Getters
+  bool get isStreakActive => _userStreak?.isStreakActive ?? false;
+  bool get isInGracePeriod => _userStreak?.isInGracePeriod ?? false;
+  int get graceDaysUsed => _userStreak?.graceDaysUsed ?? 0;
+  int get graceDaysAvailable => _userStreak?.graceDaysAvailable ?? 2;
+  int get remainingGraceDays => _userStreak?.remainingGraceDays ?? 2;
+  int get consecutiveMissedDays => _userStreak?.consecutiveMissedDays ?? 0;
+  
   StreakProvider() {
     _init();
   }
@@ -85,7 +93,7 @@ class StreakProvider extends ChangeNotifier {
       final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
       
       final response = await _supabaseService.client
-          .from('user_daily_metrics')
+          .from('health_metrics')
           .select()
           .eq('user_id', userId)
           .eq('date', dateStr)
@@ -120,7 +128,7 @@ class StreakProvider extends ChangeNotifier {
       if (userId == null) return;
       
       final response = await _supabaseService.client
-          .from('user_daily_metrics')
+          .from('health_metrics')
           .select()
           .eq('user_id', userId)
           .order('date', ascending: false)
@@ -209,7 +217,7 @@ class StreakProvider extends ChangeNotifier {
       final data = metrics.toJson();
       
       final response = await _supabaseService.client
-          .from('user_daily_metrics')
+          .from('health_metrics')
           .upsert(
             data,
             onConflict: 'user_id,date',
@@ -323,7 +331,7 @@ class StreakProvider extends ChangeNotifier {
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
-          table: 'user_daily_metrics',
+          table: 'health_metrics',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'user_id',
@@ -401,17 +409,42 @@ class StreakProvider extends ChangeNotifier {
     await saveMetrics(updated.calculateAchievements());
   }
   
-  // Get streak statistics
+  // Get streak statistics with grace period information
   Map<String, dynamic> getStreakStats() {
     return {
       'current': _userStreak?.currentStreak ?? 0,
       'longest': _userStreak?.longestStreak ?? 0,
       'total': _userStreak?.totalDaysCompleted ?? 0,
       'isActive': _userStreak?.isStreakActive ?? false,
+      'isInGracePeriod': _userStreak?.isInGracePeriod ?? false,
+      'graceDaysUsed': _userStreak?.graceDaysUsed ?? 0,
+      'graceDaysAvailable': _userStreak?.graceDaysAvailable ?? 2,
+      'remainingGraceDays': _userStreak?.remainingGraceDays ?? 2,
+      'consecutiveMissedDays': _userStreak?.consecutiveMissedDays ?? 0,
       'message': _userStreak?.streakMessage ?? 'Start your streak!',
       'todayProgress': todayProgress,
       'goalsCompleted': _getGoalsCompletedCount(),
     };
+  }
+  
+  // Get grace period status message
+  String getGracePeriodMessage() {
+    if (!isInGracePeriod || currentStreak == 0) {
+      return '';
+    }
+    
+    if (remainingGraceDays == 2) {
+      return "Don't worry! You have 2 grace days to get back on track 💪";
+    } else if (remainingGraceDays == 1) {
+      return "Last chance! Complete your goals today to save your ${currentStreak}-day streak ⚠️";
+    } else {
+      return "Grace period used up. Complete goals today or lose your streak! ⚠️";
+    }
+  }
+  
+  // Check if user is at risk of losing streak
+  bool get isStreakAtRisk {
+    return isInGracePeriod && remainingGraceDays <= 1;
   }
   
   int _getGoalsCompletedCount() {

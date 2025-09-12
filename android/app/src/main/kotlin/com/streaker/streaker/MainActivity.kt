@@ -10,7 +10,7 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CoroutineScope
@@ -22,25 +22,27 @@ import java.time.temporal.ChronoUnit
 import android.content.Context
 import androidx.work.WorkManager
 
-class MainActivity: FlutterActivity() {
+class MainActivity: FlutterFragmentActivity() {
     private val CHANNEL = "com.streaker/health_connect"
     private val TAG = "HealthConnect"
     
     private lateinit var healthConnectClient: HealthConnectClient
     private lateinit var methodChannel: MethodChannel
     
-    // Define the permissions we need
+    // Define the permissions we need - including Samsung Health specific data types
     private val permissions = setOf(
         HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getReadPermission(HeartRateRecord::class),
         HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
+        HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class), // Samsung Health uses total calories
         HealthPermission.getReadPermission(DistanceRecord::class),
         HealthPermission.getReadPermission(SleepSessionRecord::class),
         HealthPermission.getReadPermission(HydrationRecord::class),
         HealthPermission.getReadPermission(WeightRecord::class),
         HealthPermission.getReadPermission(OxygenSaturationRecord::class),
         HealthPermission.getReadPermission(BloodPressureRecord::class),
-        HealthPermission.getReadPermission(ExerciseSessionRecord::class)
+        HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+        HealthPermission.getReadPermission(RestingHeartRateRecord::class) // Samsung Health resting heart rate
     )
     
     // Permission request code
@@ -122,19 +124,51 @@ class MainActivity: FlutterActivity() {
     private fun requestPermissions(result: MethodChannel.Result) {
         coroutineScope.launch {
             try {
-                Log.d(TAG, "Requesting permissions for ${permissions.size} data types")
+                Log.d(TAG, "=== REQUESTING HEALTH PERMISSIONS ===")
+                Log.d(TAG, "Requesting permissions for ${permissions.size} data types:")
+                permissions.forEachIndexed { index, permission ->
+                    Log.d(TAG, "  ${index + 1}. $permission")
+                }
                 
                 // Check which permissions are already granted
                 val granted = healthConnectClient.permissionController.getGrantedPermissions()
                 Log.d(TAG, "Already granted: ${granted.size} permissions")
+                if (granted.isNotEmpty()) {
+                    Log.d(TAG, "Granted permissions:")
+                    granted.forEach { permission ->
+                        Log.d(TAG, "  ✅ $permission")
+                    }
+                }
                 
-                // Request permissions using the permission controller
-                val contract = PermissionController.createRequestPermissionResultContract()
-                val intent = contract.createIntent(this@MainActivity, permissions)
-                startActivityForResult(intent, PERMISSION_REQUEST_CODE)
+                val notGranted = permissions - granted
+                if (notGranted.isNotEmpty()) {
+                    Log.d(TAG, "Need to request ${notGranted.size} additional permissions:")
+                    notGranted.forEach { permission ->
+                        Log.d(TAG, "  ❌ $permission")
+                    }
+                    
+                    // Request ALL permissions (including already granted ones for completeness)
+                    val contract = PermissionController.createRequestPermissionResultContract()
+                    val intent = contract.createIntent(this@MainActivity, permissions)
+                    startActivityForResult(intent, PERMISSION_REQUEST_CODE)
+                    
+                    Log.d(TAG, "Permission dialog launched - waiting for user response...")
+                } else {
+                    Log.d(TAG, "All permissions already granted!")
+                    result.success(mapOf(
+                        "status" to "already_granted",
+                        "granted" to true,
+                        "grantedCount" to granted.size,
+                        "requiredCount" to permissions.size
+                    ))
+                    return@launch
+                }
                 
                 // Return immediately, result will be handled in onActivityResult
-                result.success(mapOf("status" to "requesting"))
+                result.success(mapOf(
+                    "status" to "requesting",
+                    "message" to "Permission dialog opened - grant access to: Steps, Heart Rate, Calories, Distance, Sleep, Water, Weight, Blood Oxygen, Blood Pressure, Exercise sessions"
+                ))
             } catch (e: Exception) {
                 Log.e(TAG, "Error requesting permissions", e)
                 result.error("PERMISSION_ERROR", e.message, null)
@@ -162,15 +196,42 @@ class MainActivity: FlutterActivity() {
     private suspend fun checkPermissionsAndRespond(result: MethodChannel.Result? = null) {
         try {
             val granted = healthConnectClient.permissionController.getGrantedPermissions()
+            Log.d(TAG, "=== PERMISSION STATUS CHECK ===")
             Log.d(TAG, "Granted permissions: ${granted.size} out of ${permissions.size}")
             
             val allGranted = granted.containsAll(permissions)
+            val missingPermissions = permissions - granted
+            
+            // Log granted permissions
+            if (granted.isNotEmpty()) {
+                Log.d(TAG, "✅ Granted permissions:")
+                granted.forEach { permission ->
+                    Log.d(TAG, "   $permission")
+                }
+            }
+            
+            // Log missing permissions
+            if (missingPermissions.isNotEmpty()) {
+                Log.w(TAG, "❌ Missing permissions:")
+                missingPermissions.forEach { permission ->
+                    Log.w(TAG, "   $permission")
+                }
+                Log.w(TAG, "USER ACTION REQUIRED: Please grant all health permissions in Health Connect")
+            } else {
+                Log.i(TAG, "🎉 All permissions granted! Health data access is ready.")
+            }
             
             val response = mapOf(
                 "granted" to allGranted,
                 "grantedCount" to granted.size,
                 "requiredCount" to permissions.size,
-                "grantedPermissions" to granted.map { it.toString() }
+                "grantedPermissions" to granted.map { it.toString() },
+                "missingPermissions" to missingPermissions.map { it.toString() },
+                "message" to if (allGranted) {
+                    "All health permissions granted! Ready to sync health data."
+                } else {
+                    "Missing ${missingPermissions.size} permissions. Please grant access to: ${missingPermissions.joinToString(", ") { it.toString().substringAfterLast(".") }}"
+                }
             )
             
             if (result != null) {
@@ -179,6 +240,8 @@ class MainActivity: FlutterActivity() {
                 // Send update to Flutter via event channel or method channel
                 methodChannel.invokeMethod("onPermissionsChecked", response)
             }
+            
+            Log.d(TAG, "Permission check complete: ${if (allGranted) "SUCCESS" else "INCOMPLETE"}")
         } catch (e: Exception) {
             Log.e(TAG, "Error checking permissions", e)
             result?.error("CHECK_ERROR", e.message, null)
@@ -469,111 +532,205 @@ class MainActivity: FlutterActivity() {
                     healthData["steps"] = 0
                 }
                 
-                // Read heart rate - try to get the lowest (resting) from today
+                // Read heart rate - prioritize resting heart rate, then try regular heart rate
                 try {
-                    val heartRateResponse = healthConnectClient.readRecords(
-                        ReadRecordsRequest(
-                            HeartRateRecord::class,
-                            timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
-                        )
-                    )
+                    var heartRateValue = 0
+                    var heartRateType = "none"
                     
-                    if (heartRateResponse.records.isNotEmpty()) {
-                        // Collect all heart rate samples from Samsung Health
-                        val samsungHeartRates = mutableListOf<Long>()
-                        val otherHeartRates = mutableListOf<Long>()
+                    // First try to get resting heart rate (Samsung Health priority)
+                    try {
+                        val restingHRResponse = healthConnectClient.readRecords(
+                            ReadRecordsRequest(
+                                RestingHeartRateRecord::class,
+                                timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
+                            )
+                        )
                         
-                        heartRateResponse.records.forEach { record ->
-                            val source = record.metadata.dataOrigin.packageName
-                            val samples = record.samples.map { it.beatsPerMinute }
+                        if (restingHRResponse.records.isNotEmpty()) {
+                            var samsungRestingHR = 0L
+                            var otherRestingHR = 0L
                             
-                            if (source.contains("shealth") || 
-                                source.contains("com.sec.android") || 
-                                source.contains("samsung")) {
-                                samsungHeartRates.addAll(samples)
-                                Log.d(TAG, "Samsung HR samples: ${samples.size} readings")
-                            } else {
-                                otherHeartRates.addAll(samples)
+                            restingHRResponse.records.forEach { record ->
+                                val source = record.metadata.dataOrigin.packageName
+                                val beatsPerMinute = record.beatsPerMinute
+                                
+                                Log.d(TAG, "Resting HR: $beatsPerMinute bpm from $source")
+                                
+                                if (source.contains("shealth") || 
+                                    source.contains("com.sec.android") || 
+                                    source.contains("samsung")) {
+                                    samsungRestingHR = beatsPerMinute
+                                } else {
+                                    otherRestingHR = beatsPerMinute
+                                }
+                            }
+                            
+                            if (samsungRestingHR > 0) {
+                                heartRateValue = samsungRestingHR.toInt()
+                                heartRateType = "samsung_resting"
+                                Log.d(TAG, "Using Samsung resting heart rate: $heartRateValue bpm")
+                            } else if (otherRestingHR > 0) {
+                                heartRateValue = otherRestingHR.toInt()
+                                heartRateType = "other_resting"
                             }
                         }
-                        
-                        // Use Samsung Health data if available, otherwise fall back
-                        val heartRatesToUse = if (samsungHeartRates.isNotEmpty()) samsungHeartRates else otherHeartRates
-                        
-                        if (heartRatesToUse.isNotEmpty()) {
-                            // Get the minimum (resting) and latest heart rate
-                            val restingHeartRate = heartRatesToUse.minOrNull() ?: 0
-                            val latestHeartRate = heartRatesToUse.last()
-                            
-                            // Use resting heart rate as the primary metric
-                            healthData["heartRate"] = restingHeartRate.toInt()
-                            healthData["latestHeartRate"] = latestHeartRate.toInt()
-                            healthData["heartRateType"] = "resting"
-                            
-                            Log.d(TAG, "Heart rate - Resting: $restingHeartRate bpm, Latest: $latestHeartRate bpm")
-                        } else {
-                            healthData["heartRate"] = 0
-                            healthData["heartRateType"] = "none"
-                        }
-                    } else {
-                        healthData["heartRate"] = 0
-                        healthData["heartRateType"] = "none"
-                        Log.d(TAG, "No heart rate data found")
+                    } catch (e: Exception) {
+                        Log.d(TAG, "Resting heart rate not available, trying regular heart rate", e)
                     }
+                    
+                    // If no resting heart rate found, try regular heart rate data
+                    if (heartRateValue == 0) {
+                        val heartRateResponse = healthConnectClient.readRecords(
+                            ReadRecordsRequest(
+                                HeartRateRecord::class,
+                                timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
+                            )
+                        )
+                        
+                        if (heartRateResponse.records.isNotEmpty()) {
+                            val samsungHeartRates = mutableListOf<Long>()
+                            val otherHeartRates = mutableListOf<Long>()
+                            
+                            heartRateResponse.records.forEach { record ->
+                                val source = record.metadata.dataOrigin.packageName
+                                val samples = record.samples.map { it.beatsPerMinute }
+                                
+                                if (source.contains("shealth") || 
+                                    source.contains("com.sec.android") || 
+                                    source.contains("samsung")) {
+                                    samsungHeartRates.addAll(samples)
+                                    Log.d(TAG, "Samsung HR samples: ${samples.size} readings")
+                                } else {
+                                    otherHeartRates.addAll(samples)
+                                }
+                            }
+                            
+                            val heartRatesToUse = if (samsungHeartRates.isNotEmpty()) samsungHeartRates else otherHeartRates
+                            
+                            if (heartRatesToUse.isNotEmpty()) {
+                                // For Samsung Health, get average of all readings rather than minimum
+                                if (samsungHeartRates.isNotEmpty()) {
+                                    heartRateValue = (samsungHeartRates.sum() / samsungHeartRates.size).toInt()
+                                    heartRateType = "samsung_average"
+                                } else {
+                                    // For non-Samsung, use latest reading
+                                    heartRateValue = heartRatesToUse.last().toInt()
+                                    heartRateType = "other_latest"
+                                }
+                                
+                                Log.d(TAG, "Heart rate ($heartRateType): $heartRateValue bpm from ${heartRatesToUse.size} samples")
+                            }
+                        }
+                    }
+                    
+                    healthData["heartRate"] = heartRateValue
+                    healthData["heartRateType"] = heartRateType
+                    
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error reading heart rate", e)
+                    Log.e(TAG, "Error reading heart rate data", e)
                     healthData["heartRate"] = 0
                     healthData["heartRateType"] = "error"
                 }
                 
-                // Read calories with source prioritization
+                // Read calories with source prioritization - try both active and total calories
                 try {
-                    val caloriesResponse = healthConnectClient.readRecords(
-                        ReadRecordsRequest(
-                            ActiveCaloriesBurnedRecord::class,
-                            timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
-                        )
-                    )
-                    
-                    var samsungCalories = 0.0
+                    var samsungActiveCalories = 0.0
+                    var samsungTotalCalories = 0.0
                     var googleFitCalories = 0.0
                     var otherCalories = 0.0
                     
-                    caloriesResponse.records.forEach { record ->
-                        val source = record.metadata.dataOrigin.packageName
-                        val calories = record.energy.inKilocalories
+                    // Read Active Calories (exercise calories)
+                    try {
+                        val activeCaloriesResponse = healthConnectClient.readRecords(
+                            ReadRecordsRequest(
+                                ActiveCaloriesBurnedRecord::class,
+                                timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
+                            )
+                        )
                         
-                        when {
-                            source.contains("shealth") || 
-                            source.contains("com.sec.android") || 
-                            source.contains("samsung") -> {
-                                samsungCalories += calories
-                                Log.d(TAG, "Samsung calories: $calories kcal")
+                        activeCaloriesResponse.records.forEach { record ->
+                            val source = record.metadata.dataOrigin.packageName
+                            val calories = record.energy.inKilocalories
+                            
+                            when {
+                                source.contains("shealth") || 
+                                source.contains("com.sec.android") || 
+                                source.contains("samsung") -> {
+                                    samsungActiveCalories += calories
+                                    Log.d(TAG, "Samsung active calories: $calories kcal from $source")
+                                }
+                                source.contains("google.android.apps.fitness") -> {
+                                    googleFitCalories += calories
+                                }
+                                else -> {
+                                    otherCalories += calories
+                                }
                             }
-                            source.contains("google.android.apps.fitness") -> {
-                                googleFitCalories += calories
+                        }
+                    } catch (e: Exception) {
+                        Log.d(TAG, "Active calories not available", e)
+                    }
+                    
+                    // Read Total Calories (Samsung Health often uses this)
+                    try {
+                        val totalCaloriesResponse = healthConnectClient.readRecords(
+                            ReadRecordsRequest(
+                                TotalCaloriesBurnedRecord::class,
+                                timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
+                            )
+                        )
+                        
+                        totalCaloriesResponse.records.forEach { record ->
+                            val source = record.metadata.dataOrigin.packageName
+                            val calories = record.energy.inKilocalories
+                            
+                            when {
+                                source.contains("shealth") || 
+                                source.contains("com.sec.android") || 
+                                source.contains("samsung") -> {
+                                    samsungTotalCalories += calories
+                                    Log.d(TAG, "Samsung total calories: $calories kcal from $source")
+                                }
+                                source.contains("google.android.apps.fitness") -> {
+                                    if (samsungActiveCalories == 0.0) googleFitCalories += calories // Avoid double counting
+                                }
+                                else -> {
+                                    if (samsungActiveCalories == 0.0 && samsungTotalCalories == 0.0) otherCalories += calories
+                                }
                             }
-                            else -> {
-                                otherCalories += calories
-                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.d(TAG, "Total calories not available", e)
+                    }
+                    
+                    // Prioritize Samsung Health data - use total calories if available, otherwise active
+                    val finalCalories = when {
+                        samsungTotalCalories > 0 -> {
+                            Log.d(TAG, "Using Samsung total calories: $samsungTotalCalories kcal")
+                            samsungTotalCalories
+                        }
+                        samsungActiveCalories > 0 -> {
+                            Log.d(TAG, "Using Samsung active calories: $samsungActiveCalories kcal")
+                            samsungActiveCalories
+                        }
+                        googleFitCalories > 0 -> {
+                            Log.d(TAG, "No Samsung data, using Google Fit: $googleFitCalories kcal")
+                            googleFitCalories
+                        }
+                        else -> {
+                            Log.d(TAG, "Using other sources: $otherCalories kcal")
+                            otherCalories
                         }
                     }
                     
-                    // Prioritize Samsung Health data
-                    val finalCalories = when {
-                        samsungCalories > 0 -> samsungCalories
-                        googleFitCalories > 0 -> googleFitCalories
-                        else -> otherCalories
-                    }
-                    
                     healthData["calories"] = finalCalories.toInt()
-                    Log.d(TAG, "Total calories (prioritizing Samsung): $finalCalories kcal")
+                    Log.d(TAG, "Final calories (prioritizing Samsung): $finalCalories kcal")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error reading calories", e)
                     healthData["calories"] = 0
                 }
                 
-                // Read distance with source prioritization
+                // Read distance with source prioritization - detailed logging for debugging
                 try {
                     val distanceResponse = healthConnectClient.readRecords(
                         ReadRecordsRequest(
@@ -585,36 +742,63 @@ class MainActivity: FlutterActivity() {
                     var samsungDistance = 0.0
                     var googleFitDistance = 0.0
                     var otherDistance = 0.0
+                    val distanceDetails = mutableListOf<Map<String, Any>>()
+                    
+                    Log.d(TAG, "Found ${distanceResponse.records.size} distance records")
                     
                     distanceResponse.records.forEach { record ->
                         val source = record.metadata.dataOrigin.packageName
                         val distance = record.distance.inKilometers
+                        
+                        val detail = mapOf(
+                            "distance" to distance,
+                            "source" to source,
+                            "startTime" to record.startTime.toString(),
+                            "endTime" to record.endTime.toString()
+                        )
+                        
+                        Log.d(TAG, "Distance record: $distance km from $source (${record.startTime} to ${record.endTime})")
                         
                         when {
                             source.contains("shealth") || 
                             source.contains("com.sec.android") || 
                             source.contains("samsung") -> {
                                 samsungDistance += distance
-                                Log.d(TAG, "Samsung distance: $distance km")
+                                distanceDetails.add(detail)
+                                Log.d(TAG, "  -> Samsung Health distance: $distance km (running total: $samsungDistance km)")
                             }
                             source.contains("google.android.apps.fitness") -> {
                                 googleFitDistance += distance
+                                if (samsungDistance == 0.0) distanceDetails.add(detail)
+                                Log.d(TAG, "  -> Google Fit distance: $distance km (running total: $googleFitDistance km)")
                             }
                             else -> {
                                 otherDistance += distance
+                                if (samsungDistance == 0.0 && googleFitDistance == 0.0) distanceDetails.add(detail)
+                                Log.d(TAG, "  -> Other source distance: $distance km (running total: $otherDistance km)")
                             }
                         }
                     }
                     
                     // Prioritize Samsung Health data
                     val finalDistance = when {
-                        samsungDistance > 0 -> samsungDistance
-                        googleFitDistance > 0 -> googleFitDistance
-                        else -> otherDistance
+                        samsungDistance > 0 -> {
+                            Log.d(TAG, "Using Samsung Health distance: $samsungDistance km")
+                            samsungDistance
+                        }
+                        googleFitDistance > 0 -> {
+                            Log.d(TAG, "No Samsung data, using Google Fit distance: $googleFitDistance km")
+                            googleFitDistance
+                        }
+                        else -> {
+                            Log.d(TAG, "Using other sources distance: $otherDistance km")
+                            otherDistance
+                        }
                     }
                     
                     healthData["distance"] = finalDistance
-                    Log.d(TAG, "Total distance (prioritizing Samsung): $finalDistance km")
+                    healthData["distanceDetails"] = distanceDetails
+                    Log.d(TAG, "FINAL distance (prioritizing Samsung): $finalDistance km from ${distanceResponse.records.size} records")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error reading distance", e)
                     healthData["distance"] = 0.0
@@ -694,22 +878,325 @@ class MainActivity: FlutterActivity() {
                     healthData["sleepMinutes"] = 0
                 }
                 
-                // Add other default values
-                healthData["water"] = 0
-                healthData["weight"] = 0.0
+                // Read water/hydration data with source prioritization
+                try {
+                    val hydrationResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            HydrationRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
+                        )
+                    )
+                    
+                    var samsungWater = 0.0
+                    var googleFitWater = 0.0
+                    var otherWater = 0.0
+                    
+                    hydrationResponse.records.forEach { record ->
+                        val source = record.metadata.dataOrigin.packageName
+                        val volume = record.volume.inLiters * 1000 // Convert to ml
+                        
+                        when {
+                            source.contains("shealth") || 
+                            source.contains("com.sec.android") || 
+                            source.contains("samsung") -> {
+                                samsungWater += volume
+                                Log.d(TAG, "Samsung water: $volume ml")
+                            }
+                            source.contains("google.android.apps.fitness") -> {
+                                googleFitWater += volume
+                            }
+                            else -> {
+                                otherWater += volume
+                            }
+                        }
+                    }
+                    
+                    // Prioritize Samsung Health data
+                    val finalWater = when {
+                        samsungWater > 0 -> samsungWater
+                        googleFitWater > 0 -> googleFitWater
+                        else -> otherWater
+                    }
+                    
+                    healthData["water"] = finalWater.toInt()
+                    Log.d(TAG, "Total water (prioritizing Samsung): $finalWater ml")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading water data", e)
+                    healthData["water"] = 0
+                }
+                
+                // Read weight data with source prioritization
+                try {
+                    val weightResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            WeightRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(
+                                startOfDay.minus(7, ChronoUnit.DAYS), // Last week for weight
+                                now
+                            )
+                        )
+                    )
+                    
+                    var samsungWeight = 0.0
+                    var googleFitWeight = 0.0
+                    var otherWeight = 0.0
+                    var samsungWeightTime: Instant? = null
+                    var otherWeightTime: Instant? = null
+                    
+                    weightResponse.records.forEach { record ->
+                        val source = record.metadata.dataOrigin.packageName
+                        val weight = record.weight.inKilograms
+                        
+                        when {
+                            source.contains("shealth") || 
+                            source.contains("com.sec.android") || 
+                            source.contains("samsung") -> {
+                                // Get the most recent Samsung weight
+                                if (samsungWeightTime == null || record.time.isAfter(samsungWeightTime)) {
+                                    samsungWeight = weight
+                                    samsungWeightTime = record.time
+                                }
+                                Log.d(TAG, "Samsung weight: $weight kg at ${record.time}")
+                            }
+                            source.contains("google.android.apps.fitness") -> {
+                                googleFitWeight = weight // Just use latest
+                            }
+                            else -> {
+                                // Get the most recent other weight
+                                if (otherWeightTime == null || record.time.isAfter(otherWeightTime)) {
+                                    otherWeight = weight
+                                    otherWeightTime = record.time
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Prioritize Samsung Health data
+                    val finalWeight = when {
+                        samsungWeight > 0 -> samsungWeight
+                        googleFitWeight > 0 -> googleFitWeight
+                        else -> otherWeight
+                    }
+                    
+                    healthData["weight"] = finalWeight
+                    Log.d(TAG, "Latest weight (prioritizing Samsung): $finalWeight kg")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading weight data", e)
+                    healthData["weight"] = 0.0
+                }
+                
+                // Read blood oxygen data with source prioritization
+                try {
+                    val oxygenResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            OxygenSaturationRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
+                        )
+                    )
+                    
+                    var samsungOxygen = 0.0
+                    var googleFitOxygen = 0.0
+                    var otherOxygen = 0.0
+                    var samsungOxygenTime: Instant? = null
+                    var otherOxygenTime: Instant? = null
+                    
+                    oxygenResponse.records.forEach { record ->
+                        val source = record.metadata.dataOrigin.packageName
+                        val percentage = record.percentage.value
+                        
+                        when {
+                            source.contains("shealth") || 
+                            source.contains("com.sec.android") || 
+                            source.contains("samsung") -> {
+                                // Get the most recent Samsung reading
+                                if (samsungOxygenTime == null || record.time.isAfter(samsungOxygenTime)) {
+                                    samsungOxygen = percentage
+                                    samsungOxygenTime = record.time
+                                }
+                                Log.d(TAG, "Samsung blood oxygen: $percentage% at ${record.time}")
+                            }
+                            source.contains("google.android.apps.fitness") -> {
+                                googleFitOxygen = percentage
+                            }
+                            else -> {
+                                if (otherOxygenTime == null || record.time.isAfter(otherOxygenTime)) {
+                                    otherOxygen = percentage
+                                    otherOxygenTime = record.time
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Prioritize Samsung Health data
+                    val finalOxygen = when {
+                        samsungOxygen > 0 -> samsungOxygen
+                        googleFitOxygen > 0 -> googleFitOxygen
+                        else -> otherOxygen
+                    }
+                    
+                    healthData["bloodOxygen"] = finalOxygen.toInt()
+                    Log.d(TAG, "Latest blood oxygen (prioritizing Samsung): $finalOxygen%")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading blood oxygen data", e)
+                    healthData["bloodOxygen"] = 0
+                }
+                
+                // Read blood pressure data with source prioritization
+                try {
+                    val bpResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            BloodPressureRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
+                        )
+                    )
+                    
+                    var samsungSystolic = 0.0
+                    var samsungDiastolic = 0.0
+                    var otherSystolic = 0.0
+                    var otherDiastolic = 0.0
+                    var samsungBpTime: Instant? = null
+                    var otherBpTime: Instant? = null
+                    
+                    bpResponse.records.forEach { record ->
+                        val source = record.metadata.dataOrigin.packageName
+                        val systolic = record.systolic.inMillimetersOfMercury
+                        val diastolic = record.diastolic.inMillimetersOfMercury
+                        
+                        when {
+                            source.contains("shealth") || 
+                            source.contains("com.sec.android") || 
+                            source.contains("samsung") -> {
+                                // Get the most recent Samsung reading
+                                if (samsungBpTime == null || record.time.isAfter(samsungBpTime)) {
+                                    samsungSystolic = systolic
+                                    samsungDiastolic = diastolic
+                                    samsungBpTime = record.time
+                                }
+                                Log.d(TAG, "Samsung blood pressure: $systolic/$diastolic mmHg at ${record.time}")
+                            }
+                            else -> {
+                                if (otherBpTime == null || record.time.isAfter(otherBpTime)) {
+                                    otherSystolic = systolic
+                                    otherDiastolic = diastolic
+                                    otherBpTime = record.time
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Prioritize Samsung Health data
+                    val finalSystolic = if (samsungSystolic > 0) samsungSystolic else otherSystolic
+                    val finalDiastolic = if (samsungDiastolic > 0) samsungDiastolic else otherDiastolic
+                    
+                    healthData["bloodPressure"] = mapOf(
+                        "systolic" to finalSystolic.toInt(),
+                        "diastolic" to finalDiastolic.toInt()
+                    )
+                    Log.d(TAG, "Latest blood pressure (prioritizing Samsung): $finalSystolic/$finalDiastolic mmHg")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading blood pressure data", e)
+                    healthData["bloodPressure"] = mapOf("systolic" to 0, "diastolic" to 0)
+                }
+                
+                // Read exercise/workout data with source prioritization
+                try {
+                    val exerciseResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            ExerciseSessionRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
+                        )
+                    )
+                    
+                    var samsungWorkouts = 0
+                    var samsungExerciseMinutes = 0L
+                    var otherWorkouts = 0
+                    var otherExerciseMinutes = 0L
+                    val workoutDetails = mutableListOf<Map<String, Any>>()
+                    
+                    exerciseResponse.records.forEach { record ->
+                        val source = record.metadata.dataOrigin.packageName
+                        val duration = java.time.Duration.between(record.startTime, record.endTime)
+                        val minutes = duration.toMinutes()
+                        
+                        val workoutDetail = mapOf(
+                            "exerciseType" to (record.exerciseType.toString()),
+                            "duration" to minutes,
+                            "startTime" to record.startTime.toString(),
+                            "endTime" to record.endTime.toString(),
+                            "source" to source,
+                            "title" to (record.title ?: "Workout")
+                        )
+                        
+                        when {
+                            source.contains("shealth") || 
+                            source.contains("com.sec.android") || 
+                            source.contains("samsung") -> {
+                                samsungWorkouts++
+                                samsungExerciseMinutes += minutes
+                                workoutDetails.clear() // Clear other workouts, use Samsung only
+                                workoutDetails.add(workoutDetail)
+                                Log.d(TAG, "Samsung workout: ${record.exerciseType} for $minutes min")
+                            }
+                            else -> {
+                                // Only add non-Samsung workouts if no Samsung data exists
+                                if (samsungWorkouts == 0) {
+                                    otherWorkouts++
+                                    otherExerciseMinutes += minutes
+                                    workoutDetails.add(workoutDetail)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Prioritize Samsung Health data
+                    val finalWorkouts = if (samsungWorkouts > 0) samsungWorkouts else otherWorkouts
+                    val finalExerciseMinutes = if (samsungExerciseMinutes > 0) samsungExerciseMinutes else otherExerciseMinutes
+                    
+                    healthData["workouts"] = finalWorkouts
+                    healthData["exerciseMinutes"] = finalExerciseMinutes
+                    healthData["workoutDetails"] = workoutDetails
+                    Log.d(TAG, "Total workouts (prioritizing Samsung): $finalWorkouts ($finalExerciseMinutes min)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading exercise data", e)
+                    healthData["workouts"] = 0
+                    healthData["exerciseMinutes"] = 0
+                }
                 
                 // Add metadata
                 healthData["dataSources"] = dataSources.toList()
                 healthData["lastSync"] = Instant.now().toString()
                 healthData["syncTime"] = System.currentTimeMillis()
                 
+                // Check if Samsung Health data is actually present
+                val hasSamsungData = dataSources.any { 
+                    it.contains("samsung") || 
+                    it.contains("shealth") || 
+                    it.contains("com.sec.android") || 
+                    it.contains("gear") 
+                }
+                healthData["hasSamsungHealthData"] = hasSamsungData
+                
                 Log.d(TAG, "=== Health Data Summary ===")
                 Log.d(TAG, "Data sources found: ${dataSources.joinToString(", ")}")
+                Log.d(TAG, "Samsung Health detected: $hasSamsungData")
                 Log.d(TAG, "Steps: ${healthData["steps"]} (${healthData["stepsBySource"]?.let { (it as Map<*, *>)["dataSource"] } ?: "Unknown"})")
                 Log.d(TAG, "Heart Rate: ${healthData["heartRate"]} bpm (${healthData["heartRateType"]})")
                 Log.d(TAG, "Calories: ${healthData["calories"]} kcal")
                 Log.d(TAG, "Distance: ${healthData["distance"]} km")
                 Log.d(TAG, "Sleep: ${healthData["sleep"]} hours (${healthData["sleepMinutes"]} minutes)")
+                Log.d(TAG, "Water: ${healthData["water"]} ml")
+                Log.d(TAG, "Weight: ${healthData["weight"]} kg")
+                Log.d(TAG, "Blood Oxygen: ${healthData["bloodOxygen"]}%")
+                val bloodPressure = healthData["bloodPressure"] as? Map<*, *>
+                Log.d(TAG, "Blood Pressure: ${bloodPressure?.get("systolic")}/${bloodPressure?.get("diastolic")} mmHg")
+                Log.d(TAG, "Workouts: ${healthData["workouts"]} (${healthData["exerciseMinutes"]} min)")
+                
+                if (!hasSamsungData) {
+                    Log.w(TAG, "⚠️  WARNING: No Samsung Health data found! Check if Samsung Health is installed and has data.")
+                    Log.w(TAG, "⚠️  Available sources: ${dataSources.joinToString(", ")}")
+                } else {
+                    Log.i(TAG, "✅ Samsung Health data successfully detected")
+                }
                 Log.d(TAG, "=========================")
                 
                 result.success(healthData)

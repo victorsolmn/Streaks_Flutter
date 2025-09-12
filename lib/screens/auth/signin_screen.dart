@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../providers/supabase_auth_provider.dart';
-import '../../providers/supabase_user_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../services/toast_service.dart';
 import '../../utils/app_theme.dart';
-import '../onboarding/onboarding_screen.dart';
 import '../main/main_screen.dart';
+import '../onboarding/onboarding_screen.dart';
 import 'signup_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -23,6 +23,14 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ToastService().initialize(context);
+    });
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
@@ -32,34 +40,67 @@ class _SignInScreenState extends State<SignInScreen> {
   Future<void> _signIn() async {
     if (_formKey.currentState?.validate() ?? false) {
       final authProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
-      final localUserProvider = Provider.of<UserProvider>(context, listen: false);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
       
-      final success = await authProvider.signIn(
+      ToastService().showLoading('Signing in...');
+      
+      final success = await authProvider.signInWithPassword(
         _emailController.text.trim(),
         _passwordController.text,
       );
 
       if (success && mounted) {
-        // Reload user data after sign-in to check if profile exists
-        await localUserProvider.reloadUserData();
+        ToastService().showSuccess('Welcome back!');
         
-        // Check if user has profile data (existing user)
-        if (localUserProvider.hasProfile && localUserProvider.hasCompletedOnboarding) {
-          // Existing user with profile - go directly to main screen
+        await userProvider.reloadUserData();
+        
+        if (userProvider.hasProfile && userProvider.hasCompletedOnboarding) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => const MainScreen(),
             ),
           );
         } else {
-          // New user or user without profile - go to onboarding
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => const OnboardingScreen(),
             ),
           );
         }
+      } else if (mounted && authProvider.error != null) {
+        ToastService().showError(authProvider.error!);
       }
+    }
+  }
+  
+  Future<void> _signInWithGoogle() async {
+    final authProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
+    final localUserProvider = Provider.of<UserProvider>(context, listen: false);
+    
+    ToastService().showLoading('Signing in with Google...');
+    
+    final success = await authProvider.signInWithGoogle();
+    
+    if (success && mounted) {
+      ToastService().showSuccess('Welcome! 👋');
+      
+      await localUserProvider.reloadUserData();
+      
+      if (localUserProvider.hasProfile && localUserProvider.hasCompletedOnboarding) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const MainScreen(),
+          ),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const OnboardingScreen(),
+          ),
+        );
+      }
+    } else if (mounted && authProvider.error != null) {
+      ToastService().showError(authProvider.error!);
     }
   }
 
@@ -113,14 +154,19 @@ class _SignInScreenState extends State<SignInScreen> {
                     
                     SizedBox(height: 32),
                     
-                    // Email field
+                    // Email Field
+                    Text(
+                      'Email',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    SizedBox(height: 8),
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
+                      decoration: InputDecoration(
                         prefixIcon: Icon(Icons.email_outlined),
+                        hintText: 'Enter your email address',
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -133,21 +179,23 @@ class _SignInScreenState extends State<SignInScreen> {
                       },
                     ),
                     
-                    SizedBox(height: 24),
+                    SizedBox(height: 20),
                     
-                    // Password field
+                    // Password Field
+                    Text(
+                      'Password',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    SizedBox(height: 8),
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
                       decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outlined),
+                        prefixIcon: Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword 
-                                ? Icons.visibility_outlined 
-                                : Icons.visibility_off_outlined,
+                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
                           ),
                           onPressed: () {
                             setState(() {
@@ -155,6 +203,7 @@ class _SignInScreenState extends State<SignInScreen> {
                             });
                           },
                         ),
+                        hintText: 'Enter your password',
                       ),
                       onFieldSubmitted: (_) => _signIn(),
                       validator: (value) {
@@ -166,30 +215,6 @@ class _SignInScreenState extends State<SignInScreen> {
                         }
                         return null;
                       },
-                    ),
-                    
-                    SizedBox(height: 16),
-                    
-                    // Forgot password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {
-                          // TODO: Implement forgot password
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Forgot password feature coming soon'),
-                            ),
-                          );
-                        },
-                        child: Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            color: AppTheme.primaryAccent,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
                     ),
                     
                     SizedBox(height: 32),
@@ -226,15 +251,16 @@ class _SignInScreenState extends State<SignInScreen> {
                           ],
                         ),
                       ),
-                      SizedBox(height: 24),
+                      SizedBox(height: 20),
                     ],
                     
                     // Sign in button
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         onPressed: auth.isLoading ? null : _signIn,
-                        child: auth.isLoading
+                        icon: Icon(Icons.login),
+                        label: auth.isLoading
                             ? SizedBox(
                                 height: 20,
                                 width: 20,
@@ -244,10 +270,57 @@ class _SignInScreenState extends State<SignInScreen> {
                                 ),
                               )
                             : Text('Sign In'),
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                        ),
                       ),
                     ),
                     
-                    SizedBox(height: 48),
+                    SizedBox(height: 20),
+                    
+                    // OR divider
+                    Row(
+                      children: [
+                        Expanded(child: Divider()),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            'OR',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider()),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 20),
+                    
+                    // Google Sign In button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: auth.isLoading ? null : _signInWithGoogle,
+                        icon: Image.network(
+                          'https://www.google.com/favicon.ico',
+                          height: 20,
+                          width: 20,
+                          errorBuilder: (context, error, stackTrace) => Icon(
+                            Icons.g_mobiledata,
+                            size: 20,
+                          ),
+                        ),
+                        label: Text('Continue with Google'),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(color: Colors.grey.withOpacity(0.5)),
+                        ),
+                      ),
+                    ),
+                    
+                    SizedBox(height: 32),
                     
                     // Sign up link
                     Row(
@@ -268,15 +341,13 @@ class _SignInScreenState extends State<SignInScreen> {
                           child: Text(
                             'Sign Up',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.primaryAccent,
-                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    
-                    SizedBox(height: 32),
                   ],
                 ),
               ),

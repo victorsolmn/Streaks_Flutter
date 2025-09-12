@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../providers/nutrition_provider.dart';
+import '../../services/toast_service.dart';
+import '../../services/popup_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/nutrition_card.dart';
 
@@ -24,6 +26,10 @@ class _NutritionScreenState extends State<NutritionScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // Initialize toast service
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ToastService().initialize(context);
+    });
   }
 
   @override
@@ -53,30 +59,65 @@ class _NutritionScreenState extends State<NutritionScreen>
       if (image == null) return;
 
       // Get food details from user
-      final foodDetails = await _showFoodDetailsDialog();
-      if (foodDetails == null) return;
+      final foodDetailsList = await _showFoodDetailsDialog();
+      if (foodDetailsList == null || foodDetailsList.isEmpty) return;
 
       final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
-      final entry = await nutritionProvider.scanFoodWithDetails(
-        image.path,
-        foodDetails['name']!,
-        foodDetails['quantity']!,
-      );
-
-      if (entry != null && mounted) {
-        final shouldAdd = await _showNutritionPreview(entry);
-        if (shouldAdd) {
-          await nutritionProvider.addNutritionEntry(entry);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Added ${entry.foodName} to your nutrition log'),
-              backgroundColor: AppTheme.successGreen,
-            ),
+      
+      // Process each food item
+      List<dynamic> processedEntries = [];
+      bool hasErrors = false;
+      
+      for (int i = 0; i < foodDetailsList.length; i++) {
+        final foodDetails = foodDetailsList[i];
+        try {
+          final entry = await nutritionProvider.scanFoodWithDetails(
+            image.path,
+            foodDetails['name']!,
+            foodDetails['quantity']!,
           );
+          if (entry != null) {
+            processedEntries.add(entry);
+          }
+        } catch (e) {
+          hasErrors = true;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to analyze ${foodDetails['name']}: ${e.toString()}'),
+                backgroundColor: AppTheme.errorRed,
+              ),
+            );
+          }
+        }
+      }
+      
+      if (processedEntries.isNotEmpty && mounted) {
+        // Show preview for all processed entries
+        final shouldAdd = await _showMultipleFoodPreview(processedEntries);
+        if (shouldAdd) {
+          for (var entry in processedEntries) {
+            await nutritionProvider.addNutritionEntry(entry);
+          }
+          ToastService().showSuccess(
+            processedEntries.length == 1 
+              ? 'Added ${processedEntries[0].foodName} to your nutrition log! 🍎'
+              : 'Added ${processedEntries.length} food items to your nutrition log! 🍎'
+          );
+        }
+      } else if (!hasErrors) {
+        if (mounted) {
+          _showErrorDialog('Could not analyze any of the food items. Please try again.');
         }
       }
     } catch (e) {
-      _showErrorDialog('Failed to scan food: ${e.toString()}');
+      if (mounted) {
+        PopupService.showNetworkError(
+          context,
+          onRetry: () => _scanFood(),
+          customMessage: 'Failed to scan food: ${e.toString()}. Please check your connection and try again.',
+        );
+      }
     } finally {
       setState(() {
         _isScanning = false;
@@ -177,177 +218,656 @@ class _NutritionScreenState extends State<NutritionScreen>
     return result ?? false;
   }
 
-  Future<Map<String, String>?> _showFoodDetailsDialog() async {
+  Future<bool> _showMultipleFoodPreview(List<dynamic> entries) async {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final nameController = TextEditingController();
-    final quantityController = TextEditingController(text: '100');
-    String selectedUnit = 'grams';
     
-    return await showDialog<Map<String, String>>(
+    // Calculate total nutrition
+    double totalCalories = 0;
+    double totalProtein = 0;
+    double totalCarbs = 0;
+    double totalFat = 0;
+    
+    for (var entry in entries) {
+      totalCalories += entry.calories;
+      totalProtein += entry.protein;
+      totalCarbs += entry.carbs;
+      totalFat += entry.fat;
+    }
+    
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+        title: Row(
+          children: [
+            Icon(Icons.restaurant_menu, color: AppTheme.primaryAccent, size: 24),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Confirm Food Entries',
+                style: TextStyle(
+                  color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryAccent.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${entries.length} item${entries.length > 1 ? 's' : ''}',
+                style: TextStyle(
+                  color: AppTheme.primaryAccent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Summary card
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryAccent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.primaryAccent.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.analytics, color: AppTheme.primaryAccent, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Total Nutrition Summary',
+                            style: TextStyle(
+                              color: AppTheme.primaryAccent,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildNutritionStat('Calories', '${totalCalories.toInt()}', 'kcal'),
+                          ),
+                          Expanded(
+                            child: _buildNutritionStat('Protein', '${totalProtein.toInt()}', 'g'),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildNutritionStat('Carbs', '${totalCarbs.toInt()}', 'g'),
+                          ),
+                          Expanded(
+                            child: _buildNutritionStat('Fat', '${totalFat.toInt()}', 'g'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16),
+                
+                // Individual food items
+                Text(
+                  'Individual Food Items:',
+                  style: TextStyle(
+                    color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+                SizedBox(height: 12),
+                
+                ...entries.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  var foodEntry = entry.value;
+                  
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDarkMode 
+                        ? AppTheme.darkCardBackground.withOpacity(0.5)
+                        : AppTheme.cardBackgroundLight.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: (isDarkMode ? AppTheme.dividerDark : AppTheme.dividerLight).withOpacity(0.5),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryAccent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                foodEntry.foodName,
+                                style: TextStyle(
+                                  color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${foodEntry.calories.toInt()} kcal',
+                                style: TextStyle(
+                                  color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              'P: ${foodEntry.protein.toInt()}g • C: ${foodEntry.carbs.toInt()}g • F: ${foodEntry.fat.toInt()}g',
+                              style: TextStyle(
+                                color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: Icon(Icons.add, size: 18),
+            label: Text('Add All to Log'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Widget _buildNutritionStat(String label, String value, String unit) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+            fontSize: 12,
+          ),
+        ),
+        SizedBox(height: 2),
+        RichText(
+          text: TextSpan(
+            text: value,
+            style: TextStyle(
+              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+            children: [
+              TextSpan(
+                text: ' $unit',
+                style: TextStyle(
+                  color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+                  fontWeight: FontWeight.normal,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<List<Map<String, String>>?> _showFoodDetailsDialog() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // List to hold multiple food items (max 4)
+    List<Map<String, dynamic>> foodItems = [
+      {
+        'nameController': TextEditingController(),
+        'quantityController': TextEditingController(text: '100'),
+        'selectedUnit': 'grams',
+      }
+    ];
+
+    return await showDialog<List<Map<String, String>>>(
       context: context,
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
-          title: Text(
-            'Food Details',
-            style: TextStyle(
-              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Help us identify your food more accurately',
-                  style: TextStyle(
-                    color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
-                    fontSize: 14,
-                  ),
-                ),
-                SizedBox(height: 20),
-                TextField(
-                  controller: nameController,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: 'Food Name',
-                    hintText: 'e.g., Chicken Biryani, Apple, Sandwich',
-                    prefixIcon: Icon(Icons.restaurant_menu, color: AppTheme.primaryAccent),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppTheme.primaryAccent, width: 2),
-                    ),
-                  ),
+          title: Row(
+            children: [
+              Icon(Icons.restaurant_menu, color: AppTheme.primaryAccent, size: 24),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Food Details',
                   style: TextStyle(
                     color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
                   ),
                 ),
-                SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        controller: quantityController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'Quantity',
-                          prefixIcon: Icon(Icons.scale, color: AppTheme.primaryAccent),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: AppTheme.primaryAccent, width: 2),
-                          ),
-                        ),
-                        style: TextStyle(
-                          color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      flex: 3,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: isDarkMode ? AppTheme.dividerDark : AppTheme.dividerLight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: selectedUnit,
-                            isExpanded: true,
-                            dropdownColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
-                            style: TextStyle(
-                              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
-                            ),
-                            items: [
-                              'grams',
-                              'kg',
-                              'cups',
-                              'pieces',
-                              'servings',
-                              'plates',
-                              'bowls',
-                              'ml',
-                              'liters',
-                            ].map((unit) => DropdownMenuItem(
-                              value: unit,
-                              child: Text(unit),
-                            )).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedUnit = value!;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryAccent.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                SizedBox(height: 12),
-                Text(
-                  'Tip: Be specific with the food name for better nutrition accuracy',
+                child: Text(
+                  '${foodItems.length}/4 items',
                   style: TextStyle(
                     color: AppTheme.primaryAccent,
                     fontSize: 12,
-                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
+              ),
+            ],
+          ),
+          content: Container(
+            width: double.maxFinite,
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryAccent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.primaryAccent.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: AppTheme.primaryAccent, size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Add up to 4 different foods from your meal for better nutrition tracking',
+                            style: TextStyle(
+                              color: AppTheme.primaryAccent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  
+                  // Dynamic food items list
+                  ...foodItems.asMap().entries.map((entry) {
+                    int index = entry.key;
+                    Map<String, dynamic> item = entry.value;
+                    
+                    return Container(
+                      margin: EdgeInsets.only(bottom: 16),
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode 
+                          ? AppTheme.darkCardBackground.withOpacity(0.5)
+                          : AppTheme.cardBackgroundLight.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primaryAccent.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Header with item number and delete button
+                          Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryAccent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Food Item ${index + 1}',
+                                  style: TextStyle(
+                                    color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              if (foodItems.length > 1)
+                                IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      item['nameController'].dispose();
+                                      item['quantityController'].dispose();
+                                      foodItems.removeAt(index);
+                                    });
+                                  },
+                                  icon: Icon(
+                                    Icons.remove_circle,
+                                    color: AppTheme.errorRed,
+                                    size: 20,
+                                  ),
+                                  constraints: BoxConstraints(),
+                                  padding: EdgeInsets.all(4),
+                                ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          
+                          // Food name input
+                          TextField(
+                            controller: item['nameController'],
+                            autofocus: index == 0,
+                            decoration: InputDecoration(
+                              labelText: 'Food Name',
+                              hintText: 'e.g., Chicken Biryani, Apple, Sandwich',
+                              prefixIcon: Icon(Icons.fastfood, color: AppTheme.primaryAccent, size: 20),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: AppTheme.primaryAccent, width: 2),
+                              ),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            style: TextStyle(
+                              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
+                          SizedBox(height: 12),
+                          
+                          // Quantity and unit row
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: TextField(
+                                  controller: item['quantityController'],
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: 'Quantity',
+                                    prefixIcon: Icon(Icons.scale, color: AppTheme.primaryAccent, size: 20),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: AppTheme.primaryAccent, width: 2),
+                                    ),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                  style: TextStyle(
+                                    color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                flex: 2,
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: isDarkMode ? AppTheme.dividerDark : AppTheme.dividerLight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: item['selectedUnit'],
+                                      isExpanded: true,
+                                      dropdownColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+                                      style: TextStyle(
+                                        color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                                        fontSize: 14,
+                                      ),
+                                      items: [
+                                        'grams',
+                                        'kg',
+                                        'cups',
+                                        'pieces',
+                                        'servings',
+                                        'plates',
+                                        'bowls',
+                                        'ml',
+                                        'liters',
+                                      ].map((unit) => DropdownMenuItem(
+                                        value: unit,
+                                        child: Text(unit),
+                                      )).toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          item['selectedUnit'] = value!;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  
+                  // Add new food item button
+                  if (foodItems.length < 4)
+                    Center(
+                      child: Container(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              foodItems.add({
+                                'nameController': TextEditingController(),
+                                'quantityController': TextEditingController(text: '100'),
+                                'selectedUnit': 'grams',
+                              });
+                            });
+                          },
+                          icon: Icon(Icons.add_circle_outline, color: AppTheme.primaryAccent),
+                          label: Text(
+                            'Add Another Food Item',
+                            style: TextStyle(color: AppTheme.primaryAccent),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: AppTheme.primaryAccent),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  
+                  SizedBox(height: 16),
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryAccent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lightbulb_outline, color: AppTheme.primaryAccent, size: 14),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Be specific with food names for better nutrition accuracy',
+                            style: TextStyle(
+                              color: AppTheme.primaryAccent,
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () {
+                // Dispose controllers before closing
+                for (var item in foodItems) {
+                  item['nameController'].dispose();
+                  item['quantityController'].dispose();
+                }
+                Navigator.of(context).pop();
+              },
               child: Text(
                 'Cancel',
                 style: TextStyle(color: AppTheme.textSecondary),
               ),
             ),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () {
-                if (nameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Please enter food name'),
-                      backgroundColor: AppTheme.errorRed,
-                    ),
-                  );
-                  return;
+                // Validate all food items
+                List<Map<String, String>> validFoodItems = [];
+                bool hasErrors = false;
+                
+                for (int i = 0; i < foodItems.length; i++) {
+                  var item = foodItems[i];
+                  String name = item['nameController'].text.trim();
+                  String quantity = item['quantityController'].text.trim();
+                  
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Please enter name for food item ${i + 1}'),
+                        backgroundColor: AppTheme.errorRed,
+                      ),
+                    );
+                    hasErrors = true;
+                    break;
+                  }
+                  if (quantity.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Please enter quantity for food item ${i + 1}'),
+                        backgroundColor: AppTheme.errorRed,
+                      ),
+                    );
+                    hasErrors = true;
+                    break;
+                  }
+                  
+                  validFoodItems.add({
+                    'name': name,
+                    'quantity': '$quantity ${item['selectedUnit']}',
+                  });
                 }
-                if (quantityController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Please enter quantity'),
-                      backgroundColor: AppTheme.errorRed,
-                    ),
-                  );
-                  return;
+                
+                if (!hasErrors) {
+                  // Dispose controllers before closing
+                  for (var item in foodItems) {
+                    item['nameController'].dispose();
+                    item['quantityController'].dispose();
+                  }
+                  Navigator.of(context).pop(validFoodItems);
                 }
-                Navigator.of(context).pop({
-                  'name': nameController.text.trim(),
-                  'quantity': '${quantityController.text.trim()} $selectedUnit',
-                });
               },
+              icon: Icon(Icons.analytics, size: 18),
+              label: Text('Analyze Food${foodItems.length > 1 ? 's' : ''}'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryAccent,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-              child: Text('Analyze Food'),
             ),
           ],
         ),

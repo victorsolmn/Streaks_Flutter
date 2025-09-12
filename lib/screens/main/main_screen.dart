@@ -4,11 +4,13 @@ import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../providers/nutrition_provider.dart';
 import '../../providers/health_provider.dart';
+import '../../services/toast_service.dart';
+import '../../services/popup_service.dart';
 import '../../widgets/sync_status_indicator.dart';
 import 'home_screen_clean.dart';
 import 'progress_screen_new.dart';
 import 'nutrition_screen.dart';
-import 'chat_screen_enhanced.dart';
+import 'chat_screen_agent.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -35,6 +37,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _profileKey = GlobalKey();
     // Add observer for app lifecycle events
     WidgetsBinding.instance.addObserver(this);
+    // Initialize toast service
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ToastService().initialize(context);
+    });
     // Load data and sync health on startup
     _loadUserDataAndSyncHealth();
     
@@ -114,24 +120,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         
         // Show success message
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text('Health data synced successfully'),
-                ],
-              ),
-              backgroundColor: AppTheme.successGreen,
-              duration: Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              margin: EdgeInsets.all(16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
+          ToastService().showSuccess('Health data synced successfully! 📊');
         }
       } else {
         debugPrint('MainScreen: Health source not connected, skipping auto-sync');
@@ -149,6 +138,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         setState(() {
           _isSyncing = false;
         });
+        // Show network error popup with retry option
+        PopupService.showNetworkError(
+          context,
+          onRetry: () => _loadUserDataAndSyncHealth(),
+          customMessage: 'Failed to load health data. Please check your connection and try again.',
+        );
       }
     }
   }
@@ -188,35 +183,18 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       
       // Show subtle sync indicator
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                ),
-                SizedBox(width: 8),
-                Text('Updating health data...'),
-              ],
-            ),
-            backgroundColor: AppTheme.primaryAccent,
-            duration: Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.only(bottom: 80, left: 16, right: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        ToastService().showInfo('Health data updated! 🔄');
       }
     } catch (e) {
       debugPrint('MainScreen: Error syncing health data: $e');
+      if (mounted) {
+        // Show network error popup with retry option
+        PopupService.showNetworkError(
+          context,
+          onRetry: () => _syncHealthDataIfNeeded(),
+          customMessage: 'Failed to sync health data. Please check your connection and try again.',
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -230,7 +208,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     const HomeScreenClean(),
     const ProgressScreenNew(),
     const NutritionScreen(),
-    const ChatScreenEnhanced(),
+    const ChatScreenAgent(),
     ProfileScreen(key: _profileKey),
   ];
 

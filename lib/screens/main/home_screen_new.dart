@@ -48,6 +48,8 @@ class _HomeScreenNewState extends State<HomeScreenNew>
     if (!healthProvider.isInitialized) {
       await healthProvider.initialize();
     }
+    // Sync health data on app open instead of periodic sync
+    await healthProvider.syncOnAppOpen();
   }
 
   Future<void> _checkAndShowFitnessGoalSummary() async {
@@ -59,8 +61,10 @@ class _HomeScreenNewState extends State<HomeScreenNew>
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final profile = userProvider.profile;
     
-    // Show popup if user hasn't seen it yet
-    if (profile != null && !profile.hasSeenFitnessGoalSummary) {
+    // Only show dialog if user just completed onboarding and hasn't seen the summary yet
+    if (profile != null && 
+        userProvider.justCompletedOnboarding && 
+        !profile.hasSeenFitnessGoalSummary) {
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -70,6 +74,8 @@ class _HomeScreenNewState extends State<HomeScreenNew>
             await userProvider.updateProfile(
               hasSeenFitnessGoalSummary: true,
             );
+            // Clear the temporary flag after showing the dialog
+            userProvider.clearJustCompletedOnboardingFlag();
           },
         ),
       );

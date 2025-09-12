@@ -17,6 +17,7 @@ import '../../services/smartwatch_service.dart';
 import '../../services/unified_health_service.dart';
 import '../../services/bluetooth_smartwatch_service.dart';
 import '../../services/native_health_connect_service.dart';
+import '../../services/flutter_health_service.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../health_debug_screen.dart';
@@ -1109,18 +1110,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: isDarkMode ? AppTheme.darkCardBackground : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return SafeArea(
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                // Drag handle indicator
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[400],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
                 Row(
                   children: [
                     Icon(
@@ -1202,48 +1227,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 20),
                   
-                  // Option 1: Health App Integration (Recommended)
+                  // Platform-specific health integration options
+                  if (Platform.isAndroid) ...[
+                    // Android: Health Connect Integration
+                    _buildIntegrationOption(
+                      context,
+                      icon: Icons.favorite,
+                      title: 'Google Health Connect',
+                      subtitle: 'Recommended for Android',
+                      description: 'Connect to Samsung Health, Google Fit, and other health apps. Works with all major smartwatch brands (Samsung Galaxy Watch, Pixel Watch, Wear OS devices).',
+                      isRecommended: true,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        _connectNativeHealthConnect();
+                      },
+                      isDarkMode: isDarkMode,
+                    ),
+                  ] else if (Platform.isIOS) ...[
+                    // iOS: HealthKit Integration  
+                    _buildIntegrationOption(
+                      context,
+                      icon: Icons.health_and_safety,
+                      title: 'Apple HealthKit',
+                      subtitle: 'Recommended for iOS',
+                      description: 'Connect to Apple Health app. Works with Apple Watch, and other compatible fitness trackers that sync to Apple Health.',
+                      isRecommended: true,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        _connectAppleHealthKit();
+                      },
+                      isDarkMode: isDarkMode,
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  
+                  // Flutter Health Integration - Universal cross-platform option
                   _buildIntegrationOption(
                     context,
-                    icon: Icons.favorite,
-                    title: 'Native Health Connect (TEST)',
-                    subtitle: 'Direct Android SDK Implementation',
-                    description: 'Uses native Android SDK as recommended by Google. Most reliable method.',
+                    icon: Icons.health_and_safety_outlined,
+                    title: 'Flutter Health Integration',
+                    subtitle: 'Universal cross-platform (Recommended)',
+                    description: Platform.isIOS 
+                      ? 'Advanced HealthKit integration supporting Apple Watch and all compatible fitness devices with comprehensive health metrics.'
+                      : 'Enhanced Health Connect integration supporting Samsung Galaxy Watch, Google Pixel Watch, Fitbit, Garmin, and all Wear OS devices with comprehensive health data sync.',
                     isRecommended: true,
                     onTap: () async {
                       Navigator.pop(context);
-                      _connectNativeHealthConnect();
-                    },
-                    isDarkMode: isDarkMode,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildIntegrationOption(
-                    context,
-                    icon: Icons.bug_report,
-                    title: 'Debug & Diagnostic Tool',
-                    subtitle: 'Troubleshoot connection issues',
-                    description: 'Run comprehensive diagnostic to identify why data is not syncing correctly.',
-                    isRecommended: false,
-                    onTap: () async {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => HealthDebugScreen(),
-                        ),
-                      );
+                      _connectFlutterHealth();
                     },
                     isDarkMode: isDarkMode,
                   ),
                   const SizedBox(height: 16),
                   
-                  // Option 2: Direct Bluetooth Connection
+                  // Universal Bluetooth Connection Option
                   _buildIntegrationOption(
                     context,
                     icon: Icons.bluetooth,
                     title: 'Direct Bluetooth Connection',
-                    subtitle: 'For watches not using health apps',
-                    description: 'Connect directly to your smartwatch via Bluetooth.',
+                    subtitle: 'Compatible with most smartwatches',
+                    description: 'Universal connection method that works with Samsung, Huawei, Fitbit, Garmin, and other Bluetooth-enabled fitness trackers across all platforms.',
                     isRecommended: false,
                     onTap: () {
                       Navigator.pop(context);
@@ -1255,6 +1297,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
+        );
+          },
         );
       },
     );
@@ -1960,28 +2004,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: isDarkMode ? Colors.white : Colors.black87,
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: isDarkMode ? Colors.white : Colors.black87,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (isRecommended) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                               decoration: BoxDecoration(
                                 color: AppTheme.primaryAccent,
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(3),
                               ),
                               child: Text(
                                 'RECOMMENDED',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 9,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                             ),
@@ -2203,9 +2251,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   Row(
                     children: [
-                      Icon(Icons.schedule, size: 16, color: Colors.grey),
+                      Icon(Icons.refresh, size: 16, color: Colors.grey),
                       const SizedBox(width: 8),
-                      Text('Auto-sync: Every hour'),
+                      Text('Auto-sync: On app open'),
                     ],
                   ),
                   
@@ -2236,10 +2284,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       } else {
-        // Show detailed error with debug logs
+        // Show detailed error with user guidance
+        final errorMsg = testResults['message'] ?? testResults['error'] ?? 'Unknown error occurred';
+        final permissionStatus = testResults['permissionRequest'] as Map<String, dynamic>?;
+        
+        String userGuidance = 'Health Connect integration failed.';
+        if (permissionStatus != null && permissionStatus['granted'] == false) {
+          final missing = permissionStatus['missingPermissions'] as List<dynamic>? ?? [];
+          if (missing.isNotEmpty) {
+            userGuidance = '''Health Connect permissions are required for data sync.
+
+Missing permissions:
+${missing.map((p) => '• ${p.toString().split('.').last}').join('\n')}
+
+To fix this:
+1. Open Health Connect app
+2. Go to App permissions → Streaker
+3. Grant all requested permissions
+4. Return to Streaker and try again''';
+          } else {
+            userGuidance = '''Please grant all health permissions in Health Connect.
+
+Steps to fix:
+1. Open Health Connect app
+2. Find Streaker in app permissions
+3. Enable access to all health data types:
+   • Steps, Heart Rate, Calories, Distance
+   • Sleep, Water, Weight, Blood metrics
+   • Exercise sessions
+4. Return to Streaker and try connecting again''';
+          }
+        }
+        
         _showDetailedError(
-          'Native Health Connect Failed',
-          testResults['error'] ?? 'Unknown error occurred',
+          'Health Connect Setup Needed',
+          userGuidance,
           nativeService.debugLogs,
         );
       }
@@ -2249,6 +2328,289 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Unexpected Error',
         e.toString(),
         nativeService.debugLogs,
+      );
+    }
+  }
+
+  // Method to connect to Apple HealthKit for iOS
+  Future<void> _connectAppleHealthKit() async {
+    if (!Platform.isIOS) {
+      _showDetailedError(
+        'iOS Only',
+        'Apple HealthKit is only available on iOS devices',
+        [],
+      );
+      return;
+    }
+
+    final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+    
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Connecting to Apple Health'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppTheme.primaryAccent),
+            const SizedBox(height: 16),
+            Text('Please grant permissions in the Health app...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Initialize health provider
+      await healthProvider.initialize();
+      
+      // Check if health service is available
+      if (healthProvider.dataSource != HealthDataSource.unavailable) {
+        // Try to connect and sync data
+        await healthProvider.syncWithHealth();
+        
+        Navigator.pop(context); // Close loading dialog
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Connected to Apple Health! Your health data will now sync automatically.'),
+            backgroundColor: AppTheme.successGreen,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else {
+        Navigator.pop(context); // Close loading dialog
+        
+        _showDetailedError(
+          'Apple Health Connection Failed',
+          'Please ensure you have granted the necessary permissions in the Health app.',
+          [],
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      
+      _showDetailedError(
+        'Apple Health Connection Error',
+        e.toString(),
+        [],
+      );
+    }
+  }
+
+  // Method to connect using Flutter Health plugin for cross-platform compatibility
+  Future<void> _connectFlutterHealth() async {
+    final flutterHealthService = FlutterHealthService();
+    
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Connecting to Flutter Health'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppTheme.primaryAccent),
+            const SizedBox(height: 16),
+            Text(Platform.isIOS 
+              ? 'Requesting HealthKit permissions...'
+              : 'Requesting Health Connect permissions...'),
+            const SizedBox(height: 8),
+            Text(
+              'This uses the official Flutter Health plugin for optimal compatibility',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      // Initialize the Flutter Health service
+      await flutterHealthService.initialize();
+      
+      // Request permissions
+      final permissionsGranted = await flutterHealthService.requestPermissions();
+      
+      if (!permissionsGranted) {
+        Navigator.pop(context); // Close loading dialog
+        _showDetailedError(
+          'Health Permissions Required',
+          'Please grant health permissions to sync your smartwatch data.',
+          ['Open your device health app and grant permissions', 'Try the connection again'],
+        );
+        return;
+      }
+      
+      // Check if permissions are properly granted
+      final hasPermissions = await flutterHealthService.hasPermissions();
+      
+      if (!hasPermissions) {
+        Navigator.pop(context); // Close loading dialog
+        _showDetailedError(
+          'Health Permissions Not Granted',
+          'Health permissions were not properly granted. Please check your device settings.',
+          ['Grant all requested health permissions', 'Restart the app if needed'],
+        );
+        return;
+      }
+      
+      // Get today's health data to test the connection
+      final healthData = await flutterHealthService.getTodaysHealthData();
+      final deviceInfo = flutterHealthService.getDeviceInfo();
+      
+      Navigator.pop(context); // Close loading dialog
+      
+      // Update health provider with the data
+      final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+      final convertedHealthData = {
+        'steps': healthData['steps'] ?? 0,
+        'heartRate': healthData['heartRate'] ?? 0,
+        'calories': healthData['calories'] ?? 0,
+        'distance': healthData['distance'] ?? 0.0,
+        'sleep': healthData['sleep'] ?? 0.0,
+      };
+      healthProvider.updateMetricsFromHealth(convertedHealthData);
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Flutter Health connected! Your smartwatch data will now sync automatically.'),
+          backgroundColor: AppTheme.successGreen,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      
+      // Show success dialog with smartwatch compatibility info
+      final smartwatchSources = healthData['smartwatchSources'] as List<String>? ?? [];
+      final hasSmartWatchData = healthData['hasSmartWatchData'] as bool? ?? false;
+      
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: AppTheme.successGreen),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('Flutter Health Connected!'),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (hasSmartWatchData && smartwatchSources.isNotEmpty) ...[
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.successGreen.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.successGreen),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.watch, color: AppTheme.successGreen, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Smartwatch Detected!',
+                                style: TextStyle(
+                                  color: AppTheme.successGreen,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ...smartwatchSources.map((source) => Padding(
+                          padding: EdgeInsets.only(left: 28, bottom: 4),
+                          child: Text(
+                            '• $source',
+                            style: TextStyle(color: AppTheme.successGreen, fontSize: 12),
+                          ),
+                        )).toList(),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ] else ...[
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'No smartwatch data detected yet. Data may appear after your next workout.',
+                            style: TextStyle(color: Colors.orange, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                
+                Text('Health System: ${deviceInfo['healthSystem']}', 
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                
+                Text('Compatible Devices:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                ...(deviceInfo['supportedWatches'] as List<String>).map((watch) => 
+                  Padding(
+                    padding: EdgeInsets.only(left: 16, bottom: 2),
+                    child: Text('• $watch', style: TextStyle(fontSize: 12)),
+                  )).toList(),
+                
+                const SizedBox(height: 16),
+                Text('Today\'s Data:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Steps: ${healthData['steps']}'),
+                Text('Heart Rate: ${healthData['heartRate']} bpm'),
+                Text('Calories: ${healthData['calories']}'),
+                Text('Distance: ${(healthData['distance'] as double).toStringAsFixed(2)} km'),
+                if (healthData['sleep'] > 0) Text('Sleep: ${(healthData['sleep'] as double).toStringAsFixed(1)} hours'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Great!', style: TextStyle(color: AppTheme.primaryAccent)),
+            ),
+          ],
+        ),
+      );
+      
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      
+      _showDetailedError(
+        'Flutter Health Connection Error',
+        'Failed to connect to Flutter Health: $e',
+        [
+          'Make sure your device has the health app installed',
+          Platform.isAndroid ? 'Install Health Connect from Play Store' : 'Check Apple Health app',
+          'Grant all requested permissions',
+          'Try connecting again',
+        ],
       );
     }
   }
@@ -2399,9 +2761,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Show debug logs in development mode
               if (debugLogs.isNotEmpty) ...[
                 ExpansionTile(
-                  title: Text(
-                    'Debug Information',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  title: Row(
+                    children: [
+                      Text(
+                        'Debug Information',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          final debugText = debugLogs.take(50).join('\n');
+                          Clipboard.setData(ClipboardData(text: debugText));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('📋 Debug information copied to clipboard'),
+                              backgroundColor: AppTheme.primaryAccent,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        icon: Icon(
+                          Icons.copy,
+                          size: 16,
+                          color: AppTheme.primaryAccent,
+                        ),
+                        tooltip: 'Copy debug logs',
+                        padding: EdgeInsets.zero,
+                        constraints: BoxConstraints(),
+                      ),
+                    ],
                   ),
                   children: [
                     Container(
@@ -2412,13 +2800,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: SingleChildScrollView(
-                        child: Text(
+                        child: SelectableText(
                           debugLogs.take(20).join('\n'),
                           style: TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 10,
                             color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
                           ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          final debugText = debugLogs.take(50).join('\n');
+                          Clipboard.setData(ClipboardData(text: debugText));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('📋 Full debug logs copied to clipboard'),
+                              backgroundColor: AppTheme.primaryAccent,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        icon: Icon(Icons.copy, size: 16),
+                        label: Text('Copy All Logs'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.primaryAccent,
                         ),
                       ),
                     ),

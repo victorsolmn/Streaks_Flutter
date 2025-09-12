@@ -7,6 +7,8 @@ class UserProfile {
   final double? targetWeight;
   final String? fitnessGoal;
   final String? activityLevel;
+  final String? experienceLevel;
+  final String? workoutConsistency;
   final String? deviceName;
   final bool deviceConnected;
   final bool hasCompletedOnboarding;
@@ -29,6 +31,8 @@ class UserProfile {
     this.targetWeight,
     this.fitnessGoal,
     this.activityLevel,
+    this.experienceLevel,
+    this.workoutConsistency,
     this.deviceName,
     this.deviceConnected = false,
     this.hasCompletedOnboarding = false,
@@ -78,6 +82,8 @@ class UserProfile {
       targetWeight: json['targetWeight']?.toDouble() ?? json['target_weight']?.toDouble(),
       fitnessGoal: json['fitnessGoal'] ?? json['goal'] ?? json['fitness_goal'],
       activityLevel: json['activityLevel'] ?? json['activity_level'] ?? 'Moderate',
+      experienceLevel: json['experienceLevel'] ?? json['experience_level'],
+      workoutConsistency: json['workoutConsistency'] ?? json['workout_consistency'],
       deviceName: json['deviceName'],
       deviceConnected: json['deviceConnected'] ?? false,
       hasCompletedOnboarding: json['hasCompletedOnboarding'] ?? json['has_completed_onboarding'] ?? false,
@@ -104,6 +110,10 @@ class UserProfile {
       'fitness_goal': fitnessGoal,
       'activityLevel': activityLevel,
       'activity_level': activityLevel,
+      'experienceLevel': experienceLevel,
+      'experience_level': experienceLevel,
+      'workoutConsistency': workoutConsistency,
+      'workout_consistency': workoutConsistency,
       'deviceName': deviceName,
       'deviceConnected': deviceConnected,
       'hasCompletedOnboarding': hasCompletedOnboarding,
@@ -134,6 +144,8 @@ class UserProfile {
     double? targetWeight,
     String? fitnessGoal,
     String? activityLevel,
+    String? experienceLevel,
+    String? workoutConsistency,
     String? deviceName,
     bool? deviceConnected,
     bool? hasCompletedOnboarding,
@@ -154,6 +166,8 @@ class UserProfile {
       targetWeight: targetWeight ?? this.targetWeight,
       fitnessGoal: fitnessGoal ?? this.fitnessGoal,
       activityLevel: activityLevel ?? this.activityLevel,
+      experienceLevel: experienceLevel ?? this.experienceLevel,
+      workoutConsistency: workoutConsistency ?? this.workoutConsistency,
       deviceName: deviceName ?? this.deviceName,
       deviceConnected: deviceConnected ?? this.deviceConnected,
       hasCompletedOnboarding: hasCompletedOnboarding ?? this.hasCompletedOnboarding,

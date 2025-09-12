@@ -66,10 +66,17 @@ CREATE TABLE IF NOT EXISTS public.user_streaks (
   longest_streak INTEGER DEFAULT 0,
   total_days_completed INTEGER DEFAULT 0,
   
+  -- Grace Period System (NEW)
+  consecutive_missed_days INTEGER DEFAULT 0, -- Track consecutive missed days
+  grace_days_used INTEGER DEFAULT 0, -- How many grace days currently used (0-2)
+  grace_days_available INTEGER DEFAULT 2, -- Max grace days available (reset to 2 after successful day)
+  last_grace_reset_date DATE, -- When grace period was last reset
+  
   -- Streak Dates
   streak_start_date DATE,
   last_completed_date DATE,
   last_checked_date DATE,
+  last_attempted_date DATE, -- NEW: Last day user tried (even if failed)
   
   -- Statistics
   total_steps BIGINT DEFAULT 0,
@@ -84,6 +91,38 @@ CREATE TABLE IF NOT EXISTS public.user_streaks (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Nutrition Entries Table
+-- Stores individual food entries for detailed tracking
+CREATE TABLE IF NOT EXISTS public.nutrition_entries (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  
+  -- Food Details
+  food_name VARCHAR(255) NOT NULL,
+  calories INTEGER NOT NULL DEFAULT 0,
+  protein DECIMAL(6,2) DEFAULT 0,
+  carbs DECIMAL(6,2) DEFAULT 0,
+  fat DECIMAL(6,2) DEFAULT 0,
+  fiber DECIMAL(6,2) DEFAULT 0,
+  
+  -- Portion and source info
+  quantity_grams INTEGER DEFAULT 100,
+  meal_type VARCHAR(50) DEFAULT 'snack', -- breakfast, lunch, dinner, snack
+  food_source VARCHAR(100), -- AI recognized, manual entry, etc
+  
+  -- Metadata
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Index for efficient queries
+  CONSTRAINT nutrition_entries_user_date_idx 
+    UNIQUE(user_id, food_name, created_at)
+);
+
+-- Index for fast daily queries
+CREATE INDEX IF NOT EXISTS idx_nutrition_entries_user_date 
+ON public.nutrition_entries(user_id, DATE(created_at));
 
 -- Streak History Table
 -- Keeps a log of all streak achievements
@@ -185,108 +224,179 @@ CREATE TRIGGER check_goals_on_update
   FOR EACH ROW
   EXECUTE FUNCTION check_daily_goals_achieved();
 
--- Function to update streak when goals are achieved
+-- Function to update streak with grace period logic
 CREATE OR REPLACE FUNCTION update_user_streak()
 RETURNS TRIGGER AS $$
 DECLARE
   v_user_streak RECORD;
   v_yesterday DATE;
-  v_streak_continues BOOLEAN;
+  v_days_since_completion INTEGER;
+  v_new_current_streak INTEGER;
+  v_new_longest_streak INTEGER;
 BEGIN
-  -- Only process if all goals are achieved
-  IF NEW.all_goals_achieved THEN
-    v_yesterday := NEW.date - INTERVAL '1 day';
-    
-    -- Get or create user streak record
-    SELECT * INTO v_user_streak FROM public.user_streaks WHERE user_id = NEW.user_id;
-    
-    IF v_user_streak IS NULL THEN
-      -- Create new streak record
+  v_yesterday := NEW.date - INTERVAL '1 day';
+  
+  -- Get or create user streak record
+  SELECT * INTO v_user_streak FROM public.user_streaks WHERE user_id = NEW.user_id;
+  
+  IF v_user_streak IS NULL THEN
+    -- Create new streak record
+    IF NEW.all_goals_achieved THEN
+      -- Start with successful day
       INSERT INTO public.user_streaks (
         user_id,
         current_streak,
         longest_streak,
         total_days_completed,
+        consecutive_missed_days,
+        grace_days_used,
+        grace_days_available,
         streak_start_date,
         last_completed_date,
+        last_attempted_date,
+        last_grace_reset_date,
         total_steps,
         total_calories_burned
       ) VALUES (
         NEW.user_id,
+        1, -- Start streak
         1,
         1,
-        1,
+        0, -- No missed days
+        0, -- No grace days used
+        2, -- Full grace available
         NEW.date,
         NEW.date,
+        NEW.date,
+        NEW.date, -- Grace reset on first success
         NEW.steps,
         NEW.calories_burned
       );
     ELSE
-      -- Check if streak continues from yesterday
-      v_streak_continues := v_user_streak.last_completed_date = v_yesterday;
+      -- Start with failed day
+      INSERT INTO public.user_streaks (
+        user_id,
+        current_streak,
+        longest_streak,
+        total_days_completed,
+        consecutive_missed_days,
+        grace_days_used,
+        grace_days_available,
+        last_attempted_date
+      ) VALUES (
+        NEW.user_id,
+        0, -- No streak yet
+        0,
+        0,
+        1, -- First missed day
+        0, -- No grace used yet (no streak to protect)
+        2,
+        NEW.date
+      );
+    END IF;
+  ELSE
+    -- Update existing streak record
+    UPDATE public.user_streaks SET last_attempted_date = NEW.date WHERE user_id = NEW.user_id;
+    
+    -- Calculate days since last completion
+    IF v_user_streak.last_completed_date IS NOT NULL THEN
+      v_days_since_completion := NEW.date - v_user_streak.last_completed_date;
+    ELSE
+      v_days_since_completion := 999; -- Large number if never completed
+    END IF;
+    
+    IF NEW.all_goals_achieved THEN
+      -- GOALS ACHIEVED - SUCCESS DAY
       
-      IF v_streak_continues THEN
-        -- Continue streak
+      IF v_days_since_completion = 1 THEN
+        -- Perfect continuation (yesterday was completed)
+        v_new_current_streak := v_user_streak.current_streak + 1;
+        
+      ELSIF v_days_since_completion <= 3 AND v_user_streak.current_streak > 0 THEN
+        -- Recovery within grace period (2-3 days gap)
+        -- Continue streak if we haven't exceeded grace limit
+        IF v_days_since_completion - 1 <= v_user_streak.grace_days_available THEN
+          v_new_current_streak := v_user_streak.current_streak + 1;
+        ELSE
+          -- Exceeded grace period, start new streak
+          v_new_current_streak := 1;
+        END IF;
+        
+      ELSE
+        -- Too long gap or no previous streak, start new
+        v_new_current_streak := 1;
+      END IF;
+      
+      v_new_longest_streak := GREATEST(v_user_streak.longest_streak, v_new_current_streak);
+      
+      -- Update streak with success
+      UPDATE public.user_streaks
+      SET
+        current_streak = v_new_current_streak,
+        longest_streak = v_new_longest_streak,
+        total_days_completed = total_days_completed + 1,
+        consecutive_missed_days = 0, -- Reset missed days
+        grace_days_used = 0, -- Reset grace days
+        grace_days_available = 2, -- Restore full grace
+        last_completed_date = NEW.date,
+        last_grace_reset_date = NEW.date,
+        total_steps = total_steps + NEW.steps,
+          total_calories_burned = total_calories_burned + NEW.calories_burned,
+        updated_at = NOW()
+      WHERE user_id = NEW.user_id;
+      
+    ELSE
+      -- GOALS NOT ACHIEVED - FAILURE DAY
+      
+      IF v_user_streak.current_streak > 0 THEN
+        -- User has an active streak to protect
+        
+        -- Calculate consecutive missed days
+        v_days_since_completion := COALESCE(NEW.date - v_user_streak.last_completed_date, 1);
+        
+        IF v_days_since_completion <= 2 THEN
+          -- Within grace period (1-2 days missed)
+          -- Keep streak alive, use grace days
+          UPDATE public.user_streaks
+          SET
+            consecutive_missed_days = v_days_since_completion,
+            grace_days_used = v_days_since_completion,
+            updated_at = NOW()
+          WHERE user_id = NEW.user_id;
+          
+        ELSE
+          -- Exceeded grace period (3+ days missed)
+          -- Lose streak completely
+          UPDATE public.user_streaks
+          SET
+            current_streak = 0,
+            consecutive_missed_days = v_days_since_completion,
+            grace_days_used = 0, -- Reset for next streak attempt
+            grace_days_available = 2,
+            streak_start_date = NULL,
+            updated_at = NOW()
+          WHERE user_id = NEW.user_id;
+        END IF;
+        
+      ELSE
+        -- No active streak, just track missed days
         UPDATE public.user_streaks
         SET
-          current_streak = current_streak + 1,
-          longest_streak = GREATEST(longest_streak, current_streak + 1),
-          total_days_completed = total_days_completed + 1,
-          last_completed_date = NEW.date,
-          total_steps = total_steps + NEW.steps,
-          total_calories_burned = total_calories_burned + NEW.calories_burned,
-          updated_at = NOW()
-        WHERE user_id = NEW.user_id;
-      ELSIF v_user_streak.last_completed_date < NEW.date THEN
-        -- Streak broken, start new
-        UPDATE public.user_streaks
-        SET
-          current_streak = 1,
-          total_days_completed = total_days_completed + 1,
-          streak_start_date = NEW.date,
-          last_completed_date = NEW.date,
-          total_steps = total_steps + NEW.steps,
-          total_calories_burned = total_calories_burned + NEW.calories_burned,
+          consecutive_missed_days = consecutive_missed_days + 1,
           updated_at = NOW()
         WHERE user_id = NEW.user_id;
       END IF;
     END IF;
-    
-    -- Log to streak history
-    INSERT INTO public.streak_history (user_id, date, streak_day, goals_achieved, metrics)
-    VALUES (
-      NEW.user_id,
-      NEW.date,
-      COALESCE(v_user_streak.current_streak, 0) + 1,
-      jsonb_build_object(
-        'steps', NEW.steps_achieved,
-        'calories', NEW.calories_achieved,
-        'sleep', NEW.sleep_achieved,
-        'water', NEW.water_achieved,
-        'nutrition', NEW.nutrition_achieved
-      ),
-      jsonb_build_object(
-        'steps', NEW.steps,
-        'calories_burned', NEW.calories_burned,
-        'calories_consumed', NEW.calories_consumed,
-        'sleep', NEW.sleep_hours,
-        'water', NEW.water_glasses
-      )
-    ) ON CONFLICT (user_id, date) DO UPDATE
-    SET
-      goals_achieved = EXCLUDED.goals_achieved,
-      metrics = EXCLUDED.metrics;
   END IF;
   
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger to update streaks
-CREATE TRIGGER update_streak_on_goals_achieved
+-- Create trigger to update streaks (fires for both success and failure)
+CREATE TRIGGER update_streak_on_metrics_change
   AFTER INSERT OR UPDATE ON public.user_daily_metrics
   FOR EACH ROW
-  WHEN (NEW.all_goals_achieved = TRUE)
   EXECUTE FUNCTION update_user_streak();
 
 -- Function to get current user stats

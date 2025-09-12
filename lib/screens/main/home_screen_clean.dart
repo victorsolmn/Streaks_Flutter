@@ -8,6 +8,8 @@ import '../../widgets/fitness_goal_summary_dialog.dart';
 import '../../widgets/streak_display_widget.dart';
 import '../../providers/streak_provider.dart';
 import 'dart:math' as math;
+import '../../widgets/health_connect_setup_guide.dart';
+import '../../services/toast_service.dart';
 
 class HomeScreenClean extends StatefulWidget {
   const HomeScreenClean({Key? key}) : super(key: key);
@@ -72,7 +74,10 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final profile = userProvider.profile;
     
-    if (profile != null && !profile.hasSeenFitnessGoalSummary) {
+    // Only show dialog if user just completed onboarding and hasn't seen the summary yet
+    if (profile != null && 
+        userProvider.justCompletedOnboarding && 
+        !profile.hasSeenFitnessGoalSummary) {
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -81,6 +86,8 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
             await userProvider.updateProfile(
               hasSeenFitnessGoalSummary: true,
             );
+            // Clear the temporary flag after showing the dialog
+            userProvider.clearJustCompletedOnboardingFlag();
           },
         ),
       );
@@ -145,6 +152,11 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
                   children: [
                     // Personalized Greeting
                     _buildGreeting(userProvider, isDarkMode),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Health Connect Button
+                    _buildHealthConnectButton(context, healthProvider, isDarkMode),
                     
                     const SizedBox(height: 24),
                     
@@ -645,6 +657,168 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
     final caloriesConsumed = todayNutrition?.totalCalories ?? 0;
     final dailyGoal = profile?.dailyCaloriesTarget ?? 2000;
     return (dailyGoal - caloriesConsumed).clamp(0, dailyGoal);
+  }
+
+  Widget _buildHealthConnectButton(BuildContext context, HealthProvider healthProvider, bool isDarkMode) {
+    final isConnected = healthProvider.isHealthSourceConnected;
+    
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: isConnected 
+            ? LinearGradient(
+                colors: [Colors.green.withOpacity(0.8), Colors.green.withOpacity(0.6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : LinearGradient(
+                colors: [AppTheme.primaryAccent.withOpacity(0.8), AppTheme.primaryAccent.withOpacity(0.6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: (isConnected ? Colors.green : AppTheme.primaryAccent).withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _showHealthConnectDialog(context, healthProvider),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isConnected ? Icons.health_and_safety : Icons.sync,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isConnected ? 'Health Connect Active' : 'Connect Health Data',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isConnected 
+                            ? 'Syncing Samsung Health data automatically'
+                            : 'Sync your Samsung Watch & Health data',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  isConnected ? Icons.check_circle : Icons.arrow_forward_ios,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showHealthConnectDialog(BuildContext context, HealthProvider healthProvider) async {
+    if (healthProvider.isHealthSourceConnected) {
+      // Show connection status and sync options
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.health_and_safety, color: Colors.green),
+              const SizedBox(width: 8),
+              const Text('Health Connect Active'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Samsung Health data is connected and syncing automatically.'),
+              const SizedBox(height: 16),
+              Text('Current data:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('• Steps: ${healthProvider.todaySteps.toInt()}'),
+              Text('• Calories: ${healthProvider.todayCaloriesBurned.toInt()}'),
+              Text('• Heart Rate: ${healthProvider.todayHeartRate.toInt()} bpm'),
+              Text('• Sleep: ${healthProvider.todaySleep.toStringAsFixed(1)} hrs'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                try {
+                  await healthProvider.syncWithHealth();
+                  ToastService().showSuccess('Health data synced successfully! 📊');
+                } catch (e) {
+                  ToastService().showError('Failed to sync health data. Please try again.');
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text('Sync Now'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Show setup guide
+      final result = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          contentPadding: EdgeInsets.zero,
+          content: const HealthConnectSetupGuide(),
+        ),
+      );
+      
+      if (result == 'continue') {
+        // Start Health Connect setup
+        try {
+          await healthProvider.initializeHealth();
+          if (healthProvider.isHealthSourceConnected) {
+            await healthProvider.syncWithHealth();
+            ToastService().showSuccess('Health Connect setup completed! 🎉');
+          } else {
+            ToastService().showInfo('Health Connect setup initiated. Please grant permissions in the app that opens.');
+          }
+        } catch (e) {
+          ToastService().showError('Failed to setup Health Connect. Please try again.');
+        }
+      }
+    }
   }
 }
 

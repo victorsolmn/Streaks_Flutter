@@ -1,785 +1,113 @@
-# Frontend Architecture & UI Design System
-## Streaks Flutter Application
-### Last Updated: September 2, 2025
+# Streaks Flutter - Frontend Architecture & Design
+**Last Updated:** September 12, 2025
 
-## Table of Contents
-1. [Design System Overview](#design-system-overview)
-2. [Health Integration UI Architecture](#health-integration-ui-architecture)
-3. [Color Palette & Theming](#color-palette--theming)
-4. [Typography System](#typography-system)
-5. [Component Architecture](#component-architecture)
-6. [Screen Layouts](#screen-layouts)
-7. [Navigation Architecture](#navigation-architecture)
-8. [State Management Patterns](#state-management-patterns)
-9. [Animation & Interaction Design](#animation--interaction-design)
-10. [Responsive Design](#responsive-design)
-11. [Performance Optimization](#performance-optimization)
-12. [Chat Interface Architecture](#chat-interface-architecture)
-13. [Device Integration Architecture](#device-integration-architecture)
-14. [Cloud Synchronization](#cloud-synchronization)
+## Architecture Overview
 
----
+### Design Pattern: Provider + MVVM
+The app follows a Provider-based state management pattern with MVVM architecture, leveraging Flutter 3.35.2 with native platform integrations.
 
-## Design System Overview
+## Folder Structure
 
-### Design Principles
-- **Health-First**: Prioritize health app integration and user wellness
-- **Clarity**: Clear visual hierarchy with distinct primary, secondary, and tertiary information levels
-- **Consistency**: Unified design language across all screens and components
-- **Accessibility**: High contrast ratios, adequate touch targets, semantic labeling
-- **Performance**: Optimized animations and efficient rendering patterns
-- **Modularity**: Reusable components with consistent APIs
-- **Intelligence**: AI-powered features seamlessly integrated into UI
-- **Trust**: Transparent health data handling with clear permission flows
-
-### Visual Language
-- **Card-based Layout**: Primary content organization pattern
-- **Health-Focused Icons**: Fitness and wellness iconography
-- **Rounded Corners**: Consistent 12-20px radius for modern, friendly appearance
-- **Subtle Shadows**: Light elevation effects (opacity 0.05-0.06)
-- **Status Indicators**: Clear visual feedback for connection states
-- **White Space**: Generous padding (16-24px) for visual breathing room
-- **Real-time Updates**: Live data visualization with smooth animations
-
-### Brand Identity
-- **App Icon**: Streaker logo representing fitness streaks
-- **Primary Color**: Orange (#FF6B1A) - Energy, enthusiasm, action
-- **Visual Metaphors**: Streaks for consistency, charts for progress, hearts for health
-
----
-
-## Health Integration UI Architecture
-
-### Native Android Implementation (Updated August 30, 2025)
-
-#### Architecture Overview
 ```
-Flutter UI Layer
-    ↓
-MethodChannel Bridge (com.streaker/health_connect)
-    ↓
-Native Android Layer (Kotlin)
-    ↓
-Google Health Connect API
-    ↓
-Samsung Health / Google Fit / Other Sources
+lib/
+├── providers/               # State management
+├── screens/                 # UI screens
+│   ├── auth/               # Authentication flows
+│   ├── onboarding/         # User onboarding
+│   ├── main/               # Main app screens
+│   └── splash/             # App initialization
+├── services/               # Business logic
+├── models/                 # Data models
+├── utils/                  # Utilities
+└── widgets/                # Reusable components
 ```
 
-#### Native Components
-1. **MainActivity.kt**: Core Health Connect implementation
-   - Direct SDK integration
-   - Data source prioritization logic
-   - Samsung Health detection (`com.sec.android.app.shealth`)
-   
-2. **HealthSyncWorker.kt**: Background sync
-   - WorkManager for hourly sync
-   - Runs when app is closed
-   - SharedPreferences for sync state
-
-3. **NativeHealthConnectService.dart**: Flutter bridge
-   - Async/await pattern
-   - Debug logging system
-   - Error handling with fallbacks
-
-#### Data Source Priority System
-```kotlin
-// Priority logic in MainActivity.kt
-val finalSteps = when {
-    samsungSteps > 0 -> samsungSteps  // First priority
-    googleFitSteps > 0 -> googleFitSteps  // Fallback
-    else -> otherSteps  // Last resort
-}
-```
-
-### Health Connection Flow UI
-```
-Profile Screen
-    ↓ 
-Smartwatch Integration Dialog
-    ↓
-[Priority 1] Native Health Connect (NEW)
-    ├── Samsung Health Detection
-    ├── Data Source Display
-    ├── Hourly Background Sync  
-    └── Debug & Diagnostic Tool
-    
-[Priority 2] Health App Connection (Legacy)
-    ├── Connection Status Display
-    ├── Permission Request Flow  
-    ├── Success/Error Feedback
-    └── Data Sync Indicators
-    
-[Priority 3] Bluetooth Fallback
-    ├── Device Scanning Interface
-    ├── Connection Progress  
-    ├── Device Selection
-    └── Error Recovery Options
-```
-
-### Health Dialog Components
-
-#### 1. Connection Status Display
-```dart
-_buildCurrentConnectionStatus(HealthProvider healthProvider, bool isDarkMode) {
-  // Visual indicators for:
-  // - Connected health source (Apple Health/Samsung Health)
-  // - Connection quality
-  // - Last sync timestamp
-  // - Data availability status
-}
-```
-
-#### 2. Integration Option Cards
-```dart
-_buildIntegrationOption(
-  icon: IconData,
-  title: String,
-  subtitle: String, 
-  description: String,
-  isRecommended: bool,
-  onTap: VoidCallback,
-  isDarkMode: bool,
-) {
-  // Card design with:
-  // - Recommended badge for health apps
-  // - Clear CTAs and descriptions
-  // - Visual hierarchy
-  // - Accessibility support
-}
-```
-
-### Health Permission UI States
-
-#### Permission Flow States
-1. **Initial State**: Show connection options (health app recommended)
-2. **Loading State**: Connection in progress with spinner and descriptive text
-3. **Permission Request**: System permission dialogs (handled by OS)
-4. **Success State**: Connected with green status indicator and sync button
-5. **Error State**: Failed connection with retry options and alternatives
-
-#### Visual Feedback System
-- **Green**: Successfully connected and syncing
-- **Orange**: Connection in progress or needs attention
-- **Red**: Connection failed or permissions denied
-- **Gray**: Not connected or unavailable
-
----
-
-## Color Palette & Theming
-
-### Brand Colors (Updated August 2025)
-```dart
-// Core Brand Color - Orange Theme
-class AppTheme {
-  static const Color primaryAccent = Color(0xFFFF6B1A);
-  static const Color primaryHover = Color(0xFFFF8C42);
-  static const Color primaryDark = Color(0xFFE55100);
-  
-  // Health Status Colors
-  static const Color successGreen = Color(0xFF00D68F);
-  static const Color warningYellow = Color(0xFFFFAA00);
-  static const Color errorRed = Color(0xFFFF3838);
-  static const Color infoBlue = Color(0xFF0095FF);
-  
-  // Accent Colors
-  static const Color accentGreen = Color(0xFF00D68F);
-  static const Color accentPink = Color(0xFFFF6B9D);
-  static const Color accentCyan = Color(0xFF00C9FF);
-  
-  // Neutral Colors
-  static const Color textPrimary = Color(0xFF111111);
-  static const Color textSecondary = Color(0xFF4F4F4F);
-  static const Color backgroundLight = Color(0xFFFFFFFF);
-  static const Color cardBackgroundLight = Color(0xFFF8F9FA);
-  static const Color dividerLight = Color(0xFFE0E0E0);
-  
-  // Dark Theme
-  static const Color darkBackground = Color(0xFF121212);
-  static const Color darkCardBackground = Color(0xFF1C1C1E);
-  static const Color textPrimaryDark = Color(0xFFFFFFFF);
-  static const Color textSecondaryDark = Color(0xFFB3B3B3);
-  static const Color dividerDark = Color(0xFF2E2E2E);
-}
-```
-
-### Gradient System
-```dart
-static const LinearGradient primaryGradient = LinearGradient(
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-  colors: [primaryAccent, primaryHover],
-);
-```
-
----
-
-## Chat Interface Architecture (Updated August 29, 2025)
-
-### ChatGPT-Style Interface Design
-
-#### Design Philosophy
-- **Clean & Minimal**: No bubble design for AI responses
-- **Clear Hierarchy**: User messages vs AI responses visually distinct
-- **Rich Formatting**: Support for headers, bullets, code blocks, quotes
-- **Brand Consistency**: Orange gradient for user messages
-
-#### Message Layout Structure
-```dart
-// User Message
-Container(
-  alignment: Alignment.centerRight,
-  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-  child: Container(
-    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-    decoration: BoxDecoration(
-      gradient: AppTheme.primaryGradient,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-    child: Text(
-      userMessage,
-      style: TextStyle(color: Colors.white, fontSize: 15),
-    ),
-  ),
-)
-
-// AI Message (No Bubble)
-Container(
-  padding: EdgeInsets.symmetric(horizontal: 20),
-  child: Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      // Avatar with gradient
-      Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          gradient: AppTheme.primaryGradient,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: SvgPicture.asset('assets/images/streaker_logo.svg'),
-      ),
-      SizedBox(width: 12),
-      // Message content
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Name and timestamp
-            Row(
-              children: [
-                Text('Streaker AI', style: TextStyle(fontWeight: FontWeight.w600)),
-                SizedBox(width: 8),
-                Text(timestamp, style: TextStyle(fontSize: 12, opacity: 0.6)),
-              ],
-            ),
-            SizedBox(height: 6),
-            // Formatted message content
-            _buildFormattedAIResponse(message),
-          ],
-        ),
-      ),
-    ],
-  ),
-)
-```
-
-#### Rich Text Formatting System
-```dart
-// Parsing and formatting rules
-Map<String, TextStyle> formatRules = {
-  'header1': TextStyle(fontSize: 20, fontWeight: FontWeight.w700),  // #
-  'header2': TextStyle(fontSize: 18, fontWeight: FontWeight.w700),  // ##
-  'header3': TextStyle(fontSize: 16, fontWeight: FontWeight.w600),  // ###
-  'bold': TextStyle(fontWeight: FontWeight.bold),                  // **text**
-  'italic': TextStyle(fontStyle: FontStyle.italic),                // *text*
-  'code': TextStyle(fontFamily: 'Courier New', fontSize: 13),      // `code`
-};
-
-// Visual elements
-- Bullets: • with proper indentation
-- Numbers: 1. 2. 3. with orange accent color
-- Code blocks: Light gray background with border
-- Quotes: Left border with accent color
-- Dividers: Gradient horizontal lines
-```
-
-#### Typing Indicator
-```dart
-Container(
-  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-  child: Row(
-    children: [
-      // AI Avatar
-      Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          gradient: AppTheme.primaryGradient,
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-      SizedBox(width: 12),
-      Column(
-        children: [
-          Text('Streaker AI'),
-          _TypingIndicator(), // Animated dots
-        ],
-      ),
-    ],
-  ),
-)
-```
-
----
-
-## Component Architecture
-
-### Core Health Components
-
-#### 1. Health Metric Cards
-```dart
-class HealthMetricCard extends StatelessWidget {
-  final HealthMetric metric;
-  final Color color;
-  final IconData icon;
-  final bool isConnected;
-  final VoidCallback? onTap;
-  
-  // Features:
-  // - Real-time data updates
-  // - Connection status indicator
-  // - Progress visualization
-  // - Goal tracking
-  // - Sync timestamp
-}
-```
-
-#### 2. Health Connection Status Widget
-```dart
-class HealthConnectionStatus extends StatelessWidget {
-  final HealthDataSource source;
-  final bool isConnected;
-  final DateTime? lastSync;
-  final VoidCallback? onTap;
-  
-  // Features:
-  // - Source identification (Apple Health/Samsung Health)
-  // - Connection quality indicator
-  // - Last sync time
-  // - Manual sync trigger
-}
-```
-
----
-
-## Screen Layouts
-
-### Enhanced Home Screen Layout
-```dart
-// Updated Home Screen with Health Integration
-Column(
-  children: [
-    // Dynamic Greeting Header
-    HealthGreetingHeader(
-      userName: user.name,
-      healthStatus: healthProvider.connectionStatus,
-      onHealthTap: _showHealthStatus,
-    ),
-    
-    // Time Period Selection with Icons
-    TimePeriodsTabBar(
-      selectedPeriod: _selectedPeriod,
-      onPeriodChanged: _onPeriodChanged,
-      // Icons: Today 📅, Week 📊, Month 📈, Year 🗓️
-    ),
-    
-    // Health Metrics Grid
-    Expanded(
-      child: HealthMetricsGrid(
-        metrics: healthProvider.metrics,
-        connectionStatus: healthProvider.dataSource,
-        onMetricTap: _showMetricDetails,
-        onConnectionTap: _showHealthIntegration,
-      ),
-    ),
-  ],
-)
-```
-
----
-
-## Navigation Architecture
-
-### Enhanced Bottom Navigation
-```dart
-// Updated Navigation with Health Focus
-final List<BottomNavigationBarItem> _bottomNavItems = [
-  BottomNavigationBarItem(
-    icon: Icon(Icons.home_outlined),
-    activeIcon: Icon(Icons.home_rounded),
-    label: 'Home',
-  ),
-  BottomNavigationBarItem(
-    icon: SvgPicture.asset('assets/images/streaker_logo.svg'),
-    activeIcon: SvgPicture.asset('assets/images/streaker_logo.svg', 
-      colorFilter: ColorFilter.mode(AppTheme.primaryAccent, BlendMode.srcIn)),
-    label: 'Streaks',
-  ),
-  BottomNavigationBarItem(
-    icon: Icon(Icons.restaurant_outlined),
-    activeIcon: Icon(Icons.restaurant_rounded),
-    label: 'Nutrition',
-  ),
-  BottomNavigationBarItem(
-    icon: Icon(Icons.smart_toy_outlined),
-    activeIcon: Icon(Icons.smart_toy_rounded),
-    label: 'AI Chat',
-  ),
-  BottomNavigationBarItem(
-    icon: Icon(Icons.person_outline_rounded),
-    activeIcon: Icon(Icons.person_rounded),
-    label: 'Profile',
-  ),
-];
-```
-
----
-
-## UI/UX Consistency Updates (August 29, 2025)
-
-### Brand Color Standardization
-All UI elements now consistently use the orange gradient theme:
-
-#### Nutrition Page
-- Macro indicators: Protein (Green), Carbs (Orange), Fat (Pink)
-- Empty state: Orange gradient camera icon
-- Remaining calories: Theme-aware card background
-
-#### Profile Page
-- Settings icons: Orange gradient backgrounds
-- Info rows: Theme-aware text colors
-- Sign out button: Uses AppTheme.errorRed
-- Log weight button: Orange primary accent
-
-#### Welcome & Onboarding
-- Feature icons: Orange gradient backgrounds
-- Selected options: Orange gradient borders
-- Action buttons: Primary accent color
-
-### Responsive Fixes
-- Home screen header: Wrapped in Expanded to prevent overflow
-- Text overflow: Added TextOverflow.ellipsis where needed
-- Proper constraints: All Row widgets have proper flex/expanded children
-
----
-
-## Authentication & Onboarding Architecture (Updated September 1, 2025)
+## Core Components
 
 ### Authentication Flow
-```
-Welcome Screen
-    ↓
-[Sign Up] → Email Validation → Create Account
-[Sign In] → Email/Password → Main Screen
-    ↓
-Onboarding (if new user)
-    ↓
-Smartwatch Connection
-    ↓
-Main Screen with Fitness Goal Summary
-```
+- SplashScreen → AuthCheck → SignIn/SignUp/Main/Onboarding
 
-### Email Duplicate Validation
-```dart
-// Enhanced email checking in SupabaseService
-Future<bool> checkEmailExists(String email) async {
-  // 1. Try sign-in with dummy password (most reliable)
-  try {
-    await signInWithPassword(email, 'dummy_password');
-  } catch (error) {
-    if (error.contains('invalid login credentials')) {
-      return true; // Email exists
-    }
-  }
-  
-  // 2. Check profiles table
-  final profile = await from('profiles')
-    .select('id')
-    .eq('email', email.toLowerCase())
-    .maybeSingle();
-  
-  return profile != null;
-}
-```
+### State Management
+- **SupabaseAuthProvider**: Authentication state
+- **UserProvider**: User profile data
 
-### Sign-Out Flow (Fixed)
-```dart
-// Profile Screen - Improved sign-out
-onPressed: () async {
-  // 1. Clear local data first
-  await userProvider.clearUserData();
-  await nutritionProvider.clearNutritionData();
-  
-  // 2. Navigate immediately (no loading dialog)
-  Navigator.pushAndRemoveUntil(
-    MaterialPageRoute(builder: (_) => WelcomeScreen()),
-    (route) => false,
-  );
-  
-  // 3. Sign out from auth providers in background
-  await supabaseAuthProvider.signOut();
-}
-```
+## UI/UX Design System
 
-### Onboarding Components
+### Color Palette
+- Primary: Orange (#FF6B35)
+- Background: Dark blue (#1A1A2E)
+- Success: Green (#4CAF50)
+- Error: Red (#E74C3C)
 
-1. **Profile Setup Screen**
-   - Basic info (age, height, weight)
-   - Fitness goals selection
-   - Activity level selection
+### Typography
+- Headers: 32sp bold
+- Body: 16sp regular
+- Captions: 12sp regular
 
-2. **Smartwatch Connection Screen**
-   - Fixed permission handling
-   - Uses unified health service
-   - Proper error messages for different failures
-   - Connection state persistence
+### Component Patterns
+- Rounded corners (12px)
+- Consistent padding (16-24px)
+- Material Design guidelines
 
-3. **Fitness Goal Summary Dialog**
-   - Shows after onboarding completion
-   - Displays selected goals and targets
-   - One-time display (tracked with hasSeenFitnessGoalSummary)
+## Navigation
+- Navigator 2.0 with MaterialPageRoute
+- Deep linking: com.streaker.streaker://
+- Tab navigation with BottomNavigationBar
 
----
+## Form Validation
+- Email regex validation
+- Password min 6 characters
+- Real-time error display
 
-## Performance Optimization
+## Performance
+- SVG for logos
+- Lazy loading
+- Proper disposal of controllers
 
-### Health Data Caching Strategy
-```dart
-class HealthDataCache {
-  static final Map<String, dynamic> _cache = {};
-  static const Duration _cacheExpiry = Duration(minutes: 5);
-  
-  static Future<Map<String, dynamic>> getCachedData(String key) async {
-    final cached = _cache[key];
-    if (cached != null && !_isExpired(cached['timestamp'])) {
-      return cached['data'];
-    }
-    return {};
-  }
-}
-```
+## Key Features Implemented
 
----
+### Health Integration
+- **Native Android:** Health Connect API with direct Kotlin integration
+- **iOS:** Apple HealthKit integration via Flutter Health plugin
+- **Data Sources:** Samsung Health, Google Fit, Apple Health
+- **Metrics:** Steps, calories, heart rate, sleep, distance tracking
 
-## Cloud Synchronization Architecture (Updated September 1, 2025)
+### AI Chat System
+- **Provider:** Grok API via X.AI platform
+- **Features:** Health coaching, nutrition advice, motivation
+- **UI:** ChatGPT-style interface with gradient user messages
+- **Context:** Conversation history and user health data integration
 
-### Automatic Bidirectional Sync Implementation
+### Nutrition Tracking
+- **Food Logging:** Photo + text input for AI analysis
+- **Macro Tracking:** Protein, carbs, fats, calories
+- **Goal Management:** Customizable daily targets
+- **Progress Visualization:** Charts and goal achievement indicators
 
-#### Architecture Overview
-```
-App State Changes
-    ↓
-Local Storage (SharedPreferences)
-    ↓
-Connectivity Monitor (connectivity_plus)
-    ↓
-[Online] → Immediate Supabase Sync
-[Offline] → Queue for Later Sync
-    ↓
-Background Sync (Timer-based)
-```
+### Streak System
+- **Logic:** All daily goals must be met to earn a streak
+- **Tracking:** Current streak, longest streak, total days
+- **Gamification:** Dynamic badges based on streak length
+- **Social Elements:** Achievement sharing and motivation
 
-#### Key Components
+### Data Synchronization
+- **Backend:** Supabase PostgreSQL with real-time sync
+- **Offline Support:** Local storage with background sync
+- **Conflict Resolution:** Timestamp-based data merging
+- **Performance:** Optimized queries with caching strategy
 
-1. **Connectivity Monitoring**
-```dart
-// Health Provider Example
-StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-_connectivity.onConnectivityChanged.listen((results) {
-  _isOnline = !results.contains(ConnectivityResult.none);
-  if (wasOffline && _isOnline) {
-    // Auto-sync when coming back online
-    syncToSupabase();
-  }
-});
-```
+## Recent Updates (September 12, 2025)
 
-2. **Periodic Sync**
-- Every 5 minutes when online
-- Throttled to prevent excessive API calls (min 60s between syncs)
-- Runs in both Health and Nutrition providers
+### APK Build & Distribution
+- **Release Build:** 59.0MB APK with all features
+- **Distribution:** WiFi sharing via HTTP server
+- **Performance:** Optimized build with tree-shaking (99.2% font reduction)
+- **Compatibility:** Android 7.0+ (API level 24+)
 
-3. **Lifecycle-based Sync**
-```dart
-// Main Screen
-void didChangeAppLifecycleState(AppLifecycleState state) {
-  if (state == AppLifecycleState.resumed) {
-    // Sync when app comes to foreground
-    healthProvider.loadHealthDataFromSupabase();
-    nutritionProvider.loadDataFromSupabase();
-  } else if (state == AppLifecycleState.paused) {
-    // Sync when app goes to background
-    healthProvider.syncOnPause();
-    nutritionProvider.syncOnPause();
-  }
-}
-```
-
-4. **Visual Sync Status Indicator**
-- **Green "Synced"**: Data up to date (shows time since last sync)
-- **Blue "Syncing"**: Currently synchronizing (rotating icon)
-- **Orange "Offline"**: No internet (shows pending items count)
-- Tap to manually trigger sync
-
-### Real-time Health Data Sync
-```dart
-class HealthDataSyncService {
-  static Future<void> syncHealthMetrics() async {
-    final localData = await _getLocalHealthData();
-    final cloudData = await _getCloudHealthData();
-    
-    // Merge and resolve conflicts
-    final mergedData = _mergeHealthData(localData, cloudData);
-    
-    // Sync to both local and cloud
-    await _saveLocalHealthData(mergedData);
-    await _saveCloudHealthData(mergedData);
-    
-    // Notify UI of updates
-    HealthProvider.instance.notifyDataUpdated();
-  }
-}
-```
-
----
-
-## Latest Updates (September 2, 2025)
-
-### Comprehensive Streak System Architecture
-
-#### Overview
-Implemented a complete streak tracking system where users earn daily streaks only when ALL fitness goals are achieved.
-
-#### Database Architecture
-```sql
--- Core Tables
-1. user_daily_metrics
-   - Tracks all daily health and nutrition data
-   - Fields: steps, calories, sleep, water, protein, etc.
-   - Goal achievement boolean flags
-   
-2. user_streaks
-   - Current streak counter
-   - Longest streak record
-   - Total days completed
-   - Last streak date
-   
-3. streak_history
-   - Historical streak records
-   - Streak changes over time
-   
-4. user_goals
-   - User-specific daily targets
-   - Customizable per user
-```
-
-#### Streak Calculation Logic
-```dart
-// Provider Architecture
-StreakProvider
-  ├── syncMetricsFromProviders()
-  │   ├── Fetches from HealthProvider
-  │   ├── Fetches from NutritionProvider
-  │   └── Calculates goal achievements
-  ├── checkAndUpdateStreak()
-  │   └── Updates streak if all goals met
-  └── Real-time Supabase sync
-```
-
-#### UI Components
-
-##### Streak Display Widget
-```dart
-class StreakDisplayWidget extends StatelessWidget {
-  // Compact mode: Small badge with fire icon and count
-  // Full mode: Complete stats with progress bars
-  
-  Widget _buildFullView() {
-    return Container(
-      // Current streak with fire icon
-      // Today's goals progress (0-5 completed)
-      // Motivational message
-      // Stats: Longest, Total, Monthly
-    );
-  }
-  
-  Widget _buildStreakBadge(int streak) {
-    // Dynamic badges based on streak:
-    // 3+ days: Trending up (green)
-    // 7+ days: Star (amber)
-    // 30+ days: Fire (orange)
-    // 100+ days: Purple fire
-  }
-}
-```
-
-### Enhanced Nutrition Tracking
-
-#### Food Input Dialog
-```dart
-Future<Map<String, String>?> _showFoodDetailsDialog() async {
-  // Two-field dialog:
-  // 1. Food name input (TextField)
-  // 2. Quantity selector with units:
-  //    - grams, kg
-  //    - cups, pieces, servings
-  //    - plates, bowls
-  //    - ml, liters
-  
-  // Returns: {"name": "Rice", "quantity": "2 cups"}
-  // Both image + user input sent to AI for accuracy
-}
-```
-
-### Navigation Improvements
-
-#### Sync Button Behavior
-```dart
-// Changed from syncing to navigation
-GestureDetector(
-  onTap: () {
-    // Navigate to Profile page (index 4)
-    // Open smartwatch integration dialog
-    Navigator.pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => MainScreen(initialIndex: 4),
-      ),
-      (route) => false,
-    );
-  },
-  child: Text('Sync now'), // Changed from "Synced now"
-)
-```
-
-### UI Cleanup
-
-#### Home Screen Simplification
-- Removed duplicate StreakDisplayWidget from home page
-- Streak display now only in dedicated Streaks tab
-- Removed pull-to-refresh that was resetting data
-- Cleaner layout without redundant elements
-
-### AI Chat Enhancement
-
-#### Token Limit Fix
-```dart
-// config/api_config.dart
-static const int maxTokens = 2000; // Increased from 500
-// Prevents response truncation
-// Added system prompt for length awareness
-```
-
----
-
-This architecture document reflects the current state of the Streaker Flutter application with comprehensive health integration, modern UI patterns (including ChatGPT-style chat interface), complete streak tracking system, and robust cross-platform compatibility. The design system prioritizes user health data transparency, seamless device integration, goal achievement tracking, and intuitive user experiences with consistent brand identity throughout.
+## Future Enhancements
+- Dark mode support
+- Offline capabilities
+- Multi-language support  
+- Biometric authentication
+- Apple Watch integration
+- Social features expansion

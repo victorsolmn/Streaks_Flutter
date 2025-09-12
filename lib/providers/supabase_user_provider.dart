@@ -8,17 +8,24 @@ class SupabaseUserProvider with ChangeNotifier {
   UserProfile? _userProfile;
   bool _isLoading = false;
   String? _error;
+  bool _hasTriedLoading = false;
 
   UserProfile? get userProfile => _userProfile;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  bool get hasProfile => _userProfile != null;
   bool get hasCompletedOnboarding => _userProfile?.hasCompletedOnboarding ?? false;
+  bool get hasTriedLoading => _hasTriedLoading;
 
   Future<void> loadUserProfile() async {
     final userId = _supabaseService.currentUser?.id;
     if (userId == null) return;
 
+    // Prevent multiple simultaneous calls
+    if (_isLoading || _hasTriedLoading) return;
+
     _isLoading = true;
+    _hasTriedLoading = true;
     notifyListeners();
 
     try {
@@ -31,8 +38,17 @@ class SupabaseUserProvider with ChangeNotifier {
           age: profileData['age'],
           height: profileData['height']?.toDouble(),
           weight: profileData['weight']?.toDouble(),
+          targetWeight: profileData['target_weight']?.toDouble(),
           activityLevel: profileData['activity_level'],
           fitnessGoal: profileData['fitness_goal'],
+          experienceLevel: profileData['experience_level'],
+          workoutConsistency: profileData['workout_consistency'],
+          hasCompletedOnboarding: profileData['has_completed_onboarding'] ?? false,
+          hasSeenFitnessGoalSummary: profileData['has_seen_fitness_goal_summary'] ?? false,
+          dailyCaloriesTarget: profileData['daily_calories_target'],
+          dailyStepsTarget: profileData['daily_steps_target'], 
+          dailySleepTarget: profileData['daily_sleep_target']?.toDouble(),
+          dailyWaterTarget: profileData['daily_water_target']?.toDouble(),
         );
       }
     } catch (e) {
@@ -59,8 +75,17 @@ class SupabaseUserProvider with ChangeNotifier {
           'age': profile.age,
           'height': profile.height,
           'weight': profile.weight,
+          'target_weight': profile.targetWeight,
           'activity_level': profile.activityLevel,
           'fitness_goal': profile.fitnessGoal,
+          'experience_level': profile.experienceLevel,
+          'workout_consistency': profile.workoutConsistency,
+          'has_completed_onboarding': profile.hasCompletedOnboarding,
+          'has_seen_fitness_goal_summary': profile.hasSeenFitnessGoalSummary,
+          'daily_calories_target': profile.dailyCaloriesTarget,
+          'daily_steps_target': profile.dailyStepsTarget,
+          'daily_sleep_target': profile.dailySleepTarget,
+          'daily_water_target': profile.dailyWaterTarget,
         },
       );
 
@@ -202,9 +227,21 @@ class SupabaseUserProvider with ChangeNotifier {
     return (_userProfile!.weight! * proteinPerKg).round();
   }
 
+  // Mark onboarding as completed
+  Future<void> completeOnboarding() async {
+    if (_userProfile == null) return;
+
+    final updatedProfile = _userProfile!.copyWith(
+      hasCompletedOnboarding: true,
+    );
+
+    await updateProfile(updatedProfile);
+  }
+
   void clearUserData() {
     _userProfile = null;
     _error = null;
+    _hasTriedLoading = false; // Reset the loading flag
     notifyListeners();
   }
 }

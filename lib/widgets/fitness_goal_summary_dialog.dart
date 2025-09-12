@@ -120,134 +120,187 @@ class FitnessGoalSummaryDialog extends StatelessWidget {
     final weeksToGoal = calculateTimeToGoal(profile);
     
     return Dialog(
+      insetPadding: EdgeInsets.all(16),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Container(
+        width: double.maxFinite,
         constraints: BoxConstraints(
-          maxWidth: 400,
           maxHeight: MediaQuery.of(context).size.height * 0.85,
+          maxWidth: MediaQuery.of(context).size.width * 0.95,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
+            // Enhanced Header with close button
             Container(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.fromLTRB(24, 20, 16, 20),
               decoration: BoxDecoration(
                 gradient: AppTheme.primaryGradient,
                 borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
                 ),
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  Icon(
-                    Icons.fitness_center,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Your Fitness Goal Summary',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.fitness_center,
                       color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                      size: 24,
                     ),
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Setup Profile (1/3)',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 14,
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Your Fitness Goal Summary',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Setup Profile (1/3)',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.1),
+                      fixedSize: Size(40, 40),
                     ),
                   ),
                 ],
               ),
             ),
             
-            // Content
+            // Enhanced Content with better spacing
             Flexible(
               child: SingleChildScrollView(
-                padding: EdgeInsets.all(20),
+                padding: EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Personal Information Section
-                    _buildSectionTitle(context, 'Personal Information'),
-                    SizedBox(height: 12),
-                    _buildInfoCard(
-                      context,
-                      [
-                        _InfoRow('Age', '${profile.age} years'),
-                        _InfoRow('Height', '${profile.height.toStringAsFixed(0)} cm'),
-                        _InfoRow('Current Weight', '${profile.weight.toStringAsFixed(1)} kg'),
-                        _InfoRow('Target Weight', '${profile.targetWeight.toStringAsFixed(1)} kg'),
-                        _InfoRow(
-                          'Weight ${weightChange >= 0 ? "Gain" : "Loss"} Goal', 
-                          '${weightChange.abs().toStringAsFixed(1)} kg'
+                    // Compact Personal Info & BMI in two columns
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left column - Personal Info
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildCompactSectionTitle(context, 'Personal Info'),
+                              SizedBox(height: 8),
+                              _buildCompactInfoCard(
+                                context,
+                                [
+                                  _CompactInfoRow('Age', '${profile.age}y', Icons.cake),
+                                  _CompactInfoRow('Height', '${profile.height.toStringAsFixed(0)}cm', Icons.height),
+                                  _CompactInfoRow('Current', '${profile.weight.toStringAsFixed(1)}kg', Icons.monitor_weight),
+                                  _CompactInfoRow('Target', '${profile.targetWeight.toStringAsFixed(1)}kg', Icons.flag),
+                                  _CompactInfoRow('${weightChange >= 0 ? "Gain" : "Loss"}', '${weightChange.abs().toStringAsFixed(1)}kg', Icons.trending_up),
+                                  _CompactInfoRow('Timeline', '$weeksToGoal weeks', Icons.schedule),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        _InfoRow('Estimated Time', '$weeksToGoal weeks'),
+                        SizedBox(width: 16),
+                        // Right column - BMI
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildCompactSectionTitle(context, 'BMI Analysis'),
+                              SizedBox(height: 8),
+                              _buildEnhancedBMICard(context, bmi, bmiCategory),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                     
-                    SizedBox(height: 20),
+                    SizedBox(height: 16),
                     
-                    // BMI Analysis
-                    _buildSectionTitle(context, 'BMI Analysis'),
-                    SizedBox(height: 12),
-                    _buildBMICard(context, bmi, bmiCategory),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Activity & Goals
-                    _buildSectionTitle(context, 'Activity & Goals'),
-                    SizedBox(height: 12),
-                    _buildInfoCard(
-                      context,
-                      [
-                        _InfoRow('Fitness Goal', _formatGoal(profile.goal)),
-                        _InfoRow('Activity Level', _formatActivityLevel(profile.activityLevel)),
+                    // Activity & Goals in compact format
+                    _buildCompactSectionTitle(context, 'Fitness Profile'),
+                    SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildGoalChip(context, _formatGoal(profile.goal), Icons.track_changes),
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: _buildGoalChip(context, _formatActivityLevel(profile.activityLevel), Icons.directions_run),
+                        ),
                       ],
                     ),
                     
-                    SizedBox(height: 20),
+                    SizedBox(height: 16),
                     
-                    // Your Personalized Plan
-                    _buildSectionTitle(context, 'Your Personalized Plan'),
-                    SizedBox(height: 12),
-                    _buildPlanCard(
+                    // Enhanced Personalized Plan with grid layout
+                    _buildCompactSectionTitle(context, 'Your Personalized Plan'),
+                    SizedBox(height: 8),
+                    _buildEnhancedPlanGrid(
                       context,
                       [
                         _PlanItem(
                           icon: Icons.local_fire_department,
-                          title: 'Maintenance Calories',
-                          value: '$maintenanceCalories kcal/day',
-                          subtitle: 'To maintain current weight',
+                          title: 'Maintenance',
+                          value: '${(maintenanceCalories / 1000).toStringAsFixed(1)}k',
+                          subtitle: 'kcal/day',
                           color: Colors.orange,
                         ),
                         _PlanItem(
                           icon: Icons.restaurant,
                           title: 'Target Intake',
-                          value: '$targetCalories kcal/day',
-                          subtitle: _getCalorieSubtitle(profile.goal, maintenanceCalories, targetCalories),
+                          value: '${(targetCalories / 1000).toStringAsFixed(1)}k',
+                          subtitle: _getShortCalorieSubtitle(profile.goal, maintenanceCalories, targetCalories),
                           color: AppTheme.primaryAccent,
                         ),
                         _PlanItem(
                           icon: Icons.directions_walk,
-                          title: 'Daily Steps Goal',
-                          value: '$targetSteps steps',
-                          subtitle: 'Based on your activity level',
-                          color: Colors.blue,
+                          title: 'Daily Steps',
+                          value: '${(targetSteps / 1000).toStringAsFixed(1)}k',
+                          subtitle: 'steps/day',
+                          color: AppTheme.accentCyan,
                         ),
                         _PlanItem(
                           icon: Icons.bedtime,
                           title: 'Sleep Target',
-                          value: '7-9 hours',
-                          subtitle: 'For optimal recovery',
-                          color: Colors.purple,
+                          value: '7-9h',
+                          subtitle: 'recovery',
+                          color: Colors.indigo,
                         ),
                       ],
                     ),
@@ -256,15 +309,14 @@ class FitnessGoalSummaryDialog extends StatelessWidget {
               ),
             ),
             
-            // Action Buttons
+            // Enhanced Action Buttons
             Container(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 20),
               decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: Theme.of(context).dividerColor,
-                    width: 1,
-                  ),
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
                 ),
               ),
               child: Row(
@@ -280,37 +332,71 @@ class FitnessGoalSummaryDialog extends StatelessWidget {
                         );
                       },
                       style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        side: BorderSide(color: AppTheme.primaryAccent),
-                      ),
-                      child: Text('Edit'),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        // Save the calculated targets to the user profile
-                        await userProvider.updateProfile(
-                          dailyCaloriesTarget: targetCalories,
-                          dailyStepsTarget: targetSteps,
-                          dailySleepTarget: profile.goal == FitnessGoal.muscleGain ? 8.0 : 7.5,
-                          dailyWaterTarget: 2.5, // 2.5 liters default
-                          bmiValue: bmi,
-                          bmiCategoryValue: bmiCategory,
-                          hasSeenFitnessGoalSummary: true,
-                        );
-                        
-                        onAgree();
-                        Navigator.of(context).pop();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryAccent,
-                        padding: EdgeInsets.symmetric(vertical: 12),
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(color: AppTheme.primaryAccent, width: 2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                       child: Text(
-                        'Agree',
-                        style: TextStyle(color: Colors.white),
+                        'Edit Goals',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        boxShadow: AppTheme.buttonShadow,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          // Save the calculated targets to the user profile
+                          await userProvider.updateProfile(
+                            dailyCaloriesTarget: targetCalories,
+                            dailyStepsTarget: targetSteps,
+                            dailySleepTarget: profile.goal == FitnessGoal.muscleGain ? 8.0 : 7.5,
+                            dailyWaterTarget: 2.5, // 2.5 liters default
+                            bmiValue: bmi,
+                            bmiCategoryValue: bmiCategory,
+                            hasSeenFitnessGoalSummary: true,
+                          );
+                          
+                          onAgree();
+                          Navigator.of(context).pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryAccent,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Start My Journey',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Icon(
+                              Icons.arrow_forward,
+                              size: 18,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -330,6 +416,291 @@ class FitnessGoalSummaryDialog extends StatelessWidget {
         fontWeight: FontWeight.bold,
       ),
     );
+  }
+
+  Widget _buildCompactSectionTitle(BuildContext context, String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: AppTheme.textSecondary,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+
+  Widget _buildCompactInfoCard(BuildContext context, List<_CompactInfoRow> rows) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: rows.asMap().entries.map((entry) {
+          final index = entry.key;
+          final row = entry.value;
+          return Container(
+            padding: EdgeInsets.symmetric(vertical: 6),
+            decoration: index < rows.length - 1 ? BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Theme.of(context).dividerColor.withOpacity(0.3),
+                  width: 0.5,
+                ),
+              ),
+            ) : null,
+            child: Row(
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryAccent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    row.icon,
+                    size: 14,
+                    color: AppTheme.primaryAccent,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    row.label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Text(
+                  row.value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedBMICard(BuildContext context, double bmi, String category) {
+    Color bmiColor;
+    IconData bmiIcon;
+    
+    if (bmi < 18.5) {
+      bmiColor = Colors.blue;
+      bmiIcon = Icons.trending_down;
+    } else if (bmi < 25) {
+      bmiColor = AppTheme.successGreen;
+      bmiIcon = Icons.check_circle;
+    } else if (bmi < 30) {
+      bmiColor = AppTheme.warningYellow;
+      bmiIcon = Icons.warning;
+    } else {
+      bmiColor = AppTheme.errorRed;
+      bmiIcon = Icons.error;
+    }
+    
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            bmiColor.withOpacity(0.15),
+            bmiColor.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: bmiColor.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: bmiColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              bmiIcon,
+              color: bmiColor,
+              size: 24,
+            ),
+          ),
+          SizedBox(height: 12),
+          Text(
+            '${bmi.toStringAsFixed(1)}',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: bmiColor,
+              letterSpacing: -0.5,
+            ),
+          ),
+          SizedBox(height: 2),
+          Text(
+            category,
+            style: TextStyle(
+              fontSize: 12,
+              color: bmiColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGoalChip(BuildContext context, String text, IconData icon) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryAccent.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.primaryAccent.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: AppTheme.primaryAccent,
+          ),
+          SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryAccent,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedPlanGrid(BuildContext context, List<_PlanItem> items) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      childAspectRatio: 1.35,
+      children: items.map((item) => Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 6,
+              offset: Offset(0, 1),
+            ),
+          ],
+          border: Border.all(
+            color: item.color.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: item.color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                item.icon,
+                color: item.color,
+                size: 16,
+              ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              item.title,
+              style: TextStyle(
+                fontSize: 10,
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            SizedBox(height: 2),
+            Text(
+              item.value,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+                letterSpacing: -0.2,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (item.subtitle != null) ...[
+              SizedBox(height: 1),
+              Text(
+                item.subtitle!,
+                style: TextStyle(
+                  fontSize: 9,
+                  color: AppTheme.textSecondary.withOpacity(0.8),
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
+        ),
+      )).toList(),
+    );
+  }
+
+  String _getShortCalorieSubtitle(FitnessGoal goal, int maintenance, int target) {
+    int difference = target - maintenance;
+    if (difference < 0) {
+      return '${difference.abs()}kcal deficit';
+    } else if (difference > 0) {
+      return '+${difference}kcal surplus';
+    } else {
+      return 'maintenance';
+    }
   }
 
   Widget _buildInfoCard(BuildContext context, List<_InfoRow> rows) {
@@ -541,6 +912,14 @@ class _InfoRow {
   final String value;
   
   _InfoRow(this.label, this.value);
+}
+
+class _CompactInfoRow {
+  final String label;
+  final String value;
+  final IconData icon;
+  
+  _CompactInfoRow(this.label, this.value, this.icon);
 }
 
 class _PlanItem {

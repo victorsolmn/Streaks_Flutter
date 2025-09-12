@@ -1,0 +1,20 @@
+SENDGRID SMTP CONFIGURATION FOR SUPABASE
+=========================================
+
+Copy these EXACT values to Supabase Dashboard:
+(Project Settings → Authentication → SMTP Settings)
+
+SMTP Host: smtp.sendgrid.net
+SMTP Port: 587
+SMTP Username: apikey
+SMTP Password: [PASTE YOUR SENDGRID API KEY HERE]
+Sender Email: noreply@streaker.app
+Sender Name: Streaker
+
+IMPORTANT NOTES:
+- Username is literally the word "apikey" (not your email!)
+- Password is your SendGrid API key (starts with SG.)
+- Sender email can be any email (doesn't need to exist)
+- Make sure there are no spaces before/after the values
+
+After entering, click "Save" and then "Send Test Email"

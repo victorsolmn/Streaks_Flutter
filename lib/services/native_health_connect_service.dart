@@ -4,6 +4,64 @@ import 'package:flutter/foundation.dart';
 
 /// Native Health Connect service that communicates with the native Android implementation
 class NativeHealthConnectService {
+  
+  /// Safely parse dynamic map to Map<String, dynamic>
+  static Map<String, dynamic> _safeParseMap(dynamic data) {
+    if (data == null) {
+      return <String, dynamic>{};
+    }
+    
+    try {
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+      
+      if (data is Map) {
+        // Convert any Map type to Map<String, dynamic>
+        final Map<String, dynamic> result = {};
+        data.forEach((key, value) {
+          final stringKey = key?.toString() ?? '';
+          if (value is Map) {
+            result[stringKey] = _safeParseMap(value);
+          } else if (value is List) {
+            result[stringKey] = _safeParseList(value);
+          } else {
+            result[stringKey] = value;
+          }
+        });
+        return result;
+      }
+      
+      return <String, dynamic>{};
+    } catch (e) {
+      debugPrint('Error parsing map: $e');
+      return <String, dynamic>{};
+    }
+  }
+  
+  /// Safely parse dynamic list
+  static List<dynamic> _safeParseList(dynamic data) {
+    if (data == null) {
+      return [];
+    }
+    
+    try {
+      if (data is List) {
+        return data.map((item) {
+          if (item is Map) {
+            return _safeParseMap(item);
+          } else {
+            return item;
+          }
+        }).toList();
+      }
+      
+      return [];
+    } catch (e) {
+      debugPrint('Error parsing list: $e');
+      return [];
+    }
+  }
   static const MethodChannel _channel = MethodChannel('com.streaker/health_connect');
   static final NativeHealthConnectService _instance = NativeHealthConnectService._internal();
   
@@ -33,7 +91,7 @@ class NativeHealthConnectService {
     
     switch (call.method) {
       case 'onPermissionsChecked':
-        final Map<dynamic, dynamic> data = call.arguments;
+        final data = _safeParseMap(call.arguments);
         _log('Permissions checked: $data');
         // You can emit events or update state here
         break;
@@ -47,9 +105,9 @@ class NativeHealthConnectService {
   Future<Map<String, dynamic>> checkAvailability() async {
     try {
       _log('Checking Health Connect availability...');
-      final Map<dynamic, dynamic> result = await _channel.invokeMethod('checkAvailability');
+      final dynamic result = await _channel.invokeMethod('checkAvailability');
       
-      final availability = Map<String, dynamic>.from(result);
+      final availability = _safeParseMap(result);
       _log('Availability result: $availability');
       
       return availability;
@@ -60,28 +118,76 @@ class NativeHealthConnectService {
         'status': 'error',
         'error': e.message,
       };
+    } catch (e) {
+      _log('ERROR parsing availability result: $e');
+      return {
+        'available': false,
+        'status': 'error',
+        'error': e.toString(),
+      };
     }
   }
   
-  /// Request Health Connect permissions
+  /// Request Health Connect permissions with detailed user guidance
   Future<Map<String, dynamic>> requestPermissions() async {
     try {
-      _log('Requesting Health Connect permissions...');
-      final Map<dynamic, dynamic> result = await _channel.invokeMethod('requestPermissions');
+      _log('🔐 Requesting Health Connect permissions...');
+      _log('This will open Health Connect to grant access to:');
+      _log('  • Steps (for daily activity tracking)');
+      _log('  • Heart Rate (for fitness monitoring)');
+      _log('  • Calories (for energy expenditure)');
+      _log('  • Distance (for workout tracking)');
+      _log('  • Sleep (for recovery analysis)');
+      _log('  • Water/Hydration (for wellness)');
+      _log('  • Weight (for health monitoring)');
+      _log('  • Blood Oxygen (for health insights)');
+      _log('  • Blood Pressure (for cardiovascular health)');
+      _log('  • Exercise Sessions (for workout analysis)');
       
-      final response = Map<String, dynamic>.from(result);
+      final dynamic result = await _channel.invokeMethod('requestPermissions');
+      
+      final response = _safeParseMap(result);
       _log('Permission request initiated: $response');
       
-      // Wait a bit for the permission dialog to complete
-      await Future.delayed(Duration(seconds: 2));
+      if (response['status'] == 'requesting') {
+        _log('📱 Permission dialog opened - please grant ALL health data permissions');
+        _log('💡 Tip: Look for "Allow all" or grant each permission individually');
+      }
+      
+      // Wait a bit longer for the permission dialog to complete
+      await Future.delayed(Duration(seconds: 3));
       
       // Check the actual permission status
-      return await checkPermissions();
+      final permissionCheck = await checkPermissions();
+      
+      if (permissionCheck['granted'] == true) {
+        _log('✅ SUCCESS: All health permissions granted!');
+      } else {
+        _log('⚠️  WARNING: Not all permissions were granted');
+        final missing = permissionCheck['missingPermissions'] as List<dynamic>? ?? [];
+        if (missing.isNotEmpty) {
+          _log('Missing permissions:');
+          for (final permission in missing) {
+            _log('  ❌ ${permission.toString().split('.').last}');
+          }
+          _log('💡 Please go to Health Connect settings and grant missing permissions');
+        }
+      }
+      
+      return permissionCheck;
     } on PlatformException catch (e) {
-      _log('ERROR requesting permissions: ${e.message}');
+      _log('❌ ERROR requesting permissions: ${e.message}');
       return {
         'granted': false,
         'error': e.message,
+        'userMessage': 'Failed to open Health Connect permissions. Please ensure Health Connect is installed and up to date.',
+      };
+    } catch (e) {
+      _log('❌ ERROR parsing permissions result: $e');
+      return {
+        'granted': false,
+        'error': e.toString(),
+        'userMessage': 'An unexpected error occurred while requesting permissions. Please try again.',
       };
     }
   }
@@ -90,9 +196,9 @@ class NativeHealthConnectService {
   Future<Map<String, dynamic>> checkPermissions() async {
     try {
       _log('Checking current permissions...');
-      final Map<dynamic, dynamic> result = await _channel.invokeMethod('checkPermissions');
+      final dynamic result = await _channel.invokeMethod('checkPermissions');
       
-      final permissions = Map<String, dynamic>.from(result);
+      final permissions = _safeParseMap(result);
       _log('Permission status: $permissions');
       
       return permissions;
@@ -101,6 +207,12 @@ class NativeHealthConnectService {
       return {
         'granted': false,
         'error': e.message,
+      };
+    } catch (e) {
+      _log('ERROR parsing permissions status: $e');
+      return {
+        'granted': false,
+        'error': e.toString(),
       };
     }
   }
@@ -161,9 +273,9 @@ class NativeHealthConnectService {
   Future<Map<String, dynamic>> readAllHealthData() async {
     try {
       _log('Reading all health data...');
-      final Map<dynamic, dynamic> result = await _channel.invokeMethod('readAllData');
+      final dynamic result = await _channel.invokeMethod('readAllData');
       
-      final healthData = Map<String, dynamic>.from(result);
+      final healthData = _safeParseMap(result);
       
       // Log data sources
       if (healthData.containsKey('dataSources')) {
@@ -194,9 +306,24 @@ class NativeHealthConnectService {
         }
       }
       
+      // Log Samsung Health detection status
+      if (healthData.containsKey('hasSamsungHealthData')) {
+        final hasSamsungData = healthData['hasSamsungHealthData'] as bool;
+        if (hasSamsungData) {
+          _log('✅ Samsung Health data successfully detected and processed');
+        } else {
+          _log('⚠️ WARNING: No Samsung Health data found!');
+          _log('   Please check:');
+          _log('   1. Samsung Health app is installed and running');
+          _log('   2. Samsung Health has recent health data');
+          _log('   3. Health Connect permissions are properly granted');
+          _log('   4. Samsung Health is syncing data to Health Connect');
+        }
+      }
+
       // Log which data source is being used
       if (healthData.containsKey('stepsBySource')) {
-        final stepsBySource = healthData['stepsBySource'] as Map<dynamic, dynamic>;
+        final stepsBySource = _safeParseMap(healthData['stepsBySource']);
         _log('Steps by source:');
         _log('  Samsung Health: ${stepsBySource['samsung']} steps');
         _log('  Google Fit: ${stepsBySource['googleFit']} steps');
@@ -208,8 +335,26 @@ class NativeHealthConnectService {
       _log('  Heart Rate: ${healthData['heartRate']} bpm (${healthData['heartRateType'] ?? 'unknown'})');
       _log('  Calories: ${healthData['calories']} kcal');
       _log('  Distance: ${healthData['distance']} km');
-      _log('  Sleep: ${healthData['sleep']} hours');
+      _log('  Sleep: ${healthData['sleep']} hours (${healthData['sleepMinutes']} min)');
+      _log('  Water: ${healthData['water']} ml');
+      _log('  Weight: ${healthData['weight']} kg');
+      _log('  Blood Oxygen: ${healthData['bloodOxygen']}%');
+      final bp = _safeParseMap(healthData['bloodPressure']);
+      _log('  Blood Pressure: ${bp['systolic']}/${bp['diastolic']} mmHg');
+      _log('  Workouts: ${healthData['workouts']} (${healthData['exerciseMinutes']} min)');
       _log('Last sync: ${healthData['lastSync']}');
+      
+      // Log detailed breakdown for debugging
+      if (healthData.containsKey('distanceDetails')) {
+        final distanceDetails = _safeParseList(healthData['distanceDetails']);
+        if (distanceDetails.isNotEmpty) {
+          _log('Distance details:');
+          for (var detail in distanceDetails) {
+            final detailMap = _safeParseMap(detail);
+            _log('  - ${detailMap['distance']} km from ${detailMap['source']}');
+          }
+        }
+      }
       
       return healthData;
     } on PlatformException catch (e) {
@@ -222,7 +367,28 @@ class NativeHealthConnectService {
         'sleep': 0.0,
         'water': 0,
         'weight': 0.0,
+        'bloodOxygen': 0,
+        'bloodPressure': {'systolic': 0, 'diastolic': 0},
+        'workouts': 0,
+        'exerciseMinutes': 0,
         'error': e.message,
+        'lastSync': DateTime.now().toIso8601String(),
+      };
+    } catch (e) {
+      _log('ERROR parsing health data: $e');
+      return {
+        'steps': 0,
+        'heartRate': 0,
+        'calories': 0,
+        'distance': 0.0,
+        'sleep': 0.0,
+        'water': 0,
+        'weight': 0.0,
+        'bloodOxygen': 0,
+        'bloodPressure': {'systolic': 0, 'diastolic': 0},
+        'workouts': 0,
+        'exerciseMinutes': 0,
+        'error': 'Type casting error: $e',
         'lastSync': DateTime.now().toIso8601String(),
       };
     }

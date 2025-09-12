@@ -27,6 +27,9 @@ dependencies:
   # workmanager: ^0.5.2  # Temporarily disabled for build compatibility
   flutter_svg: ^2.0.10
   supabase_flutter: ^2.5.6
+  # Toast and popup services
+  fluttertoast: ^8.2.4
+  package_info_plus: ^4.2.0
   # Firebase services
   firebase_core: ^2.24.2
   firebase_analytics: ^10.8.0

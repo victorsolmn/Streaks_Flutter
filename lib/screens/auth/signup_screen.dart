@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../providers/supabase_auth_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../services/supabase_service.dart';
+import '../../services/toast_service.dart';
+import '../../services/popup_service.dart';
 import '../../utils/app_theme.dart';
 import '../onboarding/onboarding_screen.dart';
 import 'signin_screen.dart';
+import 'otp_verification_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({Key? key}) : super(key: key);
@@ -23,7 +27,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
-  bool _isCheckingEmail = false;
 
   @override
   void dispose() {
@@ -34,142 +37,96 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  Future<bool> _checkEmailExists() async {
-    final email = _emailController.text.trim();
-    
-    if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your email'),
-          backgroundColor: AppTheme.errorRed,
-        ),
-      );
-      return false;
-    }
-    
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid email'),
-          backgroundColor: AppTheme.errorRed,
-        ),
-      );
-      return false;
-    }
-    
-    setState(() {
-      _isCheckingEmail = true;
-    });
-    
-    try {
-      final supabaseService = SupabaseService();
-      final emailExists = await supabaseService.checkEmailExists(email);
-      
-      setState(() {
-        _isCheckingEmail = false;
-      });
-      
-      if (emailExists) {
-        // Show snackbar with option to go to sign in
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('This email is already registered'),
-              backgroundColor: AppTheme.errorRed,
-              action: SnackBarAction(
-                label: 'Sign In',
-                textColor: Colors.white,
-                onPressed: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => const SignInScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          );
-        }
-        return false;
-      }
-      
-      return true;
-    } catch (e) {
-      setState(() {
-        _isCheckingEmail = false;
-      });
-      
-      // If we can't check, allow signup to proceed
-      // Supabase will handle duplicate email error
-      print('Email check failed, proceeding with signup: $e');
-      return true;
-    }
-  }
 
+  /// Sign up method with password
   Future<void> _signUp() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      if (!_agreeToTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please agree to the Terms & Privacy Policy'),
-            backgroundColor: AppTheme.errorRed,
-          ),
-        );
-        return;
-      }
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
 
-      // Check if email already exists
-      final canProceed = await _checkEmailExists();
-      if (!canProceed) {
-        return; // Email already exists, don't proceed
-      }
+    if (!_agreeToTerms) {
+      ToastService().showError('Please agree to the Terms & Privacy Policy');
+      return;
+    }
+
+    final email = _emailController.text.trim();
+    final name = _nameController.text.trim();
+
+    try {
+      // Skip email existence check since we're using password auth workaround
+      // The auth provider will handle duplicate users
 
       final authProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
       
-      final success = await authProvider.signUp(
-        _nameController.text.trim(),
-        _emailController.text.trim(),
+      ToastService().showLoading('Creating account...');
+      
+      final success = await authProvider.signUpWithPassword(
+        email,
         _passwordController.text,
+        name,
       );
 
       if (success && mounted) {
+        ToastService().showSuccess('Account created successfully!');
+        
+        // Since we're using password auth, go directly to onboarding
+        // Store the name in the user profile
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        await userProvider.reloadUserData();
+        
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => const OnboardingScreen(),
           ),
         );
       } else if (mounted && authProvider.error != null) {
-        // Show specific error message
-        String errorMessage = authProvider.error!;
-        
-        // Check for duplicate email error
-        if (errorMessage.toLowerCase().contains('already registered') || 
-            errorMessage.toLowerCase().contains('already exists') ||
-            errorMessage.toLowerCase().contains('duplicate')) {
-          errorMessage = 'This email is already registered. Please sign in instead.';
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: AppTheme.errorRed,
-            action: errorMessage.contains('already registered') 
-              ? SnackBarAction(
-                  label: 'Sign In',
-                  textColor: Colors.white,
-                  onPressed: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) => const SignInScreen(),
-                      ),
-                    );
-                  },
-                )
-              : null,
-          ),
+        ToastService().showError(authProvider.error!);
+      }
+
+    } catch (e) {
+      if (mounted) {
+        PopupService.showNetworkError(
+          context,
+          onRetry: () => _signUp(),
+          customMessage: 'Failed to send verification code. Please check your connection and try again.',
         );
       }
     }
+  }
+  
+  Future<void> _signUpWithGoogle() async {
+    if (!_agreeToTerms) {
+      ToastService().showError('Please agree to the Terms & Privacy Policy');
+      return;
+    }
+    
+    final authProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
+    
+    ToastService().showLoading('Signing up with Google...');
+    
+    final success = await authProvider.signInWithGoogle();
+    
+    if (success && mounted) {
+      ToastService().showSuccess('Welcome to Streaker! 🎉');
+      
+      // Navigate to onboarding for new users
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const OnboardingScreen(),
+        ),
+      );
+    } else if (mounted && authProvider.error != null) {
+      ToastService().showError(authProvider.error!);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize toast service
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ToastService().initialize(context);
+    });
   }
 
   @override
@@ -273,12 +230,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       textInputAction: TextInputAction.next,
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outlined),
+                        prefixIcon: Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword 
-                                ? Icons.visibility_outlined 
-                                : Icons.visibility_off_outlined,
+                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
                           ),
                           onPressed: () {
                             setState(() {
@@ -291,11 +246,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Please enter a password';
                         }
-                        if (value.length < 8) {
-                          return 'Password must be at least 8 characters';
-                        }
-                        if (!RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)').hasMatch(value)) {
-                          return 'Password must contain uppercase, lowercase, and number';
+                        if (value.length < 6) {
+                          return 'Password must be at least 6 characters';
                         }
                         return null;
                       },
@@ -310,12 +262,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       textInputAction: TextInputAction.done,
                       decoration: InputDecoration(
                         labelText: 'Confirm Password',
-                        prefixIcon: Icon(Icons.lock_outlined),
+                        prefixIcon: Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscureConfirmPassword 
-                                ? Icons.visibility_outlined 
-                                : Icons.visibility_off_outlined,
+                            _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                           ),
                           onPressed: () {
                             setState(() {
@@ -324,7 +274,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           },
                         ),
                       ),
-                      onFieldSubmitted: (_) => _signUp(),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please confirm your password';
@@ -335,6 +284,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         return null;
                       },
                     ),
+                    
                     
                     SizedBox(height: 32),
                     
@@ -422,9 +372,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     // Sign up button
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: auth.isLoading || _isCheckingEmail ? null : _signUp,
-                        child: auth.isLoading || _isCheckingEmail
+                      child: ElevatedButton.icon(
+                        onPressed: auth.isLoading ? null : _signUp,
+                        icon: Icon(Icons.person_add),
+                        label: auth.isLoading
                             ? SizedBox(
                                 height: 20,
                                 width: 20,
@@ -433,7 +384,54 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   color: Theme.of(context).textTheme.bodyLarge?.color,
                                 ),
                               )
-                            : Text('Create Account'),
+                            : Text('Sign Up'),
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                    
+                    SizedBox(height: 20),
+                    
+                    // OR divider
+                    Row(
+                      children: [
+                        Expanded(child: Divider()),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            'OR',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider()),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 20),
+                    
+                    // Google Sign Up button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: auth.isLoading ? null : _signUpWithGoogle,
+                        icon: Image.network(
+                          'https://www.google.com/favicon.ico',
+                          height: 20,
+                          width: 20,
+                          errorBuilder: (context, error, stackTrace) => Icon(
+                            Icons.g_mobiledata,
+                            size: 20,
+                          ),
+                        ),
+                        label: Text('Continue with Google'),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(color: Colors.grey.withOpacity(0.5)),
+                        ),
                       ),
                     ),
                     

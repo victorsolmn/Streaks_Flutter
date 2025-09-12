@@ -84,6 +84,11 @@ class StreakDisplayWidget extends StatelessWidget {
     final longestStreak = stats['longest'] as int;
     final totalDays = stats['total'] as int;
     
+    // Grace Period data
+    final isInGracePeriod = stats['isInGracePeriod'] as bool;
+    final graceDaysUsed = stats['graceDaysUsed'] as int;
+    final remainingGraceDays = stats['remainingGraceDays'] as int;
+    
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -196,6 +201,73 @@ class StreakDisplayWidget extends StatelessWidget {
           ),
           
           SizedBox(height: 16),
+          
+          // Grace Period Warning (if applicable)
+          if (isInGracePeriod) ...[
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: remainingGraceDays == 1 
+                    ? AppTheme.errorRed.withOpacity(0.2)
+                    : Colors.orange.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: remainingGraceDays == 1 
+                      ? AppTheme.errorRed.withOpacity(0.5)
+                      : Colors.orange.withOpacity(0.5),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    remainingGraceDays == 1 ? Icons.warning : Icons.info_outline,
+                    color: remainingGraceDays == 1 ? AppTheme.errorRed : Colors.orange,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Grace Period Active',
+                          style: TextStyle(
+                            color: remainingGraceDays == 1 ? AppTheme.errorRed : Colors.orange,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          '$remainingGraceDays excuse ${remainingGraceDays == 1 ? 'day' : 'days'} remaining',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Colors.black87,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Grace days visual indicator
+                  Row(
+                    children: List.generate(2, (index) => Container(
+                      margin: EdgeInsets.only(left: 4),
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: index < graceDaysUsed 
+                            ? AppTheme.errorRed
+                            : (remainingGraceDays == 1 && index == 1) 
+                                ? Colors.orange
+                                : Colors.grey.withOpacity(0.3),
+                      ),
+                    )),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 12),
+          ],
           
           // Motivational Message
           Text(

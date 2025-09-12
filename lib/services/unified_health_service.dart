@@ -600,6 +600,13 @@ class UnifiedHealthService {
       'bloodOxygen': 0,
       'bloodPressure': {'systolic': 0, 'diastolic': 0},
       'workouts': 0,
+      'exerciseMinutes': 0,
+      'latestHeartRate': 0,
+      'heartRateType': 'none',
+      'sleepMinutes': 0,
+      'workoutDetails': [],
+      'stepDetails': [],
+      'sleepDetails': [],
     };
   }
   
