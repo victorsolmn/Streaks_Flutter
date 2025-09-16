@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 // import 'package:firebase_crashlytics/firebase_crashlytics.dart'; // Temporarily disabled
 import 'firebase_options.dart';
 import 'services/supabase_service.dart';
+import 'services/enhanced_supabase_service.dart';
 import 'services/firebase_analytics_service.dart';
 import 'services/bluetooth_smartwatch_service.dart';
 import 'services/realtime_sync_service.dart';
@@ -29,8 +30,9 @@ import 'utils/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Supabase
+  // Initialize Supabase services
   await SupabaseService().initialize();
+  await EnhancedSupabaseService().initialize();
   
   // Initialize Bluetooth Smartwatch Service
   await BluetoothSmartwatchService().initialize();

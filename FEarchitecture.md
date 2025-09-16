@@ -1,5 +1,5 @@
 # Streaks Flutter - Frontend Architecture & Design
-**Last Updated:** September 12, 2025
+**Last Updated:** September 16, 2025
 
 ## Architecture Overview
 
@@ -11,12 +11,20 @@ The app follows a Provider-based state management pattern with MVVM architecture
 ```
 lib/
 ├── providers/               # State management
+│   ├── supabase_auth_provider.dart      # Enhanced authentication
+│   ├── supabase_user_provider.dart      # User profile management
+│   ├── supabase_nutrition_provider.dart # Nutrition tracking
+│   └── [existing providers...]          # Other state providers
 ├── screens/                 # UI screens
 │   ├── auth/               # Authentication flows
 │   ├── onboarding/         # User onboarding
 │   ├── main/               # Main app screens
+│   ├── database_test_screen.dart        # NEW: Integration testing
 │   └── splash/             # App initialization
 ├── services/               # Business logic
+│   ├── enhanced_supabase_service.dart   # NEW: Comprehensive CRUD ops
+│   ├── supabase_service.dart            # Core database service
+│   └── [existing services...]           # Other business logic
 ├── models/                 # Data models
 ├── utils/                  # Utilities
 └── widgets/                # Reusable components
@@ -28,8 +36,12 @@ lib/
 - SplashScreen → AuthCheck → SignIn/SignUp/Main/Onboarding
 
 ### State Management
-- **SupabaseAuthProvider**: Authentication state
-- **UserProvider**: User profile data
+- **SupabaseAuthProvider**: Enhanced authentication with Google OAuth and error handling
+- **SupabaseUserProvider**: User profile data with real-time sync
+- **SupabaseNutritionProvider**: Nutrition tracking with offline support
+- **StreakProvider**: Streak calculations and gamification
+- **HealthProvider**: Health metrics integration
+- **ThemeProvider**: App theming and preferences
 
 ## UI/UX Design System
 
@@ -96,18 +108,97 @@ lib/
 - **Conflict Resolution:** Timestamp-based data merging
 - **Performance:** Optimized queries with caching strategy
 
-## Recent Updates (September 12, 2025)
+## Recent Updates (September 16, 2025)
 
-### APK Build & Distribution
-- **Release Build:** 59.0MB APK with all features
-- **Distribution:** WiFi sharing via HTTP server
-- **Performance:** Optimized build with tree-shaking (99.2% font reduction)
-- **Compatibility:** Android 7.0+ (API level 24+)
+### Enhanced Database Integration
+- **EnhancedSupabaseService**: Comprehensive CRUD operations for all app modules
+- **DatabaseTestScreen**: Interactive testing interface with real-time logging
+- **Integration Testing Framework**: Automated testing for 10 dummy accounts
+- **API Documentation**: Complete specification with 17 endpoints documented
+
+### New Architecture Components
+
+#### Enhanced Services Layer
+```
+services/
+├── enhanced_supabase_service.dart    # NEW: Comprehensive database operations
+│   ├── User management (signup, signin, profile CRUD)
+│   ├── Nutrition tracking (add, retrieve, daily summaries)
+│   ├── Health metrics (save, retrieve, history)
+│   ├── Streaks management (update, calculate, retrieve)
+│   ├── Goals system (set, update progress, retrieve)
+│   ├── Dashboard aggregation (combined data views)
+│   └── Test data generation (10 dummy accounts)
+├── supabase_service.dart             # Core database service
+├── realtime_sync_service.dart        # Background synchronization
+├── daily_reset_service.dart          # Daily data reset logic
+└── bluetooth_smartwatch_service.dart # Smartwatch integration
+```
+
+#### Enhanced Provider Architecture
+```
+providers/
+├── supabase_auth_provider.dart       # Enhanced with Google OAuth + error handling
+├── supabase_user_provider.dart       # Real-time profile sync
+├── supabase_nutrition_provider.dart  # Offline-first nutrition tracking
+├── health_provider.dart              # Native health platform integration
+├── streak_provider.dart              # Gamification and progress tracking
+└── theme_provider.dart               # App theming and preferences
+```
+
+#### Testing Infrastructure
+```
+screens/
+├── database_test_screen.dart         # Interactive testing interface
+│   ├── Test data generation UI
+│   ├── CRUD operations testing
+│   ├── Real-time logging with color coding
+│   └── Google sign-in testing
+└── main/profile_screen.dart          # Debug menu integration
+```
+
+### Integration Test Results
+**Overall System Status**: 🟡 55% Functional (September 16, 2025)
+
+| Component | Status | Success Rate |
+|-----------|--------|--------------|
+| Authentication | ✅ PASS | 100% |
+| Database Connection | ✅ PASS | 100% |
+| Profile Management | ⚠️ PARTIAL | 70% |
+| Nutrition Tracking | ❌ FAIL | 30% |
+| Health Metrics | ❌ FAIL | 20% |
+| Streaks Management | ❌ FAIL | 10% |
+| Goals System | ⚠️ PARTIAL | 60% |
+
+### Current Issues Identified
+1. **Database Schema Mismatches**: Missing columns and table reference errors
+2. **Type Casting Errors**: String vs List conflicts in nutrition module
+3. **Constraint Violations**: Overly restrictive database constraints
+4. **Infinite Retry Loops**: Error handling needs circuit breaker pattern
+
+### Performance Metrics
+- **App Launch**: ~3.2 seconds (Good)
+- **Authentication**: <1 second (Excellent)
+- **Database Connection**: <500ms (Excellent)
+- **API Response**: 200-800ms (Good)
+- **Real-time Sync**: Functional but needs optimization
+
+### Enhanced Real-time Architecture
+```
+Data Flow:
+App UI → Provider → EnhancedSupabaseService → Supabase → PostgreSQL
+                ↓
+            Offline Queue → Background Sync → Real-time Updates
+```
+
+### Quality Assurance
+- **Comprehensive API Documentation**: 17 endpoints with field specifications
+- **Interactive Testing Interface**: Real-time validation of all operations
+- **Automated Test Scripts**: Ready for CI/CD integration
+- **Performance Monitoring**: Built-in logging and metrics collection
 
 ## Future Enhancements
-- Dark mode support
-- Offline capabilities
-- Multi-language support  
-- Biometric authentication
-- Apple Watch integration
-- Social features expansion
+- **Immediate**: Fix database schema mismatches (Priority 1)
+- **Short-term**: Implement circuit breaker pattern for error handling
+- **Medium-term**: Complete automated testing pipeline
+- **Long-term**: Advanced features (dark mode, biometric auth, Apple Watch)

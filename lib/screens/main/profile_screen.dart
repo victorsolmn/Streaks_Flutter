@@ -21,6 +21,7 @@ import '../../services/flutter_health_service.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../health_debug_screen.dart';
+import '../database_test_screen.dart';
 import '../../models/weight_model.dart';
 import '../../widgets/weight_progress_card.dart';
 import '../../utils/app_theme.dart';
@@ -587,6 +588,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             subtitle: 'Get help and contact support',
             onTap: () => _showHelpDialog(),
           ),
+          // Debug menu (only in debug mode)
+          if (const bool.fromEnvironment('dart.vm.product') == false)
+            _buildSettingItem(
+              icon: Icons.bug_report_outlined,
+              title: 'Database Test',
+              subtitle: 'Test database integration & generate test data',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => DatabaseTestScreen(),
+                  ),
+                );
+              },
+            ),
           _buildSettingItem(
             icon: Icons.info_outline,
             title: 'About',
