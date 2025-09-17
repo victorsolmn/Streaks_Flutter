@@ -191,3 +191,46 @@ After extensive debugging, switched back to traditional email/password authentic
 - `Frontend_Backend_Integration_Report.md` - Detailed technical analysis
 - `Complete_API_Documentation.md` - Full API specification
 - Desktop copies saved for easy access and manual testing
+
+## September 17, 2025 - Database Schema Resolution
+
+### Major Issues Resolved
+
+#### 1. Complete Database Schema Fix
+**Problem**: Profiles table missing 15+ critical columns causing onboarding data loss
+**Solution**:
+- Created comprehensive migration scripts (`scripts/fix_profiles_schema.sql`)
+- Added all missing columns with proper data types
+- Fixed enum constraints to match app values
+- Successfully migrated production database
+
+**New Columns Added**:
+- `target_weight`, `workout_consistency`, `experience_level`
+- `daily_calories_target`, `daily_steps_target`, `daily_sleep_target`, `daily_water_target`
+- `has_seen_fitness_goal_summary`, `device_name`, `device_connected`
+- `bmi_value`, `bmi_category_value`
+
+#### 2. Authentication State Synchronization
+**Problem**: SupabaseUserProvider losing auth state, causing silent failures
+**Solution**:
+```dart
+// Fixed by getting fresh user from service
+final currentUser = _supabaseService.currentUser;
+_currentUser = currentUser;
+```
+
+#### 3. PostgREST Schema Cache
+**Problem**: API not recognizing new columns after migration
+**Solution**: Restarted Supabase project to refresh schema cache
+
+### Testing Results
+- ✅ New user registration with complete profile
+- ✅ Onboarding saves all fields correctly
+- ✅ Profile updates persist properly
+- ✅ No more NULL values for required fields
+
+### Key Files Modified
+- `lib/providers/supabase_user_provider.dart` - Fixed auth state sync
+- `lib/services/supabase_service.dart` - Simplified profile creation
+- `lib/models/user_model.dart` - Added all new fields
+- `scripts/fix_profiles_schema.sql` - Database migration script
