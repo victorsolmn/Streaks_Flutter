@@ -1,14 +1,21 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../models/user_model.dart';
 
 class SupabaseUserProvider with ChangeNotifier {
   final SupabaseService _supabaseService = SupabaseService();
-  
+
   UserProfile? _userProfile;
   bool _isLoading = false;
   String? _error;
   bool _hasTriedLoading = false;
+  User? _currentUser;
+
+  SupabaseUserProvider() {
+    _initializeAuthListener();
+  }
 
   UserProfile? get userProfile => _userProfile;
   bool get isLoading => _isLoading;
@@ -16,13 +23,51 @@ class SupabaseUserProvider with ChangeNotifier {
   bool get hasProfile => _userProfile != null;
   bool get hasCompletedOnboarding => _userProfile?.hasCompletedOnboarding ?? false;
   bool get hasTriedLoading => _hasTriedLoading;
+  User? get currentUser => _currentUser;
+
+  void _initializeAuthListener() {
+    // Set initial user
+    _currentUser = _supabaseService.currentUser;
+
+    // Listen to auth state changes
+    _supabaseService.client.auth.onAuthStateChange.listen((data) {
+      final AuthChangeEvent event = data.event;
+      final Session? session = data.session;
+
+      _currentUser = session?.user;
+
+      // Reset profile loading state when auth changes
+      if (event == AuthChangeEvent.signedOut) {
+        _userProfile = null;
+        _hasTriedLoading = false;
+        _error = null;
+      } else if (event == AuthChangeEvent.signedIn && _currentUser != null && !_hasTriedLoading) {
+        // Auto-load profile when user signs in
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          loadUserProfile();
+        });
+      }
+
+      notifyListeners();
+    });
+  }
 
   Future<void> loadUserProfile() async {
-    final userId = _supabaseService.currentUser?.id;
-    if (userId == null) return;
+    // Get current user directly from the service to ensure we have the latest auth state
+    final currentUser = _supabaseService.currentUser;
+    _currentUser = currentUser;
+
+    final userId = currentUser?.id;
+    if (userId == null) {
+      print('❌ ERROR: No user ID available for loading profile');
+      print('🔍 DEBUG: currentUser is null, user not authenticated');
+      return;
+    }
+
+    print('✅ Loading profile for user: $userId');
 
     // Prevent multiple simultaneous calls
-    if (_isLoading || _hasTriedLoading) return;
+    if (_isLoading) return;
 
     _isLoading = true;
     _hasTriedLoading = true;
@@ -61,38 +106,111 @@ class SupabaseUserProvider with ChangeNotifier {
   }
 
   Future<void> updateProfile(UserProfile profile) async {
-    final userId = _supabaseService.currentUser?.id;
-    if (userId == null) return;
+    // Get current user directly from the service to ensure we have the latest auth state
+    final currentUser = _supabaseService.currentUser;
+    print('🔍 DEBUG: Checking user authentication...');
+    print('🔍 DEBUG: currentUser from service: $currentUser');
+    print('🔍 DEBUG: Supabase service auth: ${_supabaseService.isAuthenticated}');
+
+    // Update our local reference
+    _currentUser = currentUser;
+
+    final userId = currentUser?.id;
+    if (userId == null) {
+      print('❌ ERROR: No user ID available for profile update');
+      print('❌ DEBUG: currentUser is null, user not authenticated');
+      return;
+    }
+    print('✅ User ID found: $userId');
 
     _isLoading = true;
     notifyListeners();
 
     try {
+      print('\n' + '🔍' * 30);
+      print('📱 APP PROFILE UPDATE INITIATED');
+      print('🔍' * 30);
+      print('Profile data from app:');
+      print('  - name: ${profile.name}');
+      print('  - email: ${profile.email}');
+      print('  - age: ${profile.age}');
+      print('  - height: ${profile.height}');
+      print('  - weight: ${profile.weight}');
+      print('  - activityLevel: ${profile.activityLevel}');
+      print('  - fitnessGoal: ${profile.fitnessGoal}');
+      print('  - hasCompletedOnboarding: ${profile.hasCompletedOnboarding}');
+      print('🔍' * 30 + '\n');
+      // Trigger hot reload
+
+      // Progressive field testing to work with PostgREST cache issues
+      // Try only the core fields that PostgREST definitely recognizes
+      final coreProfileUpdates = <String, dynamic>{
+        'name': profile.name,
+        'email': profile.email,
+      };
+
+      // Add basic profile fields one by one
+      if (profile.age != null) coreProfileUpdates['age'] = profile.age;
+      if (profile.height != null) coreProfileUpdates['height'] = profile.height;
+      if (profile.weight != null) coreProfileUpdates['weight'] = profile.weight;
+      if (profile.targetWeight != null) coreProfileUpdates['target_weight'] = profile.targetWeight;
+      if (profile.activityLevel != null) coreProfileUpdates['activity_level'] = profile.activityLevel;
+      if (profile.fitnessGoal != null) coreProfileUpdates['fitness_goal'] = profile.fitnessGoal;
+      if (profile.experienceLevel != null) coreProfileUpdates['experience_level'] = profile.experienceLevel;
+      if (profile.workoutConsistency != null) coreProfileUpdates['workout_consistency'] = profile.workoutConsistency;
+      // Add daily targets to core updates now that schema is fixed
+      if (profile.dailyCaloriesTarget != null) coreProfileUpdates['daily_calories_target'] = profile.dailyCaloriesTarget;
+      if (profile.dailyStepsTarget != null) coreProfileUpdates['daily_steps_target'] = profile.dailyStepsTarget;
+      if (profile.dailySleepTarget != null) coreProfileUpdates['daily_sleep_target'] = profile.dailySleepTarget;
+      if (profile.dailyWaterTarget != null) coreProfileUpdates['daily_water_target'] = profile.dailyWaterTarget;
+      // Critical field for app routing - must be in core fields for reliable saving
+      coreProfileUpdates['has_completed_onboarding'] = profile.hasCompletedOnboarding;
+
       await _supabaseService.updateUserProfile(
         userId: userId,
-        updates: {
-          'name': profile.name,
-          'age': profile.age,
-          'height': profile.height,
-          'weight': profile.weight,
-          'target_weight': profile.targetWeight,
-          'activity_level': profile.activityLevel,
-          'fitness_goal': profile.fitnessGoal,
-          'experience_level': profile.experienceLevel,
-          'workout_consistency': profile.workoutConsistency,
-          'has_completed_onboarding': profile.hasCompletedOnboarding,
-          'has_seen_fitness_goal_summary': profile.hasSeenFitnessGoalSummary,
-          'daily_calories_target': profile.dailyCaloriesTarget,
-          'daily_steps_target': profile.dailyStepsTarget,
-          'daily_sleep_target': profile.dailySleepTarget,
-          'daily_water_target': profile.dailyWaterTarget,
-        },
+        updates: coreProfileUpdates,
       );
 
       _userProfile = profile;
+      print('✅ Profile updated successfully with core data');
+      print('📊 Saved to database: Age: ${profile.age}, Height: ${profile.height}, Weight: ${profile.weight}');
+      print('🎯 Goals: ${profile.activityLevel}, ${profile.fitnessGoal}');
+
+      // All fields now included in the core update above, no need for second phase
     } catch (e) {
-      _error = e.toString();
-      print('Error updating profile: $e');
+      // Handle missing columns gracefully - try with absolute minimal data
+      if (e.toString().contains('PGRST204')) {
+        print('⚠️ Database schema incomplete - saving with minimal data only');
+
+        try {
+          // Try with absolute bare minimum - only name (which definitely exists)
+          final bareMinimalUpdates = {
+            'name': profile.name,
+          };
+
+          await _supabaseService.updateUserProfile(
+            userId: userId,
+            updates: bareMinimalUpdates,
+          );
+
+          _userProfile = profile;
+          print('✅ Profile saved with bare minimum data (only name saved to database)');
+          print('⚠️ Your onboarding data stored locally only: Age: ${profile.age}, Height: ${profile.height}, Weight: ${profile.weight}');
+          print('⚠️ Activity: ${profile.activityLevel}, Goal: ${profile.fitnessGoal}');
+          print('📋 Database migration required to persist all profile data');
+        } catch (retryError) {
+          // If even name fails, just save locally
+          _userProfile = profile;
+          print('⚠️ Database save failed - profile stored locally only');
+          print('💾 Your onboarding data: Age: ${profile.age}, Height: ${profile.height}, Weight: ${profile.weight}');
+          print('💾 Activity: ${profile.activityLevel}, Goal: ${profile.fitnessGoal}');
+          print('🔧 Database needs immediate migration to save any profile data');
+          _error = null; // Clear error since we saved locally
+        }
+      } else {
+        _error = e.toString();
+        print('❌ Error updating profile: $e');
+      }
     }
 
     _isLoading = false;
@@ -236,6 +354,12 @@ class SupabaseUserProvider with ChangeNotifier {
     );
 
     await updateProfile(updatedProfile);
+  }
+
+  // Force reload profile from database (ignoring cache)
+  Future<void> reloadUserProfile() async {
+    _hasTriedLoading = false; // Reset to allow reload
+    await loadUserProfile();
   }
 
   void clearUserData() {

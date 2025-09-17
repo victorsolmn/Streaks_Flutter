@@ -53,14 +53,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _initializeWeightData() {
-    // Get weight data from user profile
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final profile = userProvider.profile;
-    
-    // Initialize with profile data from onboarding
+    // Get weight data from Supabase user profile
+    final supabaseUserProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
+    final profile = supabaseUserProvider.userProfile;
+
+    // Initialize with actual profile data from onboarding
     final startWeight = profile?.weight ?? 70.0;
     final currentWeight = profile?.weight ?? 70.0;
-    final targetWeight = profile?.targetWeight ?? 65.0;
+    final targetWeight = profile?.targetWeight ?? startWeight;
     
     _weightProgress = WeightProgress(
       startWeight: startWeight,
@@ -95,6 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             children: [
               _buildHeader(),
+              _buildDebugSection(), // Add debug section for testing
               _buildProfileInfo(),
               _buildWeightProgressSection(),
               _buildFitnessGoalsSection(),
@@ -137,9 +138,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileInfo() {
-    return Consumer<UserProvider>(
+    return Consumer<SupabaseUserProvider>(
       builder: (context, userProvider, child) {
-        final profile = userProvider.profile;
+        final profile = userProvider.userProfile;
         
         return Container(
           color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkCardBackground : Colors.white,
@@ -182,7 +183,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      profile?.name ?? 'John Doe',
+                      profile?.name ?? 'User',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -190,10 +191,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     SizedBox(height: 8),
-                    _buildInfoRow(Icons.height, '${profile?.height ?? 175} cm'),
+                    if (profile?.height != null)
+                      _buildInfoRow(Icons.height, '${profile!.height!.toStringAsFixed(0)} cm'),
                     SizedBox(height: 4),
-                    _buildInfoRow(Icons.cake, '${profile?.age ?? 28} years old'),
+                    if (profile?.age != null)
+                      _buildInfoRow(Icons.cake, '${profile!.age} years old'),
+                    if (profile?.weight != null) ...[
+                      SizedBox(height: 4),
+                      _buildInfoRow(Icons.monitor_weight, '${profile!.weight!.toStringAsFixed(1)} kg'),
+                    ],
                   ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDebugSection() {
+    return Consumer<SupabaseUserProvider>(
+      builder: (context, userProvider, child) {
+        return Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.orange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange.withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '🔧 Debug: Profile Data',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange[800],
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Onboarding: ${userProvider.hasCompletedOnboarding}',
+                style: TextStyle(fontSize: 12),
+              ),
+              Text(
+                'Age: ${userProvider.userProfile?.age ?? "null"}, Height: ${userProvider.userProfile?.height ?? "null"}, Weight: ${userProvider.userProfile?.weight ?? "null"}',
+                style: TextStyle(fontSize: 12),
+              ),
+              SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () async {
+                  await userProvider.reloadUserProfile();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Profile reloaded from database')),
+                  );
+                },
+                child: Text('🔄 Reload Profile'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
                 ),
               ),
             ],
@@ -209,8 +267,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Icon(
           icon,
           size: 16,
-          color: Theme.of(context).brightness == Brightness.dark 
-              ? AppTheme.textSecondaryDark 
+          color: Theme.of(context).brightness == Brightness.dark
+              ? AppTheme.textSecondaryDark
               : AppTheme.textSecondary,
         ),
         SizedBox(width: 8),
@@ -218,8 +276,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           text,
           style: TextStyle(
             fontSize: 14,
-            color: Theme.of(context).brightness == Brightness.dark 
-                ? AppTheme.textSecondaryDark 
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppTheme.textSecondaryDark
                 : AppTheme.textSecondary,
           ),
         ),
@@ -265,9 +323,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildFitnessGoalsSection() {
-    return Consumer<UserProvider>(
+    return Consumer<SupabaseUserProvider>(
       builder: (context, userProvider, child) {
-        final profile = userProvider.profile;
+        final profile = userProvider.userProfile;
         if (profile == null) return SizedBox.shrink();
         
         final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -312,18 +370,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildGoalItem(
                 icon: Icons.flag,
                 title: 'Fitness Goal',
-                value: _formatGoal(profile.goal),
+                value: profile.fitnessGoal ?? 'Not set',
                 color: AppTheme.primaryAccent,
               ),
+
+              // Activity Level
+              if (profile.activityLevel != null) ...[
+                SizedBox(height: 12),
+                _buildGoalItem(
+                  icon: Icons.fitness_center,
+                  title: 'Activity Level',
+                  value: profile.activityLevel!,
+                  color: Colors.blue,
+                ),
+              ],
+
+              // Experience Level
+              if (profile.experienceLevel != null) ...[
+                SizedBox(height: 12),
+                _buildGoalItem(
+                  icon: Icons.school,
+                  title: 'Experience Level',
+                  value: profile.experienceLevel!,
+                  color: Colors.green,
+                ),
+              ],
+
+              // Workout Consistency
+              if (profile.workoutConsistency != null) ...[
+                SizedBox(height: 12),
+                _buildGoalItem(
+                  icon: Icons.schedule,
+                  title: 'Workout Consistency',
+                  value: profile.workoutConsistency!,
+                  color: Colors.orange,
+                ),
+              ],
               
-              // BMI
-              if (profile.bmiValue != null) ...[
+              // BMI (calculated from height and weight)
+              if (profile.height != null && profile.weight != null) ...[
                 SizedBox(height: 12),
                 _buildGoalItem(
                   icon: Icons.monitor_weight,
                   title: 'BMI',
-                  value: '${profile.bmiValue!.toStringAsFixed(1)} (${profile.bmiCategoryValue ?? ""})',
-                  color: _getBMIColor(profile.bmiValue!),
+                  value: '${profile.bmi.toStringAsFixed(1)} (${profile.bmiCategory})',
+                  color: _getBMIColor(profile.bmi),
                 ),
               ],
               
@@ -376,7 +467,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
               
               // Weight Progress
-              if (profile.targetWeight != profile.weight) ...[
+              if (profile.targetWeight != null && profile.weight != null && profile.targetWeight != profile.weight) ...[
                 SizedBox(height: 20),
                 Container(
                   padding: EdgeInsets.all(12),
@@ -390,8 +481,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Row(
                     children: [
                       Icon(
-                        profile.targetWeight > profile.weight 
-                          ? Icons.trending_up 
+                        profile.targetWeight! > profile.weight!
+                          ? Icons.trending_up
                           : Icons.trending_down,
                         color: AppTheme.primaryAccent,
                       ),
@@ -409,7 +500,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             SizedBox(height: 4),
                             Text(
-                              '${profile.targetWeight.toStringAsFixed(1)} kg',
+                              '${profile.targetWeight!.toStringAsFixed(1)} kg',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -418,7 +509,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             SizedBox(height: 2),
                             Text(
-                              '${(profile.targetWeight - profile.weight).abs().toStringAsFixed(1)} kg to go',
+                              '${(profile.targetWeight! - profile.weight!).abs().toStringAsFixed(1)} kg to go',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondary,
@@ -876,7 +967,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final weight = double.tryParse(weightController.text);
               if (weight != null) {
                 final newEntry = WeightEntry(
@@ -885,7 +976,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   timestamp: DateTime.now(),
                   note: noteController.text.isEmpty ? null : noteController.text,
                 );
-                
+
                 setState(() {
                   final entries = List<WeightEntry>.from(_weightProgress.entries)
                     ..add(newEntry);
@@ -894,10 +985,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     currentWeight: weight,
                   );
                 });
-                
-                // Update user profile with new current weight
-                final userProvider = Provider.of<UserProvider>(context, listen: false);
-                userProvider.updateWeight(weight);
+
+                // Update user profile with new current weight in Supabase
+                final supabaseUserProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
+                if (supabaseUserProvider.userProfile != null) {
+                  final updatedProfile = supabaseUserProvider.userProfile!.copyWith(weight: weight);
+                  await supabaseUserProvider.updateProfile(updatedProfile);
+                }
                 
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(

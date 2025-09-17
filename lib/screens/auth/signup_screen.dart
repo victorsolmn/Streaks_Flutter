@@ -7,7 +7,7 @@ import '../../services/supabase_service.dart';
 import '../../services/toast_service.dart';
 import '../../services/popup_service.dart';
 import '../../utils/app_theme.dart';
-import '../onboarding/onboarding_screen.dart';
+import '../onboarding/enhanced_onboarding_screen.dart';
 import 'signin_screen.dart';
 import 'otp_verification_screen.dart';
 
@@ -76,7 +76,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const OnboardingScreen(),
+            builder: (context) => const EnhancedOnboardingScreen(),
           ),
         );
       } else if (mounted && authProvider.error != null) {
@@ -112,7 +112,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       // Navigate to onboarding for new users
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => const OnboardingScreen(),
+          builder: (context) => const EnhancedOnboardingScreen(),
         ),
       );
     } else if (mounted && authProvider.error != null) {

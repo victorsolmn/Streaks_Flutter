@@ -23,7 +23,7 @@ import 'providers/health_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/streak_provider.dart';
 import 'screens/auth/welcome_screen.dart';
-import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/onboarding/enhanced_onboarding_screen.dart';
 import 'screens/main/main_screen.dart';
 import 'utils/app_theme.dart';
 
@@ -62,7 +62,7 @@ void main() async {
     //   };
     // }
     
-    debugPrint('✅ Firebase initialized successfully');
+    debugPrint('✅ Firebase initialized successfully'); // Debug reload updated
   } catch (e) {
     debugPrint('Firebase initialization error: $e');
     // App can still run with Supabase only
@@ -98,15 +98,19 @@ class MyApp extends StatelessWidget {
           print('Auth state: authenticated=${auth.isAuthenticated}, loading=${auth.isLoading}');
           print('User profile: hasProfile=${userProvider.hasProfile}, onboarding=${userProvider.hasCompletedOnboarding}');
           
-          // Load user profile when authenticated and profile is not loaded (only once)
+          // Enhanced routing logic with email-based user validation
           if (auth.isAuthenticated && !userProvider.hasProfile && !userProvider.isLoading && !userProvider.hasTriedLoading) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              userProvider.loadUserProfile();
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              // Check if user is existing by trying to load profile first
+              await userProvider.loadUserProfile();
+
+              // If profile exists, user is existing - go to home
+              // If no profile, user is new - go to onboarding
             });
           }
-          
+
           Widget home;
-          
+
           // Show loading if auth is in loading state or user profile is loading
           if (auth.isLoading || (auth.isAuthenticated && userProvider.isLoading)) {
             home = const Scaffold(
@@ -115,12 +119,14 @@ class MyApp extends StatelessWidget {
               ),
             );
           } else if (auth.isAuthenticated) {
-            // Check if user has completed onboarding and has a profile
+            // Enhanced routing: existing users with complete profiles go to home
             if (userProvider.hasProfile && userProvider.hasCompletedOnboarding) {
-              home = const MainScreen();
+              home = const MainScreen(); // Existing user with complete profile
+            } else if (userProvider.hasProfile && !userProvider.hasCompletedOnboarding) {
+              home = const EnhancedOnboardingScreen(); // Existing user with incomplete profile
             } else {
-              // Authenticated but no profile - need onboarding
-              home = const OnboardingScreen();
+              // New user without profile - start onboarding
+              home = const EnhancedOnboardingScreen();
             }
           } else {
             // Not authenticated

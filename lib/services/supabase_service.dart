@@ -40,6 +40,7 @@ class SupabaseService {
         email: email,
         password: password,
         data: {'name': name},
+        emailRedirectTo: null, // Disable email confirmation redirect
       );
 
       if (response.user != null) {
@@ -274,13 +275,17 @@ class SupabaseService {
     required String name,
   }) async {
     try {
-      await _supabase.from('profiles').insert({
+      // Use upsert instead of insert since the trigger already creates a basic profile
+      // This will update the existing profile with the name
+      await _supabase.from('profiles').upsert({
         'id': userId,
         'email': email,
         'name': name,
-      });
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'id');
+      print('✅ Profile upserted successfully for user: $userId');
     } catch (e) {
-      print('Error creating profile: $e');
+      print('Error upserting profile: $e');
     }
   }
 
@@ -305,12 +310,56 @@ class SupabaseService {
   }) async {
     try {
       updates['updated_at'] = DateTime.now().toIso8601String();
-      
-      await _supabase
+
+      print('\n' + '=' * 60);
+      print('📝 SUPABASE UPDATE REQUEST');
+      print('=' * 60);
+      print('🔑 User ID: $userId');
+      print('📊 REQUEST DATA BEING SENT:');
+      updates.forEach((key, value) {
+        print('  - $key: $value (${value.runtimeType})');
+      });
+      print('=' * 60);
+
+      // Attempt the update
+      final response = await _supabase
           .from('profiles')
           .update(updates)
-          .eq('id', userId);
+          .eq('id', userId)
+          .select();
+
+      print('\n' + '=' * 60);
+      print('✅ SUPABASE RESPONSE SUCCESS');
+      print('=' * 60);
+      print('📊 RESPONSE DATA RECEIVED:');
+      if (response != null && response is List && response.isNotEmpty) {
+        final profileData = response[0];
+        profileData.forEach((key, value) {
+          print('  - $key: $value');
+        });
+      } else {
+        print('  ⚠️ No response data returned');
+      }
+      print('=' * 60 + '\n');
     } catch (e) {
+      print('\n' + '=' * 60);
+      print('❌ SUPABASE UPDATE ERROR');
+      print('=' * 60);
+      print('🔑 User ID: $userId');
+      print('📊 DATA ATTEMPTED TO SEND:');
+      updates.forEach((key, value) {
+        print('  - $key: $value');
+      });
+      print('\n🚨 ERROR DETAILS:');
+      print('  Error Type: ${e.runtimeType}');
+      print('  Error Message: $e');
+
+      if (e.toString().contains('42501')) {
+        print('\n⚠️ RLS POLICY VIOLATION DETECTED!');
+        print('  The Row Level Security policy is blocking this update.');
+        print('  This means the user does not have permission to update their profile.');
+      }
+      print('=' * 60 + '\n');
       throw Exception('Failed to update profile: $e');
     }
   }

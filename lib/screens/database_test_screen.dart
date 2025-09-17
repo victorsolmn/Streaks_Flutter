@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/enhanced_supabase_service.dart';
+import '../utils/database_migrator.dart';
 import '../utils/app_theme.dart';
 
 class DatabaseTestScreen extends StatefulWidget {
@@ -273,6 +274,143 @@ class _DatabaseTestScreenState extends State<DatabaseTestScreen> {
     }
   }
 
+  Future<void> _testMigrations() async {
+    setState(() {
+      _isLoading = true;
+      _currentOperation = 'Testing database migrations...';
+      _logs.clear();
+    });
+
+    try {
+      _log('🔧 Starting database migration tests');
+
+      // Test migrations
+      final migrationResults = await DatabaseMigrator.applyAllMigrations();
+
+      _log('📊 Migration Test Results:');
+      migrationResults.forEach((migration, success) {
+        final status = success ? '✅' : '❌';
+        _log('$status $migration');
+      });
+
+      final successCount = migrationResults.values.where((success) => success).length;
+      final totalCount = migrationResults.length;
+
+      if (successCount == totalCount) {
+        _log('🎉 All migrations successful ($successCount/$totalCount)');
+      } else {
+        _log('⚠️ Some migrations failed ($successCount/$totalCount)');
+        _log('🔗 Manual migration script available');
+      }
+
+      // Test database status
+      _log('🔍 Checking database status...');
+      final status = await DatabaseMigrator.getDatabaseStatus();
+
+      _log('📋 Database Status:');
+      status.forEach((table, tableStatus) {
+        _log('  📄 $table: $tableStatus');
+      });
+
+    } catch (e) {
+      _log('❌ Migration test failed: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+        _currentOperation = '';
+      });
+    }
+  }
+
+  Future<void> _testSchemaFixes() async {
+    setState(() {
+      _isLoading = true;
+      _currentOperation = 'Testing schema fixes...';
+      _logs.clear();
+    });
+
+    try {
+      _log('🧪 Starting schema fix validation');
+
+      // Test 1: Heart rate constraint validation
+      _log('1️⃣ Testing heart rate constraints...');
+      try {
+        final testUserId = 'test-heart-${DateTime.now().millisecondsSinceEpoch}';
+        await _supabaseService.saveHealthMetrics(
+          userId: testUserId,
+          heartRate: 25, // Should be handled gracefully now
+        );
+        _log('✅ Heart rate constraint handling working');
+      } catch (e) {
+        _log('❌ Heart rate constraint test failed: $e');
+      }
+
+      // Test 2: Profile with daily_calories_target
+      _log('2️⃣ Testing daily_calories_target field...');
+      try {
+        if (_supabaseService.currentUser != null) {
+          await _supabaseService.updateUserProfile(
+            userId: _supabaseService.currentUser!.id,
+            dailyCaloriesTarget: 2500,
+          );
+          _log('✅ daily_calories_target field working');
+        } else {
+          _log('⚠️ No user logged in - skipping profile test');
+        }
+      } catch (e) {
+        _log('❌ daily_calories_target test failed: $e');
+      }
+
+      // Test 3: Streaks upsert with constraints
+      _log('3️⃣ Testing streaks upsert operations...');
+      try {
+        if (_supabaseService.currentUser != null) {
+          await _supabaseService.updateStreak(
+            userId: _supabaseService.currentUser!.id,
+            currentStreak: 5,
+            longestStreak: 10,
+            targetAchieved: true,
+          );
+          _log('✅ Streaks upsert working');
+        } else {
+          _log('⚠️ No user logged in - skipping streaks test');
+        }
+      } catch (e) {
+        _log('❌ Streaks upsert test failed: $e');
+      }
+
+      // Test 4: Nutrition data type handling
+      _log('4️⃣ Testing nutrition data handling...');
+      try {
+        if (_supabaseService.currentUser != null) {
+          await _supabaseService.addNutritionEntry(
+            userId: _supabaseService.currentUser!.id,
+            foodName: 'Schema Test Food',
+            calories: 200,
+            protein: 10.0,
+            carbs: 30.0,
+            fat: 5.0,
+          );
+          _log('✅ Nutrition data handling working');
+        } else {
+          _log('⚠️ No user logged in - skipping nutrition test');
+        }
+      } catch (e) {
+        _log('❌ Nutrition data test failed: $e');
+      }
+
+      _log('🎯 Schema fix validation completed');
+
+    } catch (e) {
+      _log('❌ Schema fix test failed: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+        _currentOperation = '';
+      });
+    }
+  }
+
   void _clearLogs() {
     setState(() {
       _logs.clear();
@@ -351,6 +489,24 @@ class _DatabaseTestScreenState extends State<DatabaseTestScreen> {
                       label: Text('Test Google Sign-In'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _testMigrations,
+                      icon: Icon(Icons.build),
+                      label: Text('Test Migrations'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _testSchemaFixes,
+                      icon: Icon(Icons.verified),
+                      label: Text('Test Schema Fixes'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple,
                         foregroundColor: Colors.white,
                       ),
                     ),

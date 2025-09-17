@@ -1,3 +1,18 @@
+enum FitnessGoal {
+  weightLoss,
+  muscleGain,
+  maintenance,
+  endurance,
+}
+
+enum ActivityLevel {
+  sedentary,
+  lightlyActive,
+  moderatelyActive,
+  veryActive,
+  extremelyActive,
+}
+
 class UserProfile {
   final String name;
   final String email;

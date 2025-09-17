@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:convert';
 import 'dart:math';
 
 class EnhancedSupabaseService {
@@ -102,16 +101,18 @@ class EnhancedSupabaseService {
     double? weight,
     String? activityLevel,
     String? fitnessGoal,
+    int? dailyCaloriesTarget,
   }) async {
-    try {
-      final updates = <String, dynamic>{};
-      if (name != null) updates['name'] = name;
-      if (age != null) updates['age'] = age;
-      if (height != null) updates['height'] = height;
-      if (weight != null) updates['weight'] = weight;
-      if (activityLevel != null) updates['activity_level'] = activityLevel;
-      if (fitnessGoal != null) updates['fitness_goal'] = fitnessGoal;
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (age != null) updates['age'] = age;
+    if (height != null) updates['height'] = height;
+    if (weight != null) updates['weight'] = weight;
+    if (activityLevel != null) updates['activity_level'] = activityLevel;
+    if (fitnessGoal != null) updates['fitness_goal'] = fitnessGoal;
+    if (dailyCaloriesTarget != null) updates['daily_calories_target'] = dailyCaloriesTarget;
 
+    try {
       await _supabase
           .from('profiles')
           .update(updates)
@@ -120,6 +121,28 @@ class EnhancedSupabaseService {
       debugPrint('✅ Profile updated for user: $userId');
     } catch (e) {
       debugPrint('❌ Error updating profile: $e');
+
+      // Handle missing column gracefully
+      if (e.toString().contains('daily_calories_target')) {
+        debugPrint('⚠️ daily_calories_target column not found - database migration needed');
+        // Retry without the missing column
+        final retryUpdates = Map<String, dynamic>.from(updates);
+        retryUpdates.remove('daily_calories_target');
+
+        if (retryUpdates.isNotEmpty) {
+          try {
+            await _supabase
+                .from('profiles')
+                .update(retryUpdates)
+                .eq('id', userId);
+            debugPrint('✅ Profile updated without daily_calories_target');
+            return;
+          } catch (retryError) {
+            debugPrint('❌ Retry failed: $retryError');
+          }
+        }
+      }
+
       rethrow;
     }
   }
@@ -239,24 +262,50 @@ class EnhancedSupabaseService {
     int? activeMinutes,
     int? waterIntake,
   }) async {
+    final data = <String, dynamic>{
+      'user_id': userId,
+      'date': (date ?? DateTime.now()).toIso8601String().split('T')[0],
+    };
+
+    if (steps != null) data['steps'] = steps;
+
+    // Validate heart rate before saving
+    if (heartRate != null) {
+      if (heartRate >= 30 && heartRate <= 250) {
+        data['heart_rate'] = heartRate;
+      } else {
+        debugPrint('⚠️ Invalid heart rate: $heartRate BPM. Skipping...');
+        // Don't include invalid heart rate data
+      }
+    }
+
+    if (sleepHours != null) data['sleep_hours'] = sleepHours;
+    if (caloriesBurned != null) data['calories_burned'] = caloriesBurned;
+    if (distance != null) data['distance'] = distance;
+    if (activeMinutes != null) data['active_minutes'] = activeMinutes;
+    if (waterIntake != null) data['water_intake'] = waterIntake;
+
     try {
-      final data = <String, dynamic>{
-        'user_id': userId,
-        'date': (date ?? DateTime.now()).toIso8601String().split('T')[0],
-      };
-
-      if (steps != null) data['steps'] = steps;
-      if (heartRate != null) data['heart_rate'] = heartRate;
-      if (sleepHours != null) data['sleep_hours'] = sleepHours;
-      if (caloriesBurned != null) data['calories_burned'] = caloriesBurned;
-      if (distance != null) data['distance'] = distance;
-      if (activeMinutes != null) data['active_minutes'] = activeMinutes;
-      if (waterIntake != null) data['water_intake'] = waterIntake;
-
       await _supabase.from('health_metrics').upsert(data);
       debugPrint('✅ Health metrics saved for ${data['date']}');
     } catch (e) {
       debugPrint('❌ Error saving health metrics: $e');
+
+      // Add specific handling for constraint violations
+      if (e.toString().contains('heart_rate_check')) {
+        debugPrint('🔄 Retrying without heart rate data...');
+        // Retry without heart rate if constraint fails
+        final retryData = Map<String, dynamic>.from(data);
+        retryData.remove('heart_rate');
+        try {
+          await _supabase.from('health_metrics').upsert(retryData);
+          debugPrint('✅ Health metrics saved without heart rate');
+          return;
+        } catch (retryError) {
+          debugPrint('❌ Retry failed: $retryError');
+        }
+      }
+
       rethrow;
     }
   }
@@ -317,21 +366,52 @@ class EnhancedSupabaseService {
     String streakType = 'daily',
     bool? targetAchieved,
   }) async {
+    final data = <String, dynamic>{
+      'user_id': userId,
+      'streak_type': streakType,
+    };
+
+    if (currentStreak != null) data['current_streak'] = currentStreak;
+    if (longestStreak != null) data['longest_streak'] = longestStreak;
+    if (lastActivityDate != null) data['last_activity_date'] = lastActivityDate.toIso8601String().split('T')[0];
+    if (targetAchieved != null) data['target_achieved'] = targetAchieved;
+
     try {
-      final data = <String, dynamic>{
-        'user_id': userId,
-        'streak_type': streakType,
-      };
-
-      if (currentStreak != null) data['current_streak'] = currentStreak;
-      if (longestStreak != null) data['longest_streak'] = longestStreak;
-      if (lastActivityDate != null) data['last_activity_date'] = lastActivityDate.toIso8601String().split('T')[0];
-      if (targetAchieved != null) data['target_achieved'] = targetAchieved;
-
       await _supabase.from('streaks').upsert(data);
       debugPrint('✅ Streak updated: $streakType');
     } catch (e) {
       debugPrint('❌ Error updating streak: $e');
+
+      // Handle constraint and table reference issues
+      if (e.toString().contains('unique constraint') ||
+          e.toString().contains('ON CONFLICT')) {
+        debugPrint('🔄 Retrying with proper conflict resolution...');
+        try {
+          // Use insert with onConflict for better handling
+          await _supabase.from('streaks').upsert(
+            data,
+            onConflict: 'user_id,streak_type',
+          );
+          debugPrint('✅ Streak updated with conflict resolution');
+          return;
+        } catch (retryError) {
+          debugPrint('❌ Retry failed: $retryError');
+        }
+      }
+
+      // Try using user_streaks view if main table fails
+      if (e.toString().contains('does not exist') ||
+          e.toString().contains('user_streaks')) {
+        debugPrint('🔄 Trying user_streaks view...');
+        try {
+          await _supabase.from('user_streaks').upsert(data);
+          debugPrint('✅ Streak updated via user_streaks view');
+          return;
+        } catch (viewError) {
+          debugPrint('❌ View approach failed: $viewError');
+        }
+      }
+
       rethrow;
     }
   }

@@ -1,0 +1,103 @@
+{
+  "info": {
+    "name": "Supabase Profile Test",
+    "description": "Test profile update with all new fields",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Update Profile - Complete Test",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "apikey",
+            "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6d3Zja3ppYXZoem1naGl6eXF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTk0NjIsImV4cCI6MjA3MzY3NTQ2Mn0.fUtnAzqNGzKvo-FTWqpemcf0wvdlC6gpUg_ZllXBulo",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6d3Zja3ppYXZoem1naGl6eXF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTk0NjIsImV4cCI6MjA3MzY3NTQ2Mn0.fUtnAzqNGzKvo-FTWqpemcf0wvdlC6gpUg_ZllXBulo",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Prefer",
+            "value": "return=representation",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Test User Updated\",\n  \"email\": \"test@example.com\",\n  \"age\": 30,\n  \"height\": 175.5,\n  \"weight\": 72.5,\n  \"target_weight\": 70.0,\n  \"activity_level\": \"Moderately Active\",\n  \"fitness_goal\": \"Lose Weight\",\n  \"experience_level\": \"Intermediate\",\n  \"workout_consistency\": \"> 3 years\",\n  \"has_completed_onboarding\": true,\n  \"daily_calories_target\": 2200,\n  \"daily_steps_target\": 10000,\n  \"daily_sleep_target\": 7.5,\n  \"daily_water_target\": 3.5,\n  \"has_seen_fitness_goal_summary\": true,\n  \"device_name\": \"Apple Watch\",\n  \"device_connected\": true,\n  \"bmi_value\": 23.5,\n  \"bmi_category_value\": \"Normal\"\n}"
+        },
+        "url": {
+          "raw": "https://xzwvckziavhzmghizyqx.supabase.co/rest/v1/profiles?id=eq.d260d615-02b8-4e50-b102-ee7567db126f",
+          "protocol": "https",
+          "host": [
+            "xzwvckziavhzmghizyqx",
+            "supabase",
+            "co"
+          ],
+          "path": [
+            "rest",
+            "v1",
+            "profiles"
+          ],
+          "query": [
+            {
+              "key": "id",
+              "value": "eq.d260d615-02b8-4e50-b102-ee7567db126f"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Profile - Verify Update",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "apikey",
+            "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6d3Zja3ppYXZoem1naGl6eXF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTk0NjIsImV4cCI6MjA3MzY3NTQ2Mn0.fUtnAzqNGzKvo-FTWqpemcf0wvdlC6gpUg_ZllXBulo",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6d3Zja3ppYXZoem1naGl6eXF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTk0NjIsImV4cCI6MjA3MzY3NTQ2Mn0.fUtnAzqNGzKvo-FTWqpemcf0wvdlC6gpUg_ZllXBulo",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://xzwvckziavhzmghizyqx.supabase.co/rest/v1/profiles?id=eq.d260d615-02b8-4e50-b102-ee7567db126f&select=*",
+          "protocol": "https",
+          "host": [
+            "xzwvckziavhzmghizyqx",
+            "supabase",
+            "co"
+          ],
+          "path": [
+            "rest",
+            "v1",
+            "profiles"
+          ],
+          "query": [
+            {
+              "key": "id",
+              "value": "eq.d260d615-02b8-4e50-b102-ee7567db126f"
+            },
+            {
+              "key": "select",
+              "value": "*"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
