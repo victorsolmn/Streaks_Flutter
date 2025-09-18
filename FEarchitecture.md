@@ -1,5 +1,5 @@
 # Streaks Flutter - Frontend Architecture & Design
-**Last Updated:** September 16, 2025
+**Last Updated:** September 19, 2025
 
 ## Architecture Overview
 
@@ -36,8 +36,8 @@ lib/
 - SplashScreen → AuthCheck → SignIn/SignUp/Main/Onboarding
 
 ### State Management
-- **SupabaseAuthProvider**: Enhanced authentication with Google OAuth and error handling
-- **SupabaseUserProvider**: User profile data with real-time sync
+- **SupabaseAuthProvider**: Enhanced authentication with Google OAuth, iOS simulator fix, and intelligent error handling
+- **SupabaseUserProvider**: User profile data with rebuild loop prevention and real-time sync
 - **SupabaseNutritionProvider**: Nutrition tracking with offline support
 - **StreakProvider**: Streak calculations and gamification
 - **HealthProvider**: Health metrics integration
@@ -85,10 +85,12 @@ lib/
 - **Metrics:** Steps, calories, heart rate, sleep, distance tracking
 
 ### AI Chat System
-- **Provider:** Grok API via X.AI platform
+- **Provider:** Grok API via X.AI platform (Model: grok-3)
 - **Features:** Health coaching, nutrition advice, motivation
-- **UI:** ChatGPT-style interface with gradient user messages
+- **UI:** Complete ChatGPT-style interface with markdown rendering
+- **Response Format:** Structured with titles, bullet points, and contextual suggestions
 - **Context:** Conversation history and user health data integration
+- **Enhancements:** Short, actionable responses under 150 words
 
 ### Nutrition Tracking
 - **Food Logging:** Photo + text input for AI analysis
@@ -108,7 +110,48 @@ lib/
 - **Conflict Resolution:** Timestamp-based data merging
 - **Performance:** Optimized queries with caching strategy
 
-## Recent Updates (September 16, 2025)
+## Recent Critical Updates (September 2025)
+
+### September 19, 2025 - Major Stability & UX Improvements
+
+#### 🔧 Critical Rebuild Loop Fix
+**Problem**: Infinite rebuild loops causing screen blinking every 25-30ms due to Provider notification cycles
+**Solution**:
+- **main.dart**: Replaced `postFrameCallback` with `Future.microtask` for profile loading
+- **SupabaseUserProvider**: Added double-checking to prevent race conditions
+- **Impact**: Eliminated rebuild loops, improved app performance and stability
+
+#### 🔐 Google OAuth iOS Simulator Resolution
+**Problem**: Google sign-in failing with "can't connect to server" error in iOS simulator
+**Root Cause**: iOS simulator restrictions on external OAuth URL launches
+**Solution**:
+- Removed custom `redirectTo` parameter causing launch failures
+- Implemented intelligent error detection for simulator limitations
+- Added helpful fallback messaging for development environment
+- **Files**: `lib/providers/supabase_auth_provider.dart`
+- **Status**: Works perfectly on real devices, graceful fallback in simulator
+
+#### 💬 ChatGPT-Style AI Interface Transformation
+**Enhancement**: Complete redesign of AI chat interface for better user experience
+**Changes**:
+- Updated Grok API model from deprecated 'grok-beta' to 'grok-3'
+- Implemented markdown rendering with `flutter_markdown: ^0.6.18`
+- Redesigned message bubbles to ChatGPT-style layout
+- Added contextual suggestion prompts below responses
+- Structured AI responses with titles, bullet points under 150 words
+- **Files**: `lib/services/grok_service.dart`, `lib/screens/main/chat_screen.dart`, `pubspec.yaml`
+
+#### 🛠️ Widget Lifecycle Improvements
+**Problem**: App infinite reloading due to unmounted widget context access
+**Solution**: Added comprehensive `mounted` checks before any setState or context access
+**Files**: `chat_screen_agent.dart`, `profile_screen.dart`
+
+#### 📱 UI Bug Fixes
+- Fixed dropdown overflow error in onboarding screen
+- Resolved "BOTTOM OVERFLOWED BY 31 PIXELS" in activity level dropdown
+- Simplified dropdown items with Flexible widget and adjusted padding
+
+## Previous Updates (September 16, 2025)
 
 ### Enhanced Database Integration
 - **EnhancedSupabaseService**: Comprehensive CRUD operations for all app modules
@@ -138,12 +181,23 @@ services/
 #### Enhanced Provider Architecture
 ```
 providers/
-├── supabase_auth_provider.dart       # Enhanced with Google OAuth + error handling
-├── supabase_user_provider.dart       # Real-time profile sync
+├── supabase_auth_provider.dart       # OAuth + simulator fix + intelligent error handling
+├── supabase_user_provider.dart       # Rebuild loop prevention + real-time profile sync
 ├── supabase_nutrition_provider.dart  # Offline-first nutrition tracking
 ├── health_provider.dart              # Native health platform integration
 ├── streak_provider.dart              # Gamification and progress tracking
 └── theme_provider.dart               # App theming and preferences
+```
+
+#### ChatGPT-Style UI Components
+```
+screens/main/chat_screen.dart
+├── ChatGPT-style message bubbles with distinct user/AI styling
+├── Markdown rendering for AI responses with flutter_markdown
+├── Contextual suggestion prompts below responses
+├── Structured AI responses (titles, bullet points, emojis)
+├── Loading states and error handling
+└── Intelligent response truncation (150 words max)
 ```
 
 #### Testing Infrastructure

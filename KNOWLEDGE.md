@@ -6,19 +6,49 @@ Streaks Flutter is a comprehensive fitness and health tracking application built
 ## Recent Updates & Fixes (September 2025)
 
 ### Critical Bugs Fixed
-1. **App Infinite Reloading Issue**
+1. **Google OAuth iOS Simulator Issues** 🔧 **[SEPTEMBER 18, 2025]**
+   - **Problem**: Google sign-in failing with "can't connect to server" error in iOS simulator
+   - **Root Cause**: iOS simulator has restrictions on external OAuth URL launches
+   - **Solution**:
+     - Removed custom `redirectTo` parameter causing launch failures
+     - Implemented intelligent error detection for simulator limitations
+     - Added helpful fallback messaging guiding users to email/password auth for development
+   - **Files Modified**: `lib/providers/supabase_auth_provider.dart`
+   - **Status**: Works perfectly on real devices, graceful fallback in simulator
+
+2. **Critical Rebuild Loop Prevention** 🔄 **[SEPTEMBER 18, 2025]**
+   - **Problem**: Infinite rebuild loops causing screen blinking every 25-30ms
+   - **Root Cause**: Consumer3 in main.dart triggering profile loads that called notifyListeners()
+   - **Solution**:
+     - Replaced `postFrameCallback` with `Future.microtask` for profile loading
+     - Added double-checking to prevent race conditions
+     - Optimized SupabaseUserProvider to skip redundant profile loads
+   - **Files Modified**: `lib/main.dart`, `lib/providers/supabase_user_provider.dart`
+   - **Result**: Eliminated rebuild loops, improved app performance
+
+3. **AI Chat Major Enhancements** 💬 **[SEPTEMBER 18, 2025]**
+   - **Problem**: AI responses too long, poor formatting, deprecated model
+   - **Solution**:
+     - Complete ChatGPT-style UI transformation with markdown support
+     - Updated Grok API model from deprecated 'grok-beta' to 'grok-3'
+     - Implemented structured responses with bullet points and headings
+     - Added contextual suggestion prompts below responses
+   - **Files Modified**: `lib/services/grok_service.dart`, `lib/screens/main/chat_screen.dart`, `pubspec.yaml`
+   - **Dependencies Added**: `flutter_markdown: ^0.6.18`
+
+4. **App Infinite Reloading Issue**
    - **Problem**: App was constantly reloading due to unmounted widget context access
    - **Solution**: Added comprehensive `mounted` checks before any setState or context access
    - **Files Modified**:
      - `chat_screen_agent.dart`: Added Timer management and disposal
      - `profile_screen.dart`: Fixed async callbacks with mounted checks
 
-2. **Dropdown Overflow Error**
+5. **Dropdown Overflow Error**
    - **Problem**: "BOTTOM OVERFLOWED BY 31 PIXELS" in activity level dropdown
    - **Solution**: Simplified dropdown items with Flexible widget and adjusted padding
    - **File Modified**: `supabase_onboarding_screen.dart`
 
-3. **Android Build Failures**
+6. **Android Build Failures**
    - **Problem**: Health plugin compatibility issues with Android
    - **Solution**: Updated health plugin from 10.2.0 to 13.2.0, Android Gradle plugin to 8.9.1
    - **Files Modified**: `pubspec.yaml`, `android/settings.gradle.kts`, `android/app/build.gradle.kts`
