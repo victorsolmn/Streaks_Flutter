@@ -41,12 +41,9 @@ class SupabaseUserProvider with ChangeNotifier {
         _userProfile = null;
         _hasTriedLoading = false;
         _error = null;
-      } else if (event == AuthChangeEvent.signedIn && _currentUser != null && !_hasTriedLoading) {
-        // Auto-load profile when user signs in
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          loadUserProfile();
-        });
       }
+      // Removed automatic profile loading on sign-in to prevent rebuild loops
+      // Profile loading is now handled by main.dart routing logic
 
       notifyListeners();
     });
@@ -68,10 +65,13 @@ class SupabaseUserProvider with ChangeNotifier {
       return;
     }
 
-    print('✅ Loading profile for user: $userId');
+    // Prevent multiple simultaneous calls or if already has profile
+    if (_isLoading || _userProfile != null) {
+      print('⏭️ Skipping profile load - already loading: $_isLoading, has profile: ${_userProfile != null}');
+      return;
+    }
 
-    // Prevent multiple simultaneous calls
-    if (_isLoading) return;
+    print('✅ Loading profile for user: $userId');
 
     _isLoading = true;
     _hasTriedLoading = true;

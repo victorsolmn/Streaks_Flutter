@@ -1,52 +1,37 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
-import '../models/conversation_context.dart';
 import '../models/user_model.dart';
 
 class GrokService {
   static const String _baseUrl = ApiConfig.grokApiUrl;
   static const String _apiKey = ApiConfig.grokApiKey;
   
-  // System prompt for fitness assistant
+  // Concise system prompt for ChatGPT-style responses
   static const String _systemPrompt = '''
-You are an expert AI fitness coach and personal trainer named Coach. Your role is to help users achieve their fitness goals through personalized advice on nutrition, exercise, recovery, and motivation.
+You are Streaker AI, a fitness coach providing concise, well-structured responses.
 
-Your expertise includes:
-- Nutrition planning and macro/calorie tracking
-- Workout programming for various goals (weight loss, muscle gain, endurance, strength)
-- Exercise form and technique guidance
-- Recovery and sleep optimization
-- Motivation and habit formation
-- Injury prevention and management basics (always recommend seeing professionals for serious issues)
+**RESPONSE FORMAT (STRICT):**
+- Start with a brief title/heading
+- Use bullet points for key information
+- Keep responses under 150 words
+- Include 2-3 actionable suggestions at the end
+- Use emojis sparingly (💪 🎯 ✅)
 
-Personality traits:
-- Encouraging and supportive, never judgmental
-- Evidence-based approach to fitness
-- Practical and realistic with recommendations
-- Empathetic to struggles and setbacks
-- Celebrates small wins and progress
-- Uses motivational language without being overly enthusiastic
+**YOUR EXPERTISE:**
+Workouts, nutrition, recovery, habit formation, motivation
 
-Guidelines:
-1. Always prioritize safety - recommend consulting healthcare providers for medical concerns
-2. Provide personalized advice based on user's goals, fitness level, and constraints
-3. Give specific, actionable recommendations
-4. Use simple language, avoid excessive jargon
-5. Be concise but thorough - aim for complete responses within 1500 words maximum
-6. Include relevant emojis occasionally to make responses more engaging
-7. When discussing nutrition, consider dietary restrictions and preferences
-8. For exercises, explain proper form when relevant
-9. Acknowledge that fitness is a journey, not a destination
-10. Remember user's context from the conversation
-11. IMPORTANT: Keep responses comprehensive but focused - if a topic requires extensive detail, offer to provide more information in follow-up messages
+**COMMUNICATION RULES:**
+1. Be concise and scannable
+2. Focus on immediate actionable advice
+3. Use proper markdown formatting:
+   - # for main titles
+   - ## for subheadings
+   - • for bullet points
+   - **bold** for emphasis
+4. End with "What would you like to focus on next?"
 
-Important: 
-- Never provide medical advice or diagnose conditions
-- Always suggest professional help for injuries or health concerns
-- Be inclusive and respectful of all fitness levels and body types
-- Focus on sustainable, long-term lifestyle changes over quick fixes
-''';
+**SAFETY:** Always recommend consulting professionals for injuries or medical concerns.''';
 
   static final GrokService _instance = GrokService._internal();
   factory GrokService() => _instance;
@@ -58,6 +43,8 @@ Important:
     Map<String, dynamic>? userContext,
     String? personalizedSystemPrompt,
   }) async {
+    print('🤖 GROK API: Starting API call for message: "${userMessage.substring(0, userMessage.length > 50 ? 50 : userMessage.length)}..."');
+
     try {
       // Build messages array with system prompt
       final messages = [
@@ -89,6 +76,9 @@ Important:
         'content': userMessage,
       });
 
+      print('🤖 GROK API: Making request to $_baseUrl');
+      print('🤖 GROK API: Message count: ${messages.length}');
+
       // Make API request
       final response = await http.post(
         Uri.parse(_baseUrl),
@@ -105,20 +95,27 @@ Important:
         }),
       );
 
+      print('🤖 GROK API: Response status: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final content = data['choices'][0]['message']['content'];
+        print('🤖 GROK API: SUCCESS - Received AI response: "${content.substring(0, content.length > 100 ? 100 : content.length)}..."');
         return content.trim();
       } else if (response.statusCode == 401) {
+        print('🤖 GROK API: AUTH ERROR - Invalid API key');
         return 'API key not configured. Please add your GROK API key to use the AI coach feature.';
       } else if (response.statusCode == 429) {
+        print('🤖 GROK API: RATE LIMIT - Too many requests');
         return 'I\'m a bit overwhelmed right now. Please try again in a moment! 😊';
       } else {
-        print('GROK API Error: ${response.statusCode} - ${response.body}');
+        print('🤖 GROK API ERROR: ${response.statusCode} - ${response.body}');
+        print('🤖 GROK API: Using fallback response due to API error');
         return _getFallbackResponse(userMessage);
       }
     } catch (e) {
-      print('Error calling GROK API: $e');
+      print('🤖 GROK API EXCEPTION: $e');
+      print('🤖 GROK API: Using fallback response due to exception');
       return _getFallbackResponse(userMessage);
     }
   }
@@ -177,163 +174,9 @@ Important:
     return '';
   }
 
-  // Enhanced method for context-aware agent conversations
-  Future<String> sendAgentMessage({
-    required String userMessage,
-    required UserProfile userProfile,
-    required ConversationContext context,
-    List<Map<String, String>>? conversationHistory,
-    AgentQuestion? currentQuestion,
-  }) async {
-    // Build context-aware system prompt
-    final agentSystemPrompt = _buildAgentSystemPrompt(userProfile, context, currentQuestion);
-    
-    // Build enhanced user context
-    final enhancedContext = _buildEnhancedContext(userProfile, context);
-    
-    return await sendMessage(
-      userMessage: userMessage,
-      conversationHistory: conversationHistory,
-      userContext: enhancedContext,
-      personalizedSystemPrompt: agentSystemPrompt,
-    );
-  }
-
-  // Build agent-specific system prompt with context
-  String _buildAgentSystemPrompt(UserProfile userProfile, ConversationContext context, AgentQuestion? currentQuestion) {
-    final basePrompt = _systemPrompt;
-    
-    // Add conversation stage awareness
-    String stageContext = '';
-    switch (context.conversationStage) {
-      case 'getting_to_know':
-        stageContext = '''
-CONVERSATION STAGE: Getting to know the user
-- Ask thoughtful questions to understand their needs
-- Be encouraging and supportive as they share
-- Focus on building rapport and understanding their situation''';
-        break;
-      case 'established':
-        stageContext = '''
-CONVERSATION STAGE: Established relationship
-- User has shared some information about themselves
-- Provide more targeted advice based on what you know
-- Can reference previous conversations naturally''';
-        break;
-      case 'expert':
-        stageContext = '''
-CONVERSATION STAGE: Expert coaching mode
-- User trusts you and has shared detailed information
-- Provide advanced, highly personalized recommendations
-- Can challenge them appropriately and suggest complex strategies''';
-        break;
-    }
-
-    // Add current question context if agent is asking a question
-    String questionContext = '';
-    if (currentQuestion != null) {
-      questionContext = '''
-CURRENT AGENT QUESTION: "${currentQuestion.question}"
-- Type: ${currentQuestion.type}
-- Can be skipped: ${currentQuestion.canBeSkipped}
-${currentQuestion.skipReason != null ? "- Skip reason: ${currentQuestion.skipReason}" : ""}
-- If user wants to skip, be understanding and redirect to their interests''';
-    }
-
-    // Add user preferences and patterns
-    String preferencesContext = '';
-    if (context.userPreferences.isNotEmpty) {
-      preferencesContext = '''
-USER PREFERENCES LEARNED:
-${context.userPreferences.entries.map((e) => '- ${e.key}: ${e.value}').join('\n')}''';
-    }
-
-    // Add identified gaps
-    String gapsContext = '';
-    if (context.identifiedGaps.isNotEmpty) {
-      gapsContext = '''
-AREAS NEEDING MORE INFO:
-${context.identifiedGaps.map((gap) => '- $gap').join('\n')}''';
-    }
-
-    return '''$basePrompt
-
-$stageContext
-
-USER PROFILE SUMMARY:
-- Name: ${userProfile.name}
-- Goal: ${userProfile.fitnessGoal ?? 'Not specified'}
-- Experience: ${userProfile.experienceLevel ?? 'Not specified'}
-- Activity Level: ${userProfile.activityLevel ?? 'Not specified'}
-- Age: ${userProfile.age ?? 'Not specified'}
-${userProfile.weight != null ? '- Current Weight: ${userProfile.weight}kg' : ''}
-${userProfile.targetWeight != null ? '- Target Weight: ${userProfile.targetWeight}kg' : ''}
-
-$preferencesContext
-
-$gapsContext
-
-$questionContext
-
-CONVERSATION HISTORY SUMMARY:
-- Questions asked: ${context.askedQuestions.length}
-- Recent topics: ${context.recentTopics.take(3).join(', ')}
-- Last interaction: ${_formatDaysAgo(context.lastInteraction)}
-
-AGENT BEHAVIOR GUIDELINES:
-1. Be conversational and natural, not robotic
-2. Reference previous conversations when relevant
-3. If user skips questions, be understanding: "No problem! Let's focus on what you want to know."
-4. Provide actionable, specific advice based on their profile
-5. Ask follow-up questions naturally within your responses
-6. Keep responses focused and avoid overwhelming with information
-7. Celebrate their progress and acknowledge challenges
-8. Always give users control - they can skip anything or change topics anytime''';
-  }
-
-  // Build enhanced context with conversation history
-  Map<String, dynamic> _buildEnhancedContext(UserProfile userProfile, ConversationContext context) {
-    final enhancedContext = <String, dynamic>{
-      'name': userProfile.name,
-      'age': userProfile.age,
-      'height': userProfile.height,
-      'weight': userProfile.weight,
-      'targetWeight': userProfile.targetWeight,
-      'goal': userProfile.fitnessGoal,
-      'activityLevel': userProfile.activityLevel,
-      'experienceLevel': userProfile.experienceLevel,
-      'workoutConsistency': userProfile.workoutConsistency,
-    };
-
-    // Add conversation-specific context
-    enhancedContext.addAll({
-      'conversationStage': context.conversationStage,
-      'questionsAsked': context.askedQuestions.length,
-      'recentTopics': context.recentTopics,
-      'userResponses': context.userResponses,
-      'preferences': context.userPreferences,
-    });
-
-    return enhancedContext;
-  }
-
-  String _formatDaysAgo(DateTime lastInteraction) {
-    final now = DateTime.now();
-    final difference = now.difference(lastInteraction);
-    
-    if (difference.inDays == 0) {
-      if (difference.inHours == 0) {
-        return 'Just now';
-      }
-      return '${difference.inHours} hours ago';
-    } else if (difference.inDays == 1) {
-      return 'Yesterday';
-    } else {
-      return '${difference.inDays} days ago';
-    }
-  }
 
   String _getFallbackResponse(String userMessage) {
+    print('🤖 GROK API: Generating FALLBACK response for: "$userMessage"');
     final lowerMessage = userMessage.toLowerCase();
 
     // Provide helpful fallback responses for common queries

@@ -30,9 +30,11 @@ dependencies:
   # Toast and popup services
   fluttertoast: ^8.2.4
   package_info_plus: ^4.2.0
+  flutter_markdown: ^0.6.18
   # Firebase services
   firebase_core: ^2.24.2
   firebase_analytics: ^10.8.0
+  supabase: ^2.9.1
   # firebase_crashlytics: ^3.4.9  # Temporarily disabled due to iOS build issue
   # firebase_performance: ^0.9.3  # Temporarily disabled due to iOS build issue
   # Skip messaging for web compatibility for now

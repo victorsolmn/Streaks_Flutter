@@ -223,13 +223,12 @@ class SupabaseAuthProvider with ChangeNotifier {
     try {
       if (kDebugMode) {
         print('🔐 Starting Google OAuth sign-in...');
-        print('📱 Redirect URL: com.streaker.streaker://callback');
+        print('📱 Using default Supabase OAuth redirect handling');
         print('🔍 Current auth state before OAuth: ${_supabaseService.client.auth.currentSession?.user?.email ?? "None"}');
       }
 
       final response = await _supabaseService.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'com.streaker.streaker://callback',
         scopes: 'email profile',
       );
 
@@ -323,7 +322,19 @@ class SupabaseAuthProvider with ChangeNotifier {
         print('❌ Google sign-in error: $e');
         print('🔍 Error type: ${e.runtimeType}');
       }
-      _setError('Google sign in failed. Please check your internet connection and try again.');
+
+      // Check if this is a simulator-specific OAuth launch issue
+      if (e.toString().contains('Error while launching') || e.toString().contains('PlatformException')) {
+        if (kDebugMode) {
+          print('🔧 Detected simulator OAuth issue. For development, you can:');
+          print('   1. Test on a real device for full OAuth functionality');
+          print('   2. Use email/password authentication for now');
+          print('   3. Or configure a local development OAuth setup');
+        }
+        _setError('Google sign-in requires a real device or additional OAuth setup for simulator. Please try email/password sign-in for now.');
+      } else {
+        _setError('Google sign in failed. Please check your internet connection and try again.');
+      }
       _setLoading(false);
       return false;
     }

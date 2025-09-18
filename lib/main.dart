@@ -95,17 +95,19 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer3<SupabaseAuthProvider, SupabaseUserProvider, ThemeProvider>(
         builder: (context, auth, userProvider, themeProvider, _) {
-          print('Auth state: authenticated=${auth.isAuthenticated}, loading=${auth.isLoading}');
-          print('User profile: hasProfile=${userProvider.hasProfile}, onboarding=${userProvider.hasCompletedOnboarding}');
-          
-          // Enhanced routing logic with email-based user validation
-          if (auth.isAuthenticated && !userProvider.hasProfile && !userProvider.isLoading && !userProvider.hasTriedLoading) {
-            WidgetsBinding.instance.addPostFrameCallback((_) async {
-              // Check if user is existing by trying to load profile first
-              await userProvider.loadUserProfile();
+          // Removed debug print statements that were causing rebuilds
+          // print('Auth state: authenticated=${auth.isAuthenticated}, loading=${auth.isLoading}');
+          // print('User profile: hasProfile=${userProvider.hasProfile}, onboarding=${userProvider.hasCompletedOnboarding}');
 
-              // If profile exists, user is existing - go to home
-              // If no profile, user is new - go to onboarding
+          // Enhanced routing logic with email-based user validation
+          // Only trigger profile load once per authentication session
+          if (auth.isAuthenticated && !userProvider.hasProfile && !userProvider.isLoading && !userProvider.hasTriedLoading) {
+            // Use a microtask instead of postFrameCallback to prevent rebuild loops
+            Future.microtask(() async {
+              // Double-check state before loading to prevent race conditions
+              if (auth.isAuthenticated && !userProvider.hasProfile && !userProvider.isLoading && !userProvider.hasTriedLoading) {
+                await userProvider.loadUserProfile();
+              }
             });
           }
 
