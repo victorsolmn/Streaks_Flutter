@@ -53,8 +53,12 @@ class SupabaseUserProvider with ChangeNotifier {
   }
 
   Future<void> loadUserProfile() async {
+    // Get auth directly from Supabase to avoid stale state
+    final supabase = Supabase.instance.client;
+    final directAuthUser = supabase.auth.currentUser;
+
     // Get current user directly from the service to ensure we have the latest auth state
-    final currentUser = _supabaseService.currentUser;
+    final currentUser = directAuthUser ?? _supabaseService.currentUser;
     _currentUser = currentUser;
 
     final userId = currentUser?.id;
@@ -107,9 +111,15 @@ class SupabaseUserProvider with ChangeNotifier {
 
   Future<void> updateProfile(UserProfile profile) async {
     // Get current user directly from the service to ensure we have the latest auth state
-    final currentUser = _supabaseService.currentUser;
+    // Get auth state directly from Supabase client to avoid stale state
+    final supabase = Supabase.instance.client;
+    final directAuthUser = supabase.auth.currentUser;
+
+    // Use direct auth if available, otherwise fallback to service
+    final currentUser = directAuthUser ?? _supabaseService.currentUser;
     print('🔍 DEBUG: Checking user authentication...');
-    print('🔍 DEBUG: currentUser from service: $currentUser');
+    print('🔍 DEBUG: directAuthUser from Supabase: $directAuthUser');
+    print('🔍 DEBUG: currentUser from service: ${_supabaseService.currentUser}');
     print('🔍 DEBUG: Supabase service auth: ${_supabaseService.isAuthenticated}');
 
     // Update our local reference

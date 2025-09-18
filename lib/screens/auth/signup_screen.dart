@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/supabase_auth_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../services/toast_service.dart';
 import '../../services/popup_service.dart';
 import '../../utils/app_theme.dart';
-import '../onboarding/enhanced_onboarding_screen.dart';
+import '../onboarding/supabase_onboarding_screen.dart';
 import 'signin_screen.dart';
 import 'otp_verification_screen.dart';
 
@@ -68,15 +69,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       if (success && mounted) {
         ToastService().showSuccess('Account created successfully!');
-        
+
+        // CRITICAL: Wait for auth session to be fully established
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        // Verify auth state is available
+        final supabase = Supabase.instance.client;
+        final currentSession = supabase.auth.currentSession;
+        final currentUser = supabase.auth.currentUser;
+
+        print('🔍 Auth check after signup:');
+        print('  - Session: ${currentSession != null ? "Active" : "None"}');
+        print('  - User ID: ${currentUser?.id ?? "None"}');
+
         // Since we're using password auth, go directly to onboarding
         // Store the name in the user profile
         final userProvider = Provider.of<UserProvider>(context, listen: false);
         await userProvider.reloadUserData();
-        
+
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const EnhancedOnboardingScreen(),
+            builder: (context) => const SupabaseOnboardingScreen(),
           ),
         );
       } else if (mounted && authProvider.error != null) {
@@ -112,7 +125,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       // Navigate to onboarding for new users
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => const EnhancedOnboardingScreen(),
+          builder: (context) => const SupabaseOnboardingScreen(),
         ),
       );
     } else if (mounted && authProvider.error != null) {

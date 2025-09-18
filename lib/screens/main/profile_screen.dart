@@ -39,47 +39,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final ImagePicker _picker = ImagePicker();
   File? _profileImage;
   
-  // Sample weight data - in production this would come from provider
-  late WeightProgress _weightProgress;
+  // Weight data from Supabase profile
+  WeightProgress? _weightProgress;
 
   @override
   void initState() {
     super.initState();
-    // Delay initialization to ensure context is available
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Initialize with default values immediately
+    _initializeWeightDataWithDefaults();
+
+    // Then load actual data from Supabase
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // Auto-reload profile data from Supabase
+      final userProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
+      await userProvider.reloadUserProfile();
+
+      if (!mounted) return;
       _initializeWeightData();
-      setState(() {});
+      if (mounted) setState(() {});
     });
+  }
+
+  void _initializeWeightDataWithDefaults() {
+    // Initialize with placeholder data to prevent null errors
+    _weightProgress = WeightProgress(
+      startWeight: 70.0,
+      currentWeight: 70.0,
+      targetWeight: 70.0,
+      entries: [
+        WeightEntry(
+          id: 'placeholder',
+          weight: 70.0,
+          timestamp: DateTime.now(),
+        ),
+      ],
+    );
   }
 
   void _initializeWeightData() {
     // Get weight data from Supabase user profile
+    if (!mounted) return;
     final supabaseUserProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
     final profile = supabaseUserProvider.userProfile;
 
-    // Initialize with actual profile data from onboarding
-    final startWeight = profile?.weight ?? 70.0;
-    final currentWeight = profile?.weight ?? 70.0;
-    final targetWeight = profile?.targetWeight ?? startWeight;
-    
+    if (profile == null) {
+      print('ProfileScreen: No profile data available for weight initialization');
+      return;
+    }
+
+    // Use actual profile data from onboarding
+    final startWeight = profile.weight ?? 70.0;
+    final currentWeight = profile.weight ?? 70.0; // For now, same as start weight
+    final targetWeight = profile.targetWeight ?? startWeight;
+
+    print('ProfileScreen: Initializing weight data - Start: $startWeight, Current: $currentWeight, Target: $targetWeight');
+
     _weightProgress = WeightProgress(
       startWeight: startWeight,
       currentWeight: currentWeight,
       targetWeight: targetWeight,
       entries: [
-        // Add initial entry from profile
+        // Add initial entry from profile (when user started)
         WeightEntry(
           id: 'initial',
           weight: startWeight,
-          timestamp: DateTime.now().subtract(Duration(days: 30)), // Assume started 30 days ago
+          timestamp: DateTime.now().subtract(const Duration(days: 1)), // Started yesterday
         ),
-        // Add current weight entry if different from start
-        if (currentWeight != startWeight)
-          WeightEntry(
-            id: 'current',
-            weight: currentWeight,
-            timestamp: DateTime.now(),
-          ),
+        // Current weight entry
+        WeightEntry(
+          id: 'current',
+          weight: currentWeight,
+          timestamp: DateTime.now(),
+        ),
       ],
       unit: 'kg',
     );
@@ -95,7 +127,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             children: [
               _buildHeader(),
-              _buildDebugSection(), // Add debug section for testing
               _buildProfileInfo(),
               _buildWeightProgressSection(),
               _buildFitnessGoalsSection(),
@@ -210,56 +241,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildDebugSection() {
-    return Consumer<SupabaseUserProvider>(
-      builder: (context, userProvider, child) {
-        return Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.orange.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.orange.withOpacity(0.3)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '🔧 Debug: Profile Data',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange[800],
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Onboarding: ${userProvider.hasCompletedOnboarding}',
-                style: TextStyle(fontSize: 12),
-              ),
-              Text(
-                'Age: ${userProvider.userProfile?.age ?? "null"}, Height: ${userProvider.userProfile?.height ?? "null"}, Weight: ${userProvider.userProfile?.weight ?? "null"}',
-                style: TextStyle(fontSize: 12),
-              ),
-              SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () async {
-                  await userProvider.reloadUserProfile();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Profile reloaded from database')),
-                  );
-                },
-                child: Text('🔄 Reload Profile'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   Widget _buildInfoRow(IconData icon, String text) {
     return Row(
@@ -286,6 +267,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildWeightProgressSection() {
+    if (_weightProgress == null) {
+      return Container(
+        margin: const EdgeInsets.only(top: 16),
+        padding: const EdgeInsets.all(20),
+        color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkCardBackground : Colors.white,
+        child: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(20),
@@ -294,14 +286,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           WeightProgressCard(
-            weightProgress: _weightProgress,
+            weightProgress: _weightProgress!,
             onTap: () => _showWeightChart(),
           ),
           SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => _showAddWeightDialog(),
+              onPressed: _weightProgress == null ? null : () => _showAddWeightDialog(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryAccent,
                 foregroundColor: Colors.white,
@@ -859,6 +851,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showWeightChart() {
+    if (_weightProgress == null) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -904,11 +898,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: WeightChartView(
-                  weightProgress: _weightProgress,
+                  weightProgress: _weightProgress!,
                   onDeleteEntry: (entry) {
                     setState(() {
-                      _weightProgress = _weightProgress.copyWith(
-                        entries: _weightProgress.entries
+                      _weightProgress = _weightProgress!.copyWith(
+                        entries: _weightProgress!.entries
                             .where((e) => e.id != entry.id)
                             .toList(),
                       );
@@ -925,6 +919,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showAddWeightDialog() {
+    if (_weightProgress == null) return;
+
     final weightController = TextEditingController();
     final noteController = TextEditingController();
 
@@ -939,7 +935,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               controller: weightController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                labelText: 'Weight (${_weightProgress.unit})',
+                labelText: 'Weight (${_weightProgress!.unit})',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -978,9 +974,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
 
                 setState(() {
-                  final entries = List<WeightEntry>.from(_weightProgress.entries)
+                  final entries = List<WeightEntry>.from(_weightProgress!.entries)
                     ..add(newEntry);
-                  _weightProgress = _weightProgress.copyWith(
+                  _weightProgress = _weightProgress!.copyWith(
                     entries: entries,
                     currentWeight: weight,
                   );

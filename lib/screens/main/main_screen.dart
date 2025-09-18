@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../providers/nutrition_provider.dart';
 import '../../providers/health_provider.dart';
+import '../../providers/supabase_auth_provider.dart';
 import '../../services/toast_service.dart';
 import '../../services/popup_service.dart';
 import '../../widgets/sync_status_indicator.dart';

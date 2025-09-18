@@ -23,7 +23,7 @@ import 'providers/health_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/streak_provider.dart';
 import 'screens/auth/welcome_screen.dart';
-import 'screens/onboarding/enhanced_onboarding_screen.dart';
+import 'screens/onboarding/supabase_onboarding_screen.dart';
 import 'screens/main/main_screen.dart';
 import 'utils/app_theme.dart';
 
@@ -123,10 +123,10 @@ class MyApp extends StatelessWidget {
             if (userProvider.hasProfile && userProvider.hasCompletedOnboarding) {
               home = const MainScreen(); // Existing user with complete profile
             } else if (userProvider.hasProfile && !userProvider.hasCompletedOnboarding) {
-              home = const EnhancedOnboardingScreen(); // Existing user with incomplete profile
+              home = const SupabaseOnboardingScreen(); // Existing user with incomplete profile
             } else {
               // New user without profile - start onboarding
-              home = const EnhancedOnboardingScreen();
+              home = const SupabaseOnboardingScreen();
             }
           } else {
             // Not authenticated

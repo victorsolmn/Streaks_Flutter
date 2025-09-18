@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -47,6 +48,7 @@ class _ChatScreenAgentState extends State<ChatScreenAgent> {
   ConversationContext? _conversationContext;
   AgentQuestion? _currentQuestion;
   bool _agentMode = true; // Start in agent mode
+  Timer? _delayedTimer;
 
   @override
   void initState() {
@@ -56,6 +58,7 @@ class _ChatScreenAgentState extends State<ChatScreenAgent> {
 
   @override
   void dispose() {
+    _delayedTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -83,9 +86,11 @@ class _ChatScreenAgentState extends State<ChatScreenAgent> {
           timestamp: DateTime.now(),
         );
         
-        setState(() {
-          _messages.add(welcomeMessage);
-        });
+        if (mounted) {
+          setState(() {
+            _messages.add(welcomeMessage);
+          });
+        }
 
         // Save the initial context
         await _storageService.saveContext(_conversationContext!);
@@ -98,19 +103,22 @@ class _ChatScreenAgentState extends State<ChatScreenAgent> {
           timestamp: DateTime.now(),
         );
         
-        setState(() {
-          _messages.add(welcomeBackMessage);
-        });
+        if (mounted) {
+          setState(() {
+            _messages.add(welcomeBackMessage);
+          });
+        }
       }
 
       // After a brief pause, ask if agent should ask questions or wait
-      Future.delayed(const Duration(milliseconds: 1500), () {
+      _delayedTimer = Timer(const Duration(milliseconds: 1500), () {
         _checkIfShouldAskQuestion();
       });
     }
   }
 
   void _checkIfShouldAskQuestion() async {
+    if (!mounted) return;
     final userProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
     
     if (userProvider.userProfile != null && _conversationContext != null) {

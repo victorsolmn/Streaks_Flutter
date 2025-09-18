@@ -6,7 +6,7 @@ import '../../providers/user_provider.dart';
 import '../../services/toast_service.dart';
 import '../../utils/app_theme.dart';
 import '../main/main_screen.dart';
-import '../onboarding/enhanced_onboarding_screen.dart';
+import '../onboarding/supabase_onboarding_screen.dart';
 import 'signup_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -63,7 +63,7 @@ class _SignInScreenState extends State<SignInScreen> {
         } else {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => const EnhancedOnboardingScreen(),
+              builder: (context) => const SupabaseOnboardingScreen(),
             ),
           );
         }
@@ -95,7 +95,7 @@ class _SignInScreenState extends State<SignInScreen> {
       } else {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const EnhancedOnboardingScreen(),
+            builder: (context) => const SupabaseOnboardingScreen(),
           ),
         );
       }

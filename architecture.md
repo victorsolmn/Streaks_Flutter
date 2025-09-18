@@ -1,302 +1,366 @@
-# Streaks Flutter - Architecture Documentation
+# Streaks Flutter - Technical Architecture
 
 ## System Architecture Overview
 
-### Technology Stack
-- **Frontend Framework**: Flutter 3.35.2 (Dart 3.9.0)
-- **Backend Service**: Supabase (PostgreSQL + PostgREST API)
-- **Authentication**: Supabase Auth (Email/Password + Google OAuth)
-- **State Management**: Provider Pattern
-- **Local Storage**: SharedPreferences + Flutter Secure Storage
-- **Real-time Sync**: Supabase Realtime + Custom Sync Service
-- **AI Integration**: Google Gemini API + Grok API
-- **Health Integration**: Apple HealthKit (iOS) + Health Connect (Android)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Client Layer (Flutter)                 │
+├─────────────────────────────────────────────────────────────┤
+│  Presentation Layer  │  Business Logic  │   Data Layer      │
+│  - Screens/Widgets   │  - Providers      │  - Repositories   │
+│  - UI Components     │  - Services       │  - Models         │
+│  - Navigation        │  - State Mgmt     │  - API Clients    │
+├─────────────────────────────────────────────────────────────┤
+│                     Platform Integration                     │
+│  iOS: HealthKit      │  Android: Health Connect             │
+├─────────────────────────────────────────────────────────────┤
+│                      Backend Services                        │
+│  Supabase (Auth/DB)  │  Firebase (Analytics)  │  Gemini AI │
+└─────────────────────────────────────────────────────────────┘
+```
 
-## Application Architecture
-
-### Layer Structure
+## Directory Structure
 
 ```
-┌─────────────────────────────────────────┐
-│           Presentation Layer            │
-│         (Screens & Widgets)             │
-├─────────────────────────────────────────┤
-│          State Management               │
-│            (Providers)                  │
-├─────────────────────────────────────────┤
-│           Service Layer                 │
-│     (Business Logic & API Calls)        │
-├─────────────────────────────────────────┤
-│           Data Layer                    │
-│    (Models & Data Persistence)          │
-├─────────────────────────────────────────┤
-│          External Services              │
-│    (Supabase, APIs, Health Data)        │
-└─────────────────────────────────────────┘
+lib/
+├── main.dart                 # App entry point
+├── models/                   # Data models
+│   ├── user_model.dart
+│   ├── nutrition_model.dart
+│   ├── health_data_model.dart
+│   ├── profile_model.dart
+│   └── supabase_enums.dart
+├── providers/                # State management
+│   ├── supabase_auth_provider.dart
+│   ├── health_provider.dart
+│   ├── nutrition_provider.dart
+│   ├── user_provider.dart
+│   └── streak_provider.dart
+├── screens/                  # UI screens
+│   ├── auth/                # Authentication screens
+│   ├── main/                # Main app screens
+│   └── onboarding/          # Onboarding flow
+├── services/                 # Business logic
+│   ├── supabase_service.dart
+│   ├── health_service.dart
+│   ├── notification_service.dart
+│   ├── toast_service.dart
+│   ├── popup_service.dart
+│   └── onboarding_service.dart
+├── utils/                    # Utilities
+│   ├── app_theme.dart
+│   ├── constants.dart
+│   └── validators.dart
+└── widgets/                  # Reusable components
+    ├── custom_button.dart
+    ├── loading_indicator.dart
+    └── sync_status_indicator.dart
 ```
 
 ## Core Components
 
-### 1. Authentication System
+### 1. State Management Architecture
 
-#### Components
-- `SupabaseAuthProvider` - Central auth state management
-- `SupabaseService` - Low-level auth operations
-- Auth Screens (SignIn, SignUp, Welcome)
-
-#### Flow
-1. User initiates auth action
-2. Provider validates and calls service
-3. Service communicates with Supabase Auth
-4. Provider updates state
-5. UI rebuilds based on auth state
-
-### 2. User Profile Management
-
-#### Components
-- `SupabaseUserProvider` - Profile state management
-- `UserProfile` model - Complete user data structure
-- `EnhancedOnboardingScreen` - Multi-step profile setup
-
-#### Data Model (Updated Sept 17, 2025)
+#### Provider Pattern Implementation
 ```dart
-UserProfile {
-  // Basic Info
-  String name
-  String email
-  int? age
-  double? height
-  double? weight
-
-  // New Fitness Fields
-  double? targetWeight
-  String? activityLevel
-  String? fitnessGoal
-  String? experienceLevel
-  String? workoutConsistency
-
-  // Daily Targets
-  int? dailyCaloriesTarget
-  int? dailyStepsTarget
-  double? dailySleepTarget
-  double? dailyWaterTarget
-
-  // Status Flags
-  bool hasCompletedOnboarding
-  bool hasSeenFitnessGoalSummary
-
-  // Device Info
-  String? deviceName
-  bool deviceConnected
-
-  // Calculated Fields
-  double? bmiValue
-  String? bmiCategoryValue
+class AppProviders {
+  static List<Provider> get providers => [
+    ChangeNotifierProvider<SupabaseAuthProvider>(),
+    ChangeNotifierProvider<HealthProvider>(),
+    ChangeNotifierProvider<NutritionProvider>(),
+    ChangeNotifierProvider<UserProvider>(),
+    ChangeNotifierProvider<StreakProvider>(),
+  ];
 }
 ```
 
-### 3. Database Integration
+#### Provider Responsibilities
+- **SupabaseAuthProvider**: Handles authentication, session management, OTP verification
+- **HealthProvider**: Manages health data sync with HealthKit/Health Connect
+- **NutritionProvider**: Tracks meals, calories, macros
+- **UserProvider**: User profile, preferences, onboarding status
+- **StreakProvider**: Streak calculation, goal tracking
 
-#### Supabase Tables
-- `profiles` - User profile data (extended schema)
-- `nutrition` - Food tracking records
-- `health_metrics` - Daily health measurements
-- `streaks` - Habit tracking
-- `goals` - User fitness goals
+### 2. Navigation Architecture
 
-#### Service Architecture
+#### Navigation Flow
 ```
-EnhancedSupabaseService
-├── User Operations
-│   ├── createProfile()
-│   ├── updateProfile()
-│   └── deleteProfile()
-├── Nutrition Operations
-│   ├── addMeal()
-│   ├── updateMeal()
-│   └── getMealHistory()
-├── Health Operations
-│   ├── saveHealthMetrics()
-│   └── getHealthHistory()
-└── Sync Operations
-    ├── syncOfflineData()
-    └── handleRealtimeUpdates()
+SplashScreen
+    ├── AuthCheck
+    │   ├── SignInScreen → OTPVerificationScreen
+    │   └── SignUpScreen → OTPVerificationScreen
+    └── Authenticated
+        ├── OnboardingScreen (if new user)
+        └── MainScreen (5 bottom tabs)
+            ├── HomeScreen
+            ├── ProgressScreen
+            ├── NutritionScreen
+            ├── ChatScreen
+            └── ProfileScreen
 ```
 
-### 4. State Management Pattern
+### 3. Data Layer Architecture
 
-#### Provider Structure
-```
-MultiProvider
-├── SupabaseAuthProvider (Auth State)
-├── SupabaseUserProvider (User Profile)
-├── SupabaseNutritionProvider (Food Data)
-├── HealthProvider (Health Metrics)
-├── StreakProvider (Habit Tracking)
-└── ThemeProvider (UI Preferences)
-```
-
-#### State Update Flow
-1. User action triggers provider method
-2. Provider calls service layer
-3. Service interacts with Supabase/APIs
-4. Response updates provider state
-5. ChangeNotifier triggers UI rebuild
-
-### 5. Real-time Synchronization
-
-#### Components
-- `RealtimeSyncService` - Manages WebSocket connections
-- Offline queue for failed operations
-- Automatic retry with exponential backoff
-- Conflict resolution for concurrent edits
-
-#### Sync Strategy
-```
-Online Mode:
-- Direct API calls
-- Real-time updates via WebSocket
-- Immediate UI feedback
-
-Offline Mode:
-- Queue operations locally
-- Update UI optimistically
-- Sync when connection restored
-- Handle conflicts gracefully
+#### Repository Pattern
+```dart
+abstract class BaseRepository<T> {
+  Future<T?> getById(String id);
+  Future<List<T>> getAll();
+  Future<void> create(T item);
+  Future<void> update(T item);
+  Future<void> delete(String id);
+}
 ```
 
-## Data Flow Architecture
-
-### Authentication Flow
-```
-User Input → AuthScreen → SupabaseAuthProvider → SupabaseService → Supabase Auth
-                                ↓
-                        Update Auth State
-                                ↓
-                        Navigate to Home/Onboarding
-```
-
-### Profile Update Flow (Fixed Sept 17)
-```
-Onboarding Screen → Collect User Data → SupabaseUserProvider
-                                              ↓
-                                    Get Fresh Auth State
-                                              ↓
-                                    Update Profile via API
-                                              ↓
-                                    Update Local State
+#### API Client Structure
+```dart
+class SupabaseClient {
+  // Singleton pattern
+  static final instance = Supabase.instance.client;
+  
+  // Auth operations
+  Future<AuthResponse> signInWithOTP(String email);
+  Future<AuthResponse> verifyOTP(String email, String token);
+  
+  // Database operations
+  PostgrestQueryBuilder from(String table);
+  RealtimeChannel channel(String name);
+}
 ```
 
-### Health Data Integration
+### 4. Health Integration Architecture
+
+#### Platform-Specific Implementation
+```dart
+class HealthService {
+  // Platform detection
+  final bool isIOS = Platform.isIOS;
+  final bool isAndroid = Platform.isAndroid;
+  
+  // Permission handling
+  Future<bool> requestPermissions();
+  
+  // Data sync
+  Future<void> syncHealthData() {
+    if (isIOS) return _syncWithHealthKit();
+    if (isAndroid) return _syncWithHealthConnect();
+  }
+}
 ```
-HealthKit/Health Connect → HealthService → HealthProvider
-                                              ↓
-                                    Process & Aggregate
-                                              ↓
-                                    Save to Supabase
-                                              ↓
-                                    Update Dashboard
+
+#### Health Data Flow
+1. Request permissions from user
+2. Fetch data from health platform
+3. Process and normalize data
+4. Sync to Supabase backend
+5. Update local state via Provider
+
+### 5. Authentication Architecture
+
+#### OTP Flow Implementation
+```
+User enters email
+    ↓
+Send OTP via Supabase
+    ↓
+User enters 6-digit code
+    ↓
+Verify OTP
+    ↓
+Create/Update user profile
+    ↓
+Navigate to app/onboarding
 ```
 
-## Error Handling Strategy
+#### Session Management
+- Token stored in secure storage
+- Auto-refresh on app launch
+- Session validation on API calls
+- Logout clears all local data
 
-### Levels of Error Handling
-1. **Silent Recovery** - Retry without user notification
-2. **User Notification** - Toast/Snackbar for important errors
-3. **Fallback UI** - Show cached data when API fails
-4. **Graceful Degradation** - Disable features when services unavailable
+## Database Schema
 
-### Error Recovery Patterns
-- Automatic retry with exponential backoff
-- Circuit breaker for persistent failures
-- Offline queue for network errors
-- Rollback capability for critical operations
+### Core Tables
 
-## Security Architecture
+#### user_profiles
+```sql
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  display_name TEXT,
+  age INTEGER,
+  weight DECIMAL,
+  height DECIMAL,
+  activity_level TEXT,
+  fitness_goal TEXT,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+```
 
-### Authentication Security
-- Secure token storage using Flutter Secure Storage
-- Automatic token refresh
-- Session timeout handling
-- Biometric authentication support (planned)
+#### health_data
+```sql
+CREATE TABLE health_data (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES user_profiles(id),
+  date DATE,
+  steps INTEGER,
+  calories_burned DECIMAL,
+  active_minutes INTEGER,
+  distance DECIMAL,
+  heart_rate_avg INTEGER,
+  synced_at TIMESTAMP
+);
+```
 
-### Data Security
-- Row Level Security (RLS) in Supabase
-- User data isolation
-- Encrypted local storage for sensitive data
-- API key management via environment variables
+#### nutrition_entries
+```sql
+CREATE TABLE nutrition_entries (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES user_profiles(id),
+  meal_type TEXT,
+  food_name TEXT,
+  calories DECIMAL,
+  protein DECIMAL,
+  carbs DECIMAL,
+  fat DECIMAL,
+  logged_at TIMESTAMP
+);
+```
 
 ## Performance Optimizations
 
-### Implemented Optimizations
-- Lazy loading for large data sets
-- Image caching and compression
-- Debounced search inputs
-- Memoized expensive calculations
-- Connection pooling for database
+### 1. Widget Lifecycle Management
+- Always check `mounted` before async operations
+- Proper disposal of controllers and listeners
+- Timer management to prevent memory leaks
 
-### Caching Strategy
+### 2. Data Caching Strategy
+- Local caching with SharedPreferences
+- Offline-first approach for critical data
+- Sync queue for failed operations
+
+### 3. Image Optimization
+- Lazy loading for images
+- Compression before upload
+- CDN integration for assets
+
+## Security Implementation
+
+### 1. Data Protection
+- Flutter Secure Storage for sensitive data
+- Environment variables for API keys
+- Certificate pinning for API calls
+
+### 2. Authentication Security
+- OTP expiration (60 seconds)
+- Rate limiting on auth endpoints
+- Session timeout after inactivity
+
+### 3. Health Data Privacy
+- Explicit permission requests
+- Minimal data collection
+- User control over data sharing
+
+## Error Handling Strategy
+
+### 1. Global Error Handling
+```dart
+class ErrorHandler {
+  static void handleError(dynamic error) {
+    if (error is NetworkException) {
+      PopupService.showNetworkError();
+    } else if (error is AuthException) {
+      NavigationService.navigateToLogin();
+    } else {
+      ToastService.showError('An error occurred');
+    }
+  }
+}
 ```
-Level 1: In-memory cache (Provider state)
-Level 2: Local storage (SharedPreferences)
-Level 3: Remote database (Supabase)
-```
 
-## Testing Architecture
+### 2. Retry Mechanisms
+- Exponential backoff for network requests
+- Offline queue for failed syncs
+- User-initiated retry options
 
-### Test Coverage
-- Unit tests for business logic
-- Widget tests for UI components
-- Integration tests for API flows
-- End-to-end tests for critical paths
+## Testing Strategy
 
-### Testing Infrastructure
-- `DatabaseTestScreen` - Interactive API testing
-- Automated test scripts
-- Mock data generators
-- Performance benchmarking tools
+### 1. Unit Tests
+- Provider logic testing
+- Model serialization tests
+- Utility function tests
 
-## Deployment Architecture
+### 2. Widget Tests
+- Screen navigation tests
+- Form validation tests
+- Component interaction tests
 
-### Build Configuration
-- Development, staging, production environments
-- Environment-specific configurations
-- Feature flags for gradual rollout
-- A/B testing infrastructure (planned)
+### 3. Integration Tests
+- Auth flow testing
+- Health sync testing
+- End-to-end user journeys
+
+## Build & Deployment
+
+### iOS Configuration
+- Bundle ID: com.streaker.streaker
+- Minimum iOS: 13.0
+- HealthKit capabilities enabled
+
+### Android Configuration
+- Package: com.streaker.streaker
+- Min SDK: 26 (Android 8.0)
+- Target SDK: 36
+- Health Connect integration
 
 ### CI/CD Pipeline (Planned)
+```yaml
+pipeline:
+  - lint: flutter analyze
+  - test: flutter test
+  - build_ios: flutter build ios
+  - build_android: flutter build apk
+  - deploy: fastlane deploy
 ```
-Code Push → GitHub Actions → Run Tests → Build App → Deploy to TestFlight/Play Console
-```
 
-## Future Architecture Enhancements
+## Monitoring & Analytics
 
-### Planned Improvements
-1. **Microservices Migration** - Split monolithic services
-2. **GraphQL Integration** - Replace REST with GraphQL
-3. **Event-Driven Architecture** - Implement event sourcing
-4. **ML Pipeline** - On-device AI for personalized recommendations
-5. **Multi-tenancy Support** - Support for gym/trainer accounts
+### 1. Firebase Analytics Events
+- User registration
+- Feature usage
+- Error tracking
+- Performance metrics
 
-### Scalability Considerations
-- Database sharding for user data
-- CDN for static assets
-- Edge functions for computation
-- WebSocket scaling for real-time features
+### 2. Crash Reporting
+- Firebase Crashlytics (when enabled)
+- Error boundaries
+- Stack trace collection
 
-## Architecture Decisions Log
+### 3. Performance Monitoring
+- App startup time
+- Screen load times
+- API response times
+- Memory usage tracking
 
-### Sept 17, 2025
-- **Decision**: Get auth state fresh from service instead of caching
-- **Reason**: Cached state was becoming stale, causing auth failures
-- **Impact**: More reliable but slightly more API calls
+## Future Architecture Improvements
 
-### Sept 16, 2025
-- **Decision**: Use Provider pattern over Riverpod/Bloc
-- **Reason**: Simpler implementation, sufficient for current needs
-- **Impact**: Easier maintenance but less powerful state management
+### 1. Scalability Enhancements
+- Implement GraphQL for efficient data fetching
+- Add Redis caching layer
+- Microservices architecture for backend
 
-### Sept 15, 2025
-- **Decision**: Supabase over Firebase
-- **Reason**: Better PostgreSQL support, simpler pricing
-- **Impact**: More control over database but less mature ecosystem
+### 2. Technical Debt Reduction
+- Migrate to Riverpod for better state management
+- Implement clean architecture principles
+- Add comprehensive error boundaries
+
+### 3. Feature Additions
+- Real-time collaboration features
+- WebSocket for live updates
+- Background task scheduling
+- ML model integration for predictions
+
+---
+Last Updated: September 2025
+Version: 1.0.0

@@ -5,7 +5,7 @@ import '../../providers/supabase_auth_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/toast_service.dart';
 import '../../utils/app_theme.dart';
-import '../onboarding/enhanced_onboarding_screen.dart';
+import '../onboarding/supabase_onboarding_screen.dart';
 import '../main/main_screen.dart';
 import 'dart:async';
 
@@ -116,7 +116,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         // New users always go through onboarding
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const EnhancedOnboardingScreen(),
+            builder: (context) => const SupabaseOnboardingScreen(),
           ),
         );
       } else {
@@ -134,7 +134,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           // Existing user but incomplete profile → Onboarding
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => const EnhancedOnboardingScreen(),
+              builder: (context) => const SupabaseOnboardingScreen(),
             ),
           );
         }

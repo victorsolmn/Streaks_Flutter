@@ -58,6 +58,25 @@ class SupabaseAuthProvider with ChangeNotifier {
       if (response.user != null) {
         _currentUser = response.user;
 
+        // CRITICAL FIX: Sign in the user to establish a session
+        // signUp creates user but doesn't create session, we need to sign them in
+        try {
+          final signInResponse = await _supabaseService.client.auth.signInWithPassword(
+            email: email,
+            password: password,
+          );
+
+          if (signInResponse.session != null) {
+            print('✅ Session established after signup');
+            _currentUser = signInResponse.user;
+          } else {
+            print('⚠️ Warning: No session after signin attempt');
+          }
+        } catch (signInError) {
+          print('⚠️ Warning: Could not establish session after signup: $signInError');
+          // Continue anyway as user is created
+        }
+
         // Ensure user profile exists (in case database trigger failed)
         await _ensureUserProfileExists(response.user!);
 
