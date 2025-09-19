@@ -63,7 +63,7 @@ class StreakProvider extends ChangeNotifier {
       if (userId == null) return;
       
       final response = await _supabaseService.client
-          .from('user_streaks')
+          .from('streaks')
           .select()
           .eq('user_id', userId)
           .maybeSingle();
@@ -268,7 +268,7 @@ class StreakProvider extends ChangeNotifier {
       if (userId == null) return;
       
       final response = await _supabaseService.client
-          .from('user_streaks')
+          .from('streaks')
           .insert({
             'user_id': userId,
             'current_streak': 0,
@@ -356,7 +356,7 @@ class StreakProvider extends ChangeNotifier {
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
-          table: 'user_streaks',
+          table: 'streaks',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'user_id',

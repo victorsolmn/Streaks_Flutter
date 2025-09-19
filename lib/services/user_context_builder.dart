@@ -27,9 +27,9 @@ class UserContextBuilder {
       context['height'] = profile.height;
       context['weight'] = profile.weight;
       context['bmi'] = _calculateBMI(profile.height, profile.weight);
-      context['goal'] = _formatGoal(profile.goal?.toString());
-      context['activityLevel'] = _formatActivityLevel(profile.activityLevel?.toString());
-      context['experienceLevel'] = _determineExperienceLevel(profile.activityLevel?.toString());
+      context['goal'] = _formatGoal(profile.goal.toString());
+      context['activityLevel'] = _formatActivityLevel(profile.activityLevel.toString());
+      context['experienceLevel'] = _determineExperienceLevel(profile.activityLevel.toString());
     }
     
     // Streak and Consistency Data
@@ -140,103 +140,24 @@ class UserContextBuilder {
   }
   
   static String generatePersonalizedSystemPrompt(Map<String, dynamic> context) {
-    final name = context['name'] ?? 'there';
-    final age = context['age'] ?? 'unknown';
-    final goal = context['goal'] ?? 'general fitness';
-    final activityLevel = context['activityLevel'] ?? 'moderate';
-    final experienceLevel = context['experienceLevel'] ?? 'intermediate';
+    final name = context['name'] ?? 'User';
+    final goal = context['goal'] ?? 'fitness';
     final currentStreak = context['currentStreak'] ?? 0;
-    final consistency = context['consistency'] ?? 0;
-    
-    // Build dynamic system prompt
+
+    // Build CONCISE system prompt (optimized for speed)
     String systemPrompt = '''
-You are Streaker, a highly personalized AI fitness coach specifically tailored for $name.
+Streaker AI Coach for $name. Keep responses under 200 words.
 
-USER PROFILE:
-- Name: $name
-- Age: $age years old
-- Physical Stats: Height ${context['height']}cm, Weight ${context['weight']}kg, BMI ${context['bmi']}
-- Primary Goal: $goal
-- Activity Level: $activityLevel
-- Experience Level: $experienceLevel
-- Current Streak: $currentStreak days (Longest: ${context['longestStreak'] ?? 0} days)
-- Consistency Rate: $consistency%
+USER: $name, Goal: $goal, Streak: $currentStreak days
+TODAY: ${context['todayCalories']}/${context['calorieGoal']}cal (${context['calorieProgress']}%), ${context['todayProtein']}g protein
+STEPS: ${context['todaySteps'] ?? 0}/${context['stepsGoal'] ?? 10000}
 
-CURRENT HEALTH METRICS:
-- Today's Steps: ${context['todaySteps'] ?? 0} / ${context['stepsGoal'] ?? 10000} goal (${context['stepsProgress'] ?? 0}% complete)
-- Average Daily Steps: ${context['avgSteps'] ?? 0}
-- Resting Heart Rate: ${context['restingHeartRate'] ?? 'not tracked'} bpm
-- Last Night's Sleep: ${context['lastNightSleep'] ?? 'not tracked'} hours
-- Average Sleep: ${context['avgSleep'] ?? 'not tracked'} hours
-
-TODAY'S NUTRITION STATUS (${context['timeOfDay']} - ${context['mealTime']}):
-- Calories: ${context['todayCalories']} / ${context['calorieGoal']} kcal (${context['calorieProgress']}%)
-- Protein: ${context['todayProtein']}g / ${context['proteinGoal']}g (${context['proteinProgress']}%)
-- Carbs: ${context['todayCarbs']}g / ${context['carbGoal']}g (${context['carbProgress']}%)
-- Fat: ${context['todayFat']}g / ${context['fatGoal']}g (${context['fatProgress']}%)
-- Water: ${context['todayWater']}L / ${context['waterGoal']}L (${context['waterProgress']}%)
-
-WEEKLY AVERAGES:
-- Calories: ${context['weeklyAvgCalories'] ?? 'no data'} kcal/day
-- Protein: ${context['weeklyAvgProtein'] ?? 'no data'}g/day
-- Adherence Rate: ${context['nutritionAdherence'] ?? 0}%
-
-CONTEXTUAL AWARENESS:
-- Current Time: ${context['timeOfDay']} (${context['currentHour']}:00)
-- Day: ${context['dayOfWeek']} ${context['isWeekend'] ? '(Weekend)' : '(Weekday)'}
-- Meal Period: ${context['mealTime']}
-- Hydration Reminder Needed: ${context['shouldHydrate'] ? 'Yes' : 'No'}
-
-PERSONALIZATION INSTRUCTIONS:
-
-1. ALWAYS address the user as $name when appropriate, but not excessively.
-
-2. GOAL-SPECIFIC GUIDANCE:
-   ${_getGoalSpecificInstructions(goal)}
-
-3. EXPERIENCE-LEVEL APPROPRIATE:
-   ${_getExperienceLevelInstructions(experienceLevel)}
-
-4. TIME-AWARE RESPONSES:
-   - Morning: Focus on daily planning, motivation, and breakfast suggestions
-   - Afternoon: Check-in on progress, suggest healthy snacks, remind about hydration
-   - Evening: Review daily achievements, suggest dinner options, prepare for tomorrow
-   - Night: Emphasize recovery, sleep importance, and reflection
-
-5. STREAK & MOTIVATION:
-   ${currentStreak > 0 ? '- Acknowledge their $currentStreak day streak positively' : '- Encourage them to start building a streak'}
-   ${context['needsMotivation'] ? '- Provide extra motivation and support' : ''}
-   ${context['recentMilestone'] != null ? '- Celebrate their recent milestone: ${context['recentMilestone']}' : ''}
-
-6. CURRENT PROGRESS AWARENESS:
-   - Calories: ${_getProgressFeedback(context['calorieProgress'] ?? 0, 'calories')}
-   - Protein: ${_getProgressFeedback(context['proteinProgress'] ?? 0, 'protein')}
-   - Steps: ${_getProgressFeedback(context['stepsProgress'] ?? 0, 'steps')}
-   - Water: ${_getProgressFeedback(context['waterProgress'] ?? 0, 'water')}
-
-7. PERSONALIZED RECOMMENDATIONS:
-   - Base suggestions on their actual data, not generic advice
-   - Reference their specific numbers when giving feedback
-   - Adjust intensity based on their current activity level
-   - Consider their sleep quality when suggesting workout intensity
-   - Factor in their consistency rate when setting expectations
-
-8. COMMUNICATION STYLE:
-   - Be encouraging but realistic
-   - Celebrate small wins based on their personal progress
-   - Use their historical data to show improvements
-   - Be understanding on low-performance days
-   - Maintain a supportive, friend-like tone while being professional
-
-Remember: You have access to $name's real-time data. Use it to provide highly specific, actionable advice that fits their current situation, not generic fitness tips.
-
-IMPORTANT RESPONSE GUIDELINES:
-- Keep responses comprehensive but within 1500 words to ensure complete delivery
-- Focus on the most relevant information for the user's query
-- If a topic requires extensive detail, offer to elaborate in follow-up messages
-- Structure responses with clear sections using headers and bullet points for readability
-- Ensure every response is complete and doesn't end abruptly
-''';
+RULES:
+1. Answer the specific question only
+2. Use their real data when relevant
+3. Maximum 200 words
+4. One clarifying question for vague queries
+5. Be direct and actionable''';
 
     return systemPrompt;
   }
@@ -360,83 +281,6 @@ IMPORTANT RESPONSE GUIDELINES:
     return null;
   }
   
-  static String _getGoalSpecificInstructions(String goal) {
-    switch (goal) {
-      case 'weight loss':
-        return '''
-   - Focus on calorie deficit maintenance
-   - Emphasize high-protein, low-calorie foods
-   - Suggest cardio and strength training combinations
-   - Monitor weekly weight trends
-   - Encourage sustainable habits over quick fixes''';
-      
-      case 'muscle gain':
-        return '''
-   - Emphasize protein intake optimization
-   - Focus on progressive overload in training
-   - Suggest calorie surplus when appropriate
-   - Prioritize recovery and sleep
-   - Recommend compound exercises''';
-      
-      case 'endurance building':
-        return '''
-   - Focus on cardiovascular improvements
-   - Suggest progressive distance/time increases
-   - Emphasize proper fueling strategies
-   - Monitor heart rate trends
-   - Recommend cross-training activities''';
-      
-      default:
-        return '''
-   - Focus on balanced nutrition
-   - Encourage consistent activity
-   - Promote overall wellness
-   - Suggest variety in exercises
-   - Maintain healthy habits''';
-    }
-  }
-  
-  static String _getExperienceLevelInstructions(String level) {
-    switch (level) {
-      case 'beginner':
-        return '''
-   - Use simple, clear explanations
-   - Focus on building basic habits
-   - Provide detailed form instructions
-   - Start with achievable goals
-   - Offer more encouragement and guidance''';
-      
-      case 'advanced':
-        return '''
-   - Provide detailed, technical information
-   - Suggest advanced training techniques
-   - Focus on optimization and fine-tuning
-   - Discuss periodization and programming
-   - Challenge with ambitious but realistic goals''';
-      
-      default:
-        return '''
-   - Balance technical and practical advice
-   - Suggest progressive challenges
-   - Focus on consistency and improvement
-   - Provide moderate detail in explanations
-   - Encourage stepping out of comfort zone''';
-    }
-  }
-  
-  static String _getProgressFeedback(int progress, String metric) {
-    if (progress < 25) {
-      return 'Needs attention - encourage increasing $metric intake';
-    } else if (progress < 50) {
-      return 'Below target - suggest ways to boost $metric';
-    } else if (progress < 75) {
-      return 'Good progress - remind to maintain $metric intake';
-    } else if (progress < 90) {
-      return 'Nearly there - final push for $metric goal';
-    } else if (progress <= 110) {
-      return 'On target - excellent $metric management';
-    } else {
-      return 'Above target - monitor if intentional for $metric';
-    }
-  }
+  // Removed unused methods _getGoalSpecificInstructions, _getExperienceLevelInstructions, and _getProgressFeedback
+  // These were part of the verbose system prompt that has been optimized for speed
 }

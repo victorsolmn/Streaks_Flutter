@@ -22,6 +22,7 @@ import 'providers/user_provider.dart';
 import 'providers/health_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/streak_provider.dart';
+import 'providers/achievement_provider.dart';
 import 'screens/auth/welcome_screen.dart';
 import 'screens/onboarding/supabase_onboarding_screen.dart';
 import 'screens/main/main_screen.dart';
@@ -92,6 +93,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => HealthProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider(prefs)),
         ChangeNotifierProvider(create: (_) => StreakProvider()),
+        ChangeNotifierProvider(create: (_) => AchievementProvider()),
       ],
       child: Consumer3<SupabaseAuthProvider, SupabaseUserProvider, ThemeProvider>(
         builder: (context, auth, userProvider, themeProvider, _) {

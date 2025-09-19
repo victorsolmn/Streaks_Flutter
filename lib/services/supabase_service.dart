@@ -23,6 +23,10 @@ class SupabaseService {
     await Supabase.initialize(
       url: SupabaseConfig.supabaseUrl,
       anonKey: SupabaseConfig.supabaseAnonKey,
+      authOptions: const FlutterAuthClientOptions(
+        authFlowType: AuthFlowType.pkce,
+        autoRefreshToken: true,
+      ),
     );
 
     _supabase = Supabase.instance.client;
@@ -372,14 +376,25 @@ class SupabaseService {
     required Map<String, dynamic> metrics,
   }) async {
     try {
-      await _supabase.from('health_metrics').upsert({
+      // Only include heart_rate if it's valid (> 0)
+      final data = {
         'user_id': userId,
         'date': date,
         'steps': metrics['steps'] ?? 0,
-        'heart_rate': metrics['heart_rate'],
-        'sleep_hours': metrics['sleep_hours'],
-        'calories_burned': metrics['calories_burned'],
-      }, onConflict: 'user_id,date');
+      };
+
+      // Add optional fields only if they have valid values
+      if (metrics['heart_rate'] != null && metrics['heart_rate'] > 0) {
+        data['heart_rate'] = metrics['heart_rate'];
+      }
+      if (metrics['sleep_hours'] != null && metrics['sleep_hours'] > 0) {
+        data['sleep_hours'] = metrics['sleep_hours'];
+      }
+      if (metrics['calories_burned'] != null && metrics['calories_burned'] > 0) {
+        data['calories_burned'] = metrics['calories_burned'];
+      }
+
+      await _supabase.from('health_metrics').upsert(data, onConflict: 'user_id,date');
     } catch (e) {
       throw Exception('Failed to save health metrics: $e');
     }

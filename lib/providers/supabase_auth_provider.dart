@@ -229,6 +229,8 @@ class SupabaseAuthProvider with ChangeNotifier {
 
       final response = await _supabaseService.client.auth.signInWithOAuth(
         OAuthProvider.google,
+        authScreenLaunchMode: LaunchMode.externalApplication,
+        redirectTo: 'com.streaker.streaker://login-callback',
         scopes: 'email profile',
       );
 

@@ -391,7 +391,7 @@ $recentContext
 
             // Main content
             Expanded(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
@@ -401,25 +401,30 @@ $recentContext
                     Text(
                       'Hi, $userName! 👋',
                       style: TextStyle(
-                        fontSize: 28,
+                        fontSize: 32,
                         fontWeight: FontWeight.bold,
                         color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                        letterSpacing: -0.5,
+                        height: 1.1,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
-                      'Ready to crush your fitness goals?',
+                      'Ready to ignite your fitness journey?',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
                         color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+                        height: 1.3,
+                        letterSpacing: 0.2,
                       ),
                     ),
                     const SizedBox(height: 32),
 
                     // Quick prompts
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 12,
+                      runSpacing: 12,
                       alignment: WrapAlignment.center,
                       children: [
                         _buildQuickPromptChip(
@@ -446,63 +451,78 @@ $recentContext
                     ),
                     const SizedBox(height: 32),
 
-                    // Popular topics
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Popular Topics',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  _buildTopicCard(
-                                    icon: Icons.fitness_center,
-                                    title: 'Strength Training',
-                                    description: 'Build muscle and power',
-                                    gradient: AppTheme.primaryGradient,
-                                    onTap: () => _sendMessage('Tell me about effective strength training techniques'),
-                                  ),
-                                  _buildTopicCard(
-                                    icon: Icons.directions_run,
-                                    title: 'Cardio & Endurance',
-                                    description: 'Boost your stamina',
-                                    gradient: AppTheme.secondaryGradient,
-                                    onTap: () => _sendMessage('How can I improve my cardio endurance?'),
-                                  ),
-                                  _buildTopicCard(
-                                    icon: Icons.restaurant,
-                                    title: 'Nutrition Tips',
-                                    description: 'Fuel your body right',
-                                    gradient: AppTheme.accentGradient,
-                                    onTap: () => _sendMessage('What nutrition tips do you have for my goals?'),
-                                  ),
-                                  _buildTopicCard(
-                                    icon: Icons.bedtime,
-                                    title: 'Recovery',
-                                    description: 'Rest and restore',
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                                    ),
-                                    onTap: () => _sendMessage('How important is recovery and how can I optimize it?'),
-                                  ),
-                                ],
+                    // Popular topics - Modern Grid Design
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.explore,
+                                size: 20,
+                                color: AppTheme.primaryAccent.withOpacity(0.8),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Explore Topics',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        // Modern 2x2 Grid Layout
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 1.6,
+                          children: [
+                            _buildModernTopicTile(
+                              icon: Icons.fitness_center,
+                              title: 'Strength',
+                              subtitle: 'Build muscle',
+                              color: AppTheme.accentFlameRed,
+                              isDarkMode: isDarkMode,
+                              onTap: () => _sendMessage('Tell me about effective strength training techniques'),
+                            ),
+                            _buildModernTopicTile(
+                              icon: Icons.directions_run,
+                              title: 'Cardio',
+                              subtitle: 'Boost endurance',
+                              color: AppTheme.accentFlameOrange,
+                              isDarkMode: isDarkMode,
+                              onTap: () => _sendMessage('How can I improve my cardio endurance?'),
+                            ),
+                            _buildModernTopicTile(
+                              icon: Icons.restaurant_menu,
+                              title: 'Nutrition',
+                              subtitle: 'Fuel your body',
+                              color: AppTheme.accentEmber,
+                              isDarkMode: isDarkMode,
+                              onTap: () => _sendMessage('What nutrition tips do you have for my goals?'),
+                            ),
+                            _buildModernTopicTile(
+                              icon: Icons.bedtime,
+                              title: 'Recovery',
+                              subtitle: 'Rest & restore',
+                              color: AppTheme.accentFlameYellow,
+                              isDarkMode: isDarkMode,
+                              onTap: () => _sendMessage('How important is recovery and how can I optimize it?'),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -973,34 +993,139 @@ $recentContext
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(25),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
             color: isDarkMode
                 ? AppTheme.darkCardBackground
                 : AppTheme.cardBackgroundLight,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(25),
             border: Border.all(
-              color: AppTheme.primaryAccent.withOpacity(0.3),
+              color: AppTheme.primaryAccent.withOpacity(0.2),
+              width: 1.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryAccent.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+                spreadRadius: 0,
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 16,
-                color: AppTheme.primaryAccent,
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  size: 16,
+                  color: AppTheme.primaryAccent,
+                ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 10),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 14,
+                  fontWeight: FontWeight.w600,
                   color: isDarkMode
                       ? AppTheme.textPrimaryDark
                       : AppTheme.textPrimary,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernTopicTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required bool isDarkMode,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDarkMode
+                ? AppTheme.darkCardBackground
+                : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDarkMode
+                  ? Colors.white.withOpacity(0.08)
+                  : Colors.grey.withOpacity(0.15),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+                spreadRadius: 0,
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode
+                      ? AppTheme.textPrimaryDark
+                      : AppTheme.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDarkMode
+                      ? AppTheme.textSecondaryDark.withOpacity(0.7)
+                      : AppTheme.textSecondary.withOpacity(0.7),
+                  letterSpacing: 0.1,
                 ),
               ),
             ],
@@ -1023,42 +1148,247 @@ $recentContext
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24),
           child: Container(
-            width: 140,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: gradient,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+            width: 95,
+            height: 95,
+            child: Stack(
               children: [
-                Icon(
-                  icon,
-                  size: 32,
-                  color: Colors.white,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                // Main 3D card container
+                Container(
+                  width: 95,
+                  height: 95,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      // Deep shadow for 3D effect
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 30,
+                        offset: const Offset(0, 15),
+                        spreadRadius: -5,
+                      ),
+                      // Mid shadow
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                        spreadRadius: -2,
+                      ),
+                      // Close shadow
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                        spreadRadius: 0,
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.white.withOpacity(0.9),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: gradient,
+                      borderRadius: BorderRadius.circular(24),
+                      // Inner highlight for 3D effect
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        // Inner glow gradient overlay
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withOpacity(0.1),
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.05),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // 3D Icon container
+                            Container(
+                              width: 35,
+                              height: 35,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Colors.white.withOpacity(0.3),
+                                    Colors.white.withOpacity(0.1),
+                                  ],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                  BoxShadow(
+                                    color: Colors.white.withOpacity(0.1),
+                                    blurRadius: 1,
+                                    offset: const Offset(0, -1),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                icon,
+                                size: 18,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.3),
+                                    offset: const Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // Title with 3D text effect
+                            Text(
+                              title,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 0.3,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.5),
+                                    offset: const Offset(0, 1),
+                                    blurRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            // Description
+                            Text(
+                              description,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: Colors.white.withOpacity(0.9),
+                                height: 1.2,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.3),
+                                    offset: const Offset(0, 1),
+                                    blurRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Alternative chip-style layout inspired by Image #3
+  Widget _buildTopicChips(bool isDarkMode) {
+    final topics = [
+      {'icon': Icons.fitness_center, 'title': 'Strength Training', 'message': 'Tell me about effective strength training techniques'},
+      {'icon': Icons.directions_run, 'title': 'Cardio & Endurance', 'message': 'How can I improve my cardio endurance?'},
+      {'icon': Icons.restaurant, 'title': 'Nutrition Tips', 'message': 'What nutrition tips do you have for my goals?'},
+      {'icon': Icons.bedtime, 'title': 'Recovery', 'message': 'How important is recovery and how can I optimize it?'},
+      {'icon': Icons.psychology, 'title': 'Mindset', 'message': 'Help me develop a strong fitness mindset'},
+      {'icon': Icons.timer, 'title': 'Quick Workout', 'message': 'Give me a 15-minute workout I can do now'},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: topics.map((topic) => _buildTopicChip(
+          icon: topic['icon'] as IconData,
+          title: topic['title'] as String,
+          onTap: () => _sendMessage(topic['message'] as String),
+          isDarkMode: isDarkMode,
+        )).toList(),
+      ),
+    );
+  }
+
+  Widget _buildTopicChip({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    required bool isDarkMode,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppTheme.primaryAccent.withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryAccent.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
           ),
         ),
       ),

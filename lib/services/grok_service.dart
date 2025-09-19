@@ -1,37 +1,32 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
-import '../models/user_model.dart';
 
 class GrokService {
   static const String _baseUrl = ApiConfig.grokApiUrl;
   static const String _apiKey = ApiConfig.grokApiKey;
   
-  // Concise system prompt for ChatGPT-style responses
+  // Optimized system prompt for faster, focused responses
   static const String _systemPrompt = '''
-You are Streaker AI, a fitness coach providing concise, well-structured responses.
+You are Streaker AI, a fitness coach. CRITICAL RULES:
 
-**RESPONSE FORMAT (STRICT):**
-- Start with a brief title/heading
-- Use bullet points for key information
-- Keep responses under 150 words
-- Include 2-3 actionable suggestions at the end
-- Use emojis sparingly (💪 🎯 ✅)
+1. **RESPONSE LENGTH**: Maximum 200 words (strictly enforced)
+2. **VAGUE QUERIES**: Ask ONE clarifying question if query is unclear
+3. **FORMAT**:
+   - Direct answer to the specific question asked
+   - 2-3 bullet points if needed
+   - One follow-up question
 
-**YOUR EXPERTISE:**
-Workouts, nutrition, recovery, habit formation, motivation
+4. **FOCUS**: Answer ONLY what was asked, don't add unrelated advice
+5. **TONE**: Friendly, concise, actionable
 
-**COMMUNICATION RULES:**
-1. Be concise and scannable
-2. Focus on immediate actionable advice
-3. Use proper markdown formatting:
-   - # for main titles
-   - ## for subheadings
-   - • for bullet points
-   - **bold** for emphasis
-4. End with "What would you like to focus on next?"
+Examples of clarifying questions for vague queries:
+- "Want a workout" → "What's your fitness level and available time today?"
+- "Help with diet" → "What's your specific goal - weight loss, muscle gain, or energy?"
+- "I'm stuck" → "What specific challenge are you facing with your fitness journey?"
 
-**SAFETY:** Always recommend consulting professionals for injuries or medical concerns.''';
+**NEVER** provide lengthy explanations or general advice unless specifically requested.''';
 
   static final GrokService _instance = GrokService._internal();
   factory GrokService() => _instance;
@@ -44,6 +39,12 @@ Workouts, nutrition, recovery, habit formation, motivation
     String? personalizedSystemPrompt,
   }) async {
     print('🤖 GROK API: Starting API call for message: "${userMessage.substring(0, userMessage.length > 50 ? 50 : userMessage.length)}..."');
+
+    // Check for vague queries first (but only if no conversation history)
+    if ((conversationHistory == null || conversationHistory.isEmpty) && _isVagueQuery(userMessage)) {
+      print('🤖 GROK API: Detected vague query, returning clarifying question');
+      return _getClarifyingQuestion(userMessage);
+    }
 
     try {
       // Build messages array with system prompt
@@ -79,21 +80,30 @@ Workouts, nutrition, recovery, habit formation, motivation
       print('🤖 GROK API: Making request to $_baseUrl');
       print('🤖 GROK API: Message count: ${messages.length}');
 
-      // Make API request
-      final response = await http.post(
-        Uri.parse(_baseUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_apiKey',
-        },
-        body: jsonEncode({
-          'model': ApiConfig.grokModel,
-          'messages': messages,
-          'temperature': ApiConfig.temperature,
-          'max_tokens': ApiConfig.maxTokens,
-          'top_p': ApiConfig.topP,
-        }),
-      );
+      // Make API request with timeout
+      final response = await http
+          .post(
+            Uri.parse(_baseUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $_apiKey',
+            },
+            body: jsonEncode({
+              'model': ApiConfig.grokModel,
+              'messages': messages,
+              'temperature': ApiConfig.temperature,
+              'max_tokens': ApiConfig.maxTokens,
+              'top_p': ApiConfig.topP,
+              'stream': false,
+            }),
+          )
+          .timeout(
+            ApiConfig.apiTimeout,
+            onTimeout: () {
+              print('🤖 GROK API: Request timed out after ${ApiConfig.apiTimeout.inSeconds} seconds');
+              throw TimeoutException('Request timed out', ApiConfig.apiTimeout);
+            },
+          );
 
       print('🤖 GROK API: Response status: ${response.statusCode}');
 
@@ -113,11 +123,111 @@ Workouts, nutrition, recovery, habit formation, motivation
         print('🤖 GROK API: Using fallback response due to API error');
         return _getFallbackResponse(userMessage);
       }
+    } on TimeoutException catch (e) {
+      print('🤖 GROK API TIMEOUT: $e');
+      return _getTimeoutResponse();
     } catch (e) {
       print('🤖 GROK API EXCEPTION: $e');
       print('🤖 GROK API: Using fallback response due to exception');
       return _getFallbackResponse(userMessage);
     }
+  }
+
+  String _getTimeoutResponse() {
+    return '''I apologize for the delay! The AI service is taking longer than expected.
+
+**Quick Tips While You Wait:**
+• Try asking a more specific question
+• Check your internet connection
+• You can still browse your stats and logs
+
+Feel free to try again in a moment! 💪''';
+  }
+
+  bool _isVagueQuery(String message) {
+    final vaguePhrases = [
+      'help', 'workout', 'diet', 'exercise', 'food', 'nutrition',
+      'weight', 'muscle', 'fitness', 'health', 'plan', 'routine',
+      'program', 'schedule', 'tips', 'advice', 'motivation', 'stuck'
+    ];
+
+    final words = message.toLowerCase().split(' ');
+
+    // Check if message is too short and contains only vague terms
+    if (words.length <= 2) {
+      for (final word in words) {
+        if (vaguePhrases.contains(word)) {
+          return true;
+        }
+      }
+    }
+
+    // Check if message is just a single vague word
+    if (words.length == 1 && vaguePhrases.contains(words[0])) {
+      return true;
+    }
+
+    return false;
+  }
+
+  String _getClarifyingQuestion(String vagueMessage) {
+    final lower = vagueMessage.toLowerCase();
+
+    if (lower.contains('workout') || lower.contains('exercise')) {
+      return '''I'd love to help with your workout! To give you the best advice:
+
+**Please tell me:**
+• Your fitness level (beginner/intermediate/advanced)?
+• How much time do you have today?
+• Any specific muscle groups or goals?
+
+Example: "I'm a beginner with 30 minutes for upper body"''';
+    }
+
+    if (lower.contains('diet') || lower.contains('nutrition') || lower.contains('food')) {
+      return '''I can help with your nutrition! To be more specific:
+
+**What would you like to know?**
+• Meal planning for your goals?
+• Macro calculations?
+• Healthy recipe ideas?
+• Pre/post workout nutrition?
+
+Example: "Help me plan high-protein meals for muscle gain"''';
+    }
+
+    if (lower.contains('weight')) {
+      return '''I can help with weight management! Please clarify:
+
+**Are you looking to:**
+• Lose weight? (How much?)
+• Gain weight/muscle?
+• Maintain current weight?
+• Track progress effectively?
+
+Example: "I want to lose 10 pounds in 2 months"''';
+    }
+
+    if (lower.contains('stuck') || lower.contains('motivation')) {
+      return '''I understand you need support! Let me know:
+
+**What's challenging you?**
+• Not seeing results?
+• Lost motivation?
+• Plateau in progress?
+• Need accountability?
+
+Example: "I've hit a plateau in my weight loss"''';
+    }
+
+    return '''I'd like to help! Could you be more specific?
+
+**Tell me about:**
+• Your current fitness goal
+• What you're struggling with
+• Your experience level
+
+Example: "I need a strength training plan for beginners"''';
   }
 
   String _buildContextMessage(Map<String, dynamic> userContext) {

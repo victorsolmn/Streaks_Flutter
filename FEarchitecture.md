@@ -1,5 +1,5 @@
 # Streaks Flutter - Frontend Architecture & Design
-**Last Updated:** September 19, 2025
+**Last Updated:** September 19, 2025 - Achievement System & UI Improvements
 
 ## Architecture Overview
 
@@ -14,7 +14,9 @@ lib/
 │   ├── supabase_auth_provider.dart      # Enhanced authentication
 │   ├── supabase_user_provider.dart      # User profile management
 │   ├── supabase_nutrition_provider.dart # Nutrition tracking
-│   └── [existing providers...]          # Other state providers
+│   ├── achievement_provider.dart        # Achievement system
+│   ├── streak_provider.dart            # Streak tracking
+│   └── [other providers...]            # Other state providers
 ├── screens/                 # UI screens
 │   ├── auth/               # Authentication flows
 │   ├── onboarding/         # User onboarding
@@ -26,8 +28,15 @@ lib/
 │   ├── supabase_service.dart            # Core database service
 │   └── [existing services...]           # Other business logic
 ├── models/                 # Data models
+│   ├── achievement_model.dart    # Achievement data structure
+│   └── [other models...]
 ├── utils/                  # Utilities
 └── widgets/                # Reusable components
+    ├── achievements/       # Achievement UI components
+    │   ├── achievement_badge.dart
+    │   ├── achievement_grid.dart
+    │   └── achievement_popup.dart
+    └── [other widgets...]
 ```
 
 ## Core Components
@@ -97,6 +106,24 @@ lib/
 - **Macro Tracking:** Protein, carbs, fats, calories
 - **Goal Management:** Customizable daily targets
 - **Progress Visualization:** Charts and goal achievement indicators
+
+### Achievement System 🏆
+- **15 Unique Badges:** Categorized into Milestones, Elite, and Legends
+- **3D Hexagonal Design:** Custom painter with mathematical precision
+- **Dynamic Progress:** Real-time tracking with percentage indicators
+- **Visual States:**
+  - Locked (grey with progress bar)
+  - Close to unlock (orange indicator)
+  - Unlocked (full color with checkmark)
+- **Categories:**
+  - Streak Milestones (7, 14, 21, 30, 50 days)
+  - Elite Streaks (90, 180, 365 days)
+  - Special Achievements (Comeback Kid, Iron Will, etc.)
+- **UI Components:**
+  - Achievement grid with 3x5 layout
+  - Animated badge tap interactions
+  - Detailed popup with requirements
+  - Recent unlocks carousel
 
 ### Streak System
 - **Logic:** All daily goals must be met to earn a streak

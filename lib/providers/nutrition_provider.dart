@@ -198,24 +198,19 @@ class NutritionProvider with ChangeNotifier {
       );
 
       _entries.clear();
-      
+
+      // Each entry from the database is a nutrition entry itself
       for (final entry in history) {
-        final foodItems = entry['food_items'] as List?;
-        if (foodItems != null && foodItems.isNotEmpty) {
-          // Load individual food items from the JSON array
-          for (final item in foodItems) {
-            _entries.add(NutritionEntry(
-              id: item['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-              foodName: item['foodName'] ?? 'Unknown',
-              calories: item['calories'] ?? 0,
-              protein: (item['protein'] ?? 0).toDouble(),
-              carbs: (item['carbs'] ?? 0).toDouble(),
-              fat: (item['fat'] ?? 0).toDouble(),
-              fiber: (item['fiber'] ?? 0).toDouble(),
-              timestamp: DateTime.parse(item['timestamp'] ?? entry['date']),
-            ));
-          }
-        }
+        _entries.add(NutritionEntry(
+          id: entry['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          foodName: entry['food_name'] ?? 'Unknown', // Database uses snake_case
+          calories: entry['calories'] ?? 0,
+          protein: (entry['protein'] ?? 0).toDouble(),
+          carbs: (entry['carbs'] ?? 0).toDouble(),
+          fat: (entry['fat'] ?? 0).toDouble(),
+          fiber: (entry['fiber'] ?? 0).toDouble(),
+          timestamp: DateTime.parse(entry['created_at'] ?? entry['date'] ?? DateTime.now().toIso8601String()),
+        ));
       }
 
       // Save to local storage as well
@@ -345,16 +340,18 @@ class NutritionProvider with ChangeNotifier {
           foodItems.add(entry.toJson());
         }
 
-        // TODO: Fix saveNutritionEntry call with proper parameters
-        /* await _supabaseService.saveNutritionEntry(
-          userId: userId,
-          foodName: 'Daily Total',
-          calories: totalCalories,
-          protein: totalProtein,
-          carbs: totalCarbs,
-          fat: totalFat,
-          fiber: totalFiber,
-        ); */
+        // Save each individual entry to Supabase
+        for (final entry in dayEntries) {
+          await _supabaseService.saveNutritionEntry(
+            userId: userId,
+            foodName: entry.foodName,
+            calories: entry.calories,
+            protein: entry.protein,
+            carbs: entry.carbs,
+            fat: entry.fat,
+            fiber: entry.fiber,
+          );
+        }
       }
       
       _lastSyncTime = DateTime.now();

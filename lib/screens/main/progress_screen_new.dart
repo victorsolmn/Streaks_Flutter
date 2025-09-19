@@ -4,9 +4,12 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/nutrition_provider.dart';
 import '../../providers/health_provider.dart';
+import '../../providers/achievement_provider.dart';
 import '../../models/health_metric_model.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/circular_progress_widget.dart';
+import '../../widgets/achievements/achievement_grid.dart';
+import '../../services/achievement_checker.dart';
 // import 'dart:math' as math; // Not needed anymore - no random data
 
 class ProgressScreenNew extends StatefulWidget {
@@ -109,20 +112,33 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
   }
 
   Widget _buildAchievementsTab(UserProvider userProvider, NutritionProvider nutritionProvider) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildStreakStatsSection(userProvider),
-          const SizedBox(height: 32),
-          _buildWeeklyPerformance(userProvider, nutritionProvider),
-          const SizedBox(height: 32),
-          _buildMotivationalMessage(userProvider),
-          const SizedBox(height: 32),
-          _buildAchievementBadges(userProvider),
-        ],
+    // Check achievements when tab is viewed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AchievementChecker.checkAllAchievements(context);
+    });
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        final achievementProvider = context.read<AchievementProvider>();
+        await achievementProvider.loadAchievements();
+        await AchievementChecker.checkAllAchievements(context);
+      },
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildStreakStatsSection(userProvider),
+            const SizedBox(height: 32),
+            _buildWeeklyPerformance(userProvider, nutritionProvider),
+            const SizedBox(height: 32),
+            _buildMotivationalMessage(userProvider),
+            const SizedBox(height: 32),
+            // Replace old achievement badges with new AchievementGrid
+            const AchievementGrid(),
+          ],
+        ),
       ),
     );
   }
@@ -722,59 +738,10 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
     );
   }
 
-  Widget _buildAchievementBadges(UserProvider userProvider) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Achievements',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
-        ),
-        const SizedBox(height: 20),
-        
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 1.8, // Increased to prevent overflow
-          children: [
-            _buildAchievementCard(
-              title: 'Build the Habit',
-              subtitle: '5 Day Streak',
-              icon: Icons.hotel_class,
-              isUnlocked: true,
-              isGrey: true,
-            ),
-            _buildAchievementCard(
-              title: 'Consistency Champion',
-              subtitle: '20 Day Streak',
-              icon: Icons.emoji_events,
-              isUnlocked: true,
-              isGold: true,
-            ),
-            _buildAchievementCard(
-              title: 'Fitness Legend',
-              subtitle: '100 Day Streak',
-              icon: Icons.star,
-              isUnlocked: false,
-            ),
-            _buildAchievementCard(
-              title: 'Fitness Legend',
-              subtitle: '100 Day Streak',
-              icon: Icons.star,
-              isUnlocked: false,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+  // Removed old _buildAchievementBadges method as we're using AchievementGrid now
 
+  // Removed old _buildAchievementCard method
+  /*
   Widget _buildAchievementCard({
     required String title,
     required String subtitle,
@@ -862,4 +829,5 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
       ),
     );
   }
+  */
 }

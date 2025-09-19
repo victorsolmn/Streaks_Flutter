@@ -76,17 +76,18 @@ class UserDailyMetrics {
 
   // Calculate if goals are achieved
   UserDailyMetrics calculateAchievements() {
-    final stepsAchieved = steps >= stepsGoal;
-    final caloriesAchieved = caloriesConsumed <= caloriesGoal && caloriesConsumed > 0;
-    final sleepAchieved = sleepHours >= sleepGoal;
-    final waterAchieved = waterGlasses >= waterGoal;
+    // 80% completion threshold for more achievable streaks
+    final stepsAchieved = steps >= (stepsGoal * 0.8); // 80% of steps goal
+    final caloriesAchieved = caloriesConsumed <= (caloriesGoal * 1.2) && caloriesConsumed > 0; // Allow 20% over calorie goal
+    final sleepAchieved = sleepHours >= (sleepGoal * 0.8); // 80% of sleep goal
+    final waterAchieved = waterGlasses >= waterGoal; // Still track but optional for streak
     final nutritionAchieved = caloriesConsumed > 0; // Has logged food
-    
-    final allGoalsAchieved = stepsAchieved && 
-                             caloriesAchieved && 
-                             sleepAchieved && 
-                             waterAchieved && 
-                             nutritionAchieved;
+
+    // Water is now optional - only 4 goals required for streak
+    final allGoalsAchieved = stepsAchieved &&
+                             caloriesAchieved &&
+                             sleepAchieved &&
+                             nutritionAchieved; // Water removed from requirement
     
     return copyWith(
       stepsAchieved: stepsAchieved,

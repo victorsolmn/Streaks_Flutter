@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -101,10 +102,12 @@ class RealtimeSyncService {
       final entriesJson = prefs.getString('nutrition_entries');
       
       if (entriesJson != null) {
+        // Parse the JSON string first
+        final decodedJson = jsonDecode(entriesJson);
         final entries = List<Map<String, dynamic>>.from(
-          (entriesJson as List).map((e) => Map<String, dynamic>.from(e))
+          (decodedJson as List).map((e) => Map<String, dynamic>.from(e))
         );
-        
+
         // Group entries by date
         final entriesByDate = <String, Map<String, dynamic>>{};
         

@@ -32,7 +32,13 @@ class AppTheme {
   static const Color textPrimaryDark = Color(0xFFFFFFFF);  // Primary text for dark theme
   static const Color textSecondaryDark = Color(0xFFB3B3B3);  // Secondary text for dark theme
   
-  // Accent Colors
+  // Flame/Fire Inspired Accent Colors
+  static const Color accentFlameRed = Color(0xFFFF4444);    // Bright flame red
+  static const Color accentFlameYellow = Color(0xFFFFBB33); // Flame yellow/orange
+  static const Color accentFlameOrange = Color(0xFFFF7733); // Mid flame orange
+  static const Color accentEmber = Color(0xFFCC4400);       // Deep ember
+
+  // Keep essential functional colors
   static const Color accentGreen = Color(0xFF00D68F);  // Success green
   static const Color accentYellow = Color(0xFFFFAA00);  // Warning yellow
   static const Color accentPink = Color(0xFFFF6B9D);  // Pink
@@ -43,6 +49,10 @@ class AppTheme {
   static const Color warningYellow = Color(0xFFFFAA00);
   static const Color errorRed = Color(0xFFFF3838);
   static const Color infoBlue = Color(0xFF0095FF);
+
+  // Alias for compatibility
+  static const Color success = Color(0xFF00D68F);
+  static const Color error = Color(0xFFFF3838);
   
   // Dividers
   static const Color dividerDark = Color(0xFF2E2E2E);  // Divider for dark theme
@@ -65,6 +75,44 @@ class AppTheme {
   
   static const LinearGradient purpleGradient = LinearGradient(
     colors: [secondaryLight, Color(0xFF4D8EF7)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  // Flame/Fire Inspired Gradients for Chat UI
+  static const LinearGradient flameRedGradient = LinearGradient(
+    colors: [accentFlameRed, Color(0xFFFF6B6B)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient flameOrangeGradient = LinearGradient(
+    colors: [accentFlameOrange, accentFlameYellow],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient emberGradient = LinearGradient(
+    colors: [accentEmber, accentFlameRed],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient sunsetGradient = LinearGradient(
+    colors: [Color(0xFFFF8A50), Color(0xFFFFB347)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  // Keep some original gradients as alternatives
+  static const LinearGradient secondaryGradient = LinearGradient(
+    colors: [Color(0xFF4A90E2), Color(0xFF2D7EF5)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient accentGradient = LinearGradient(
+    colors: [accentGreen, Color(0xFF00E5A0)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );

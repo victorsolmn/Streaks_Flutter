@@ -191,9 +191,21 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
 
   Widget _buildGreeting(UserProvider userProvider, bool isDarkMode) {
     final profile = userProvider.profile;
-    final userName = profile?.name ?? 'User';
-    final firstName = userName.split(' ').first;
-    
+    String userName = profile?.name ?? '';
+
+    // If name is empty or just whitespace, fallback to 'User'
+    if (userName.trim().isEmpty) {
+      userName = 'User';
+    }
+
+    // Get first name from full name
+    String displayName = userName.split(' ').first;
+
+    // Handle long names - truncate if needed
+    if (displayName.length > 15) {
+      displayName = displayName.substring(0, 14) + '...';
+    }
+
     // Get time-based greeting
     final hour = DateTime.now().hour;
     String greeting;
@@ -204,16 +216,18 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
     } else {
       greeting = 'Good evening';
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Hello $firstName 👋',
+          'Hello $displayName 👋',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.bold,
             fontSize: 28,
           ),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
         ),
         const SizedBox(height: 4),
         Text(

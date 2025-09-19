@@ -11,7 +11,7 @@ import '../../widgets/sync_status_indicator.dart';
 import 'home_screen_clean.dart';
 import 'progress_screen_new.dart';
 import 'nutrition_screen.dart';
-import 'chat_screen_agent.dart';
+import 'chat_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -40,7 +40,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     // Initialize toast service
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ToastService().initialize(context);
+      if (mounted) {
+        ToastService().initialize(context);
+      }
     });
     // Load data and sync health on startup
     _loadUserDataAndSyncHealth();
@@ -89,19 +91,26 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _loadUserDataAndSyncHealth() async {
     if (_isDataLoaded) return;
-    
+
+    // Early return if widget is not mounted
+    if (!mounted) return;
+
     // Show sync indicator
-    if (mounted) {
-      setState(() {
-        _isSyncing = true;
-      });
-    }
-    
+    setState(() {
+      _isSyncing = true;
+    });
+
     try {
+      // Check mounted before accessing context
+      if (!mounted) return;
+
       // Load nutrition data from Supabase
       final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
       await nutritionProvider.loadDataFromSupabase();
-      
+
+      // Check mounted after async operation
+      if (!mounted) return;
+
       // Load and sync health data
       final healthProvider = Provider.of<HealthProvider>(context, listen: false);
       
@@ -109,18 +118,28 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       if (!healthProvider.isInitialized) {
         await healthProvider.initialize();
       }
-      
+
+      // Check mounted after async operation
+      if (!mounted) return;
+
       // Load health data from Supabase
       await healthProvider.loadHealthDataFromSupabase();
+
+      // Check mounted after async operation
+      if (!mounted) return;
       
       // Automatically sync with health sources if connected
       if (healthProvider.isHealthSourceConnected) {
         debugPrint('MainScreen: Auto-syncing health data on app startup...');
         await healthProvider.syncWithHealth();
+
+        // Check mounted after async operation
+        if (!mounted) return;
+
         _lastSyncTime = DateTime.now();
-        
+
         // Show success message
-        if (mounted) {
+        if (mounted && context.mounted) {
           ToastService().showSuccess('Health data synced successfully! 📊');
         }
       } else {
@@ -139,12 +158,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         setState(() {
           _isSyncing = false;
         });
-        // Show network error popup with retry option
-        PopupService.showNetworkError(
-          context,
-          onRetry: () => _loadUserDataAndSyncHealth(),
-          customMessage: 'Failed to load health data. Please check your connection and try again.',
-        );
+        // Only show popup if still mounted and context is valid
+        if (mounted && context.mounted) {
+          // Show network error popup with retry option
+          PopupService.showNetworkError(
+            context,
+            onRetry: () => _loadUserDataAndSyncHealth(),
+            customMessage: 'Failed to load health data. Please check your connection and try again.',
+          );
+        }
       }
     }
   }
@@ -183,12 +205,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _lastSyncTime = DateTime.now();
       
       // Show subtle sync indicator
-      if (mounted) {
+      if (mounted && context.mounted) {
         ToastService().showInfo('Health data updated! 🔄');
       }
     } catch (e) {
       debugPrint('MainScreen: Error syncing health data: $e');
-      if (mounted) {
+      // Only show popup if still mounted and context is valid
+      if (mounted && context.mounted) {
         // Show network error popup with retry option
         PopupService.showNetworkError(
           context,
@@ -209,7 +232,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     const HomeScreenClean(),
     const ProgressScreenNew(),
     const NutritionScreen(),
-    const ChatScreenAgent(),
+    const ChatScreen(),
     ProfileScreen(key: _profileKey),
   ];
 
@@ -270,12 +293,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             index: _currentIndex,
             children: _screens,
           ),
-          // Sync status indicator
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            right: 16,
-            child: const SyncStatusIndicator(),
-          ),
+          // Sync status indicator - only show on home screen
+          if (_currentIndex == 0) // Only show on home screen
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              right: 16,
+              child: const SyncStatusIndicator(),
+            ),
         ],
       ),
       bottomNavigationBar: Container(
