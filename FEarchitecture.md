@@ -1,5 +1,5 @@
 # Streaks Flutter - Frontend Architecture & Design
-**Last Updated:** September 19, 2025 - Achievement System & UI Improvements
+**Last Updated:** September 19, 2025 - v1.0.1 Release & Test Infrastructure
 
 ## Architecture Overview
 
@@ -278,8 +278,40 @@ App UI → Provider → EnhancedSupabaseService → Supabase → PostgreSQL
 - **Automated Test Scripts**: Ready for CI/CD integration
 - **Performance Monitoring**: Built-in logging and metrics collection
 
+## Version 1.0.1 Release Updates (September 19, 2025)
+
+### Android Release Signing Configuration
+- **Keystore Created**: `android/app/streaker-release-key.jks`
+- **Properties File**: `android/key.properties` (excluded from git)
+- **Build Configuration**: Updated `build.gradle.kts` with proper release signing
+- **Security**: Added keystore files to `.gitignore`
+
+### Test Data Infrastructure
+- **5 Test User Personas**: Elite, Busy Professional, Weekend Warrior, New Beginner, Comeback Hero
+- **Comprehensive SQL Scripts**:
+  - `scripts/test_data_personas.sql` - Complete test dataset
+  - `scripts/cleanup_supabase.sql` - Database cleanup
+  - `scripts/clear_supabase_auth.sql` - Auth cleanup
+  - `scripts/add_gender_field.sql` - Schema migration
+- **Achievement Data**: Pre-configured achievements for each persona level
+
+### Database Schema Updates
+- **Gender Field**: Added to profiles table (Male/Female/Other/Prefer not to say)
+- **Water Intake**: Removed deprecated column from health_metrics
+- **Constraints**: Fixed duplicate key violations with ON CONFLICT clauses
+
+### Navigation Improvements
+- **Onboarding Back Button**: Fixed to return to welcome screen
+- **Step Navigation**: Improved flow with proper back navigation support
+
+### Build & Deployment
+- **Version**: Updated to 1.0.1 (Build 2)
+- **AAB Size**: 49.2MB (optimized)
+- **Google Play**: Ready for internal testing track
+- **Instructions**: Created comprehensive upload documentation
+
 ## Future Enhancements
-- **Immediate**: Fix database schema mismatches (Priority 1)
-- **Short-term**: Implement circuit breaker pattern for error handling
+- **Immediate**: Database schema consistency validation
+- **Short-term**: Implement offline-first architecture
 - **Medium-term**: Complete automated testing pipeline
-- **Long-term**: Advanced features (dark mode, biometric auth, Apple Watch)
+- **Long-term**: Advanced features (social, wearables, voice input)

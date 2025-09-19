@@ -231,8 +231,30 @@ python3 -m http.server 8080
 
 ## Version History
 - v1.0.0: Initial release with core features
-- v1.0.1: Fixed widget lifecycle issues, Android compatibility
-- Latest: Health plugin v13.2.0, improved stability
+- v1.0.1: Release signing, test data infrastructure, navigation fixes
+- Latest: Added gender field support, comprehensive test personas
+
+## Recent Release (v1.0.1 - Build 2)
+
+### Key Changes
+1. **Android Release Signing**
+   - Created release keystore configuration
+   - Fixed Google Play Console upload issue (was using debug signing)
+   - Added keystore security documentation
+
+2. **Test Data Infrastructure**
+   - Created 5 test user personas (Elite, Busy, Weekend, Beginner, Hero)
+   - Comprehensive SQL scripts for database population
+   - Achievement data for different user levels
+
+3. **Database Schema Updates**
+   - Added gender field to profiles table
+   - Removed deprecated water_intake column
+   - Fixed duplicate key violations
+
+4. **Navigation Improvements**
+   - Fixed onboarding back button to return to welcome screen
+   - Improved step navigation flow
 
 ---
-Last Updated: September 2025
+Last Updated: September 19, 2025
