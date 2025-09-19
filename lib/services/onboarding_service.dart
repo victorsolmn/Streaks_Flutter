@@ -66,6 +66,7 @@ class OnboardingService {
   /// Save onboarding data step by step
   Future<bool> saveOnboardingStep1({
     required String name,
+    required String gender,
     required int age,
     required double height,
     required double weight,
@@ -94,6 +95,7 @@ class OnboardingService {
 
       final updateData = {
         'name': name,
+        'gender': gender,
         'age': age,
         'height': height,
         'weight': weight,

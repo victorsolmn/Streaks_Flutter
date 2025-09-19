@@ -41,6 +41,7 @@ class _SupabaseOnboardingScreenState extends State<SupabaseOnboardingScreen>
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
   final _targetWeightController = TextEditingController();
+  String? _selectedGender;
 
   // Step 2: Fitness Goal
   String? _selectedFitnessGoal;
@@ -188,6 +189,7 @@ class _SupabaseOnboardingScreenState extends State<SupabaseOnboardingScreen>
 
           final success = await _onboardingService.saveOnboardingStep1(
             name: _nameController.text.trim(),
+            gender: _selectedGender!,
             age: int.parse(_ageController.text),
             height: double.parse(_heightController.text),
             weight: double.parse(_weightController.text),
@@ -293,6 +295,12 @@ class _SupabaseOnboardingScreenState extends State<SupabaseOnboardingScreen>
     }
   }
 
+  void _backToGetStarted() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+    );
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -344,11 +352,10 @@ class _SupabaseOnboardingScreenState extends State<SupabaseOnboardingScreen>
                 'Step ${_currentStep + 1} of $_totalSteps',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
-              if (_currentStep > 0)
-                IconButton(
-                  onPressed: _previousStep,
-                  icon: const Icon(Icons.arrow_back),
-                ),
+              IconButton(
+                onPressed: _currentStep > 0 ? _previousStep : _backToGetStarted,
+                icon: const Icon(Icons.arrow_back),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -415,6 +422,43 @@ class _SupabaseOnboardingScreenState extends State<SupabaseOnboardingScreen>
             validator: (value) {
               if (value?.trim().isEmpty ?? true) {
                 return 'Please enter your name';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 24),
+
+          // Gender
+          Text(
+            'Gender',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: _selectedGender,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.person_outline),
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            ),
+            items: SupabaseEnums.genderOptions.map((gender) {
+              return DropdownMenuItem(
+                value: gender,
+                child: Text(
+                  gender,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedGender = value;
+              });
+            },
+            validator: (value) {
+              if (value == null) {
+                return 'Please select your gender';
               }
               return null;
             },
@@ -693,15 +737,9 @@ class _SupabaseOnboardingScreenState extends State<SupabaseOnboardingScreen>
 
                 return DropdownMenuItem(
                   value: level,
-                  child: Flexible(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4.0),
-                      child: Text(
-                        level,
-                        style: const TextStyle(fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+                  child: Text(
+                    level,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 );
               }).toList(),
@@ -991,14 +1029,15 @@ class _SupabaseOnboardingScreenState extends State<SupabaseOnboardingScreen>
       ),
       child: Row(
         children: [
-          if (_currentStep > 0)
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _isProcessing ? null : _previousStep,
-                child: const Text('Back'),
-              ),
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _isProcessing
+                  ? null
+                  : (_currentStep > 0 ? _previousStep : _backToGetStarted),
+              child: const Text('Back'),
             ),
-          if (_currentStep > 0) const SizedBox(width: 16),
+          ),
+          const SizedBox(width: 16),
           Expanded(
             flex: 2,
             child: ElevatedButton(

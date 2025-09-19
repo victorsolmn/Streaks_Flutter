@@ -27,6 +27,14 @@ class SupabaseEnums {
     'Advanced',
   ];
 
+  // Gender options from schema constraint
+  static const List<String> genderOptions = [
+    'Male',
+    'Female',
+    'Other',
+    'Prefer not to say',
+  ];
+
   // Workout Consistency options from schema constraint
   // Note: This field has mixed values in the schema
   static const List<String> workoutFrequency = [
