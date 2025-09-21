@@ -1,317 +1,168 @@
-# Streaks Flutter - Frontend Architecture & Design
-**Last Updated:** September 19, 2025 - v1.0.1 Release & Test Infrastructure
+# Streaks Flutter - Feature Architecture
 
-## Architecture Overview
+## Core Features
 
-### Design Pattern: Provider + MVVM
-The app follows a Provider-based state management pattern with MVVM architecture, leveraging Flutter 3.35.2 with native platform integrations.
+### 1. Health Data Integration
+- **Samsung Health** (Primary source via Health Connect)
+- **Google Fit** (Secondary fallback)
+- **Manual Entry** (Tertiary option)
 
-## Folder Structure
+### 2. Nutrition Tracking
+- Food scanning with camera
+- Indian food database integration
+- Manual nutrition entry
+- Daily totals calculation
+- Sync with Supabase
 
+### 3. Achievement System
+- Dynamic achievement tracking
+- Progress visualization
+- Milestone notifications
+
+### 4. Streak Tracking
+- Daily goal completion
+- Streak persistence
+- Recovery mechanisms
+
+## Data Flow Architecture
+
+### Health Metrics Flow
 ```
-lib/
-├── providers/               # State management
-│   ├── supabase_auth_provider.dart      # Enhanced authentication
-│   ├── supabase_user_provider.dart      # User profile management
-│   ├── supabase_nutrition_provider.dart # Nutrition tracking
-│   ├── achievement_provider.dart        # Achievement system
-│   ├── streak_provider.dart            # Streak tracking
-│   └── [other providers...]            # Other state providers
-├── screens/                 # UI screens
-│   ├── auth/               # Authentication flows
-│   ├── onboarding/         # User onboarding
-│   ├── main/               # Main app screens
-│   ├── database_test_screen.dart        # NEW: Integration testing
-│   └── splash/             # App initialization
-├── services/               # Business logic
-│   ├── enhanced_supabase_service.dart   # NEW: Comprehensive CRUD ops
-│   ├── supabase_service.dart            # Core database service
-│   └── [existing services...]           # Other business logic
-├── models/                 # Data models
-│   ├── achievement_model.dart    # Achievement data structure
-│   └── [other models...]
-├── utils/                  # Utilities
-└── widgets/                # Reusable components
-    ├── achievements/       # Achievement UI components
-    │   ├── achievement_badge.dart
-    │   ├── achievement_grid.dart
-    │   └── achievement_popup.dart
-    └── [other widgets...]
-```
-
-## Core Components
-
-### Authentication Flow
-- SplashScreen → AuthCheck → SignIn/SignUp/Main/Onboarding
-
-### State Management
-- **SupabaseAuthProvider**: Enhanced authentication with Google OAuth, iOS simulator fix, and intelligent error handling
-- **SupabaseUserProvider**: User profile data with rebuild loop prevention and real-time sync
-- **SupabaseNutritionProvider**: Nutrition tracking with offline support
-- **StreakProvider**: Streak calculations and gamification
-- **HealthProvider**: Health metrics integration
-- **ThemeProvider**: App theming and preferences
-
-## UI/UX Design System
-
-### Color Palette
-- Primary: Orange (#FF6B35)
-- Background: Dark blue (#1A1A2E)
-- Success: Green (#4CAF50)
-- Error: Red (#E74C3C)
-
-### Typography
-- Headers: 32sp bold
-- Body: 16sp regular
-- Captions: 12sp regular
-
-### Component Patterns
-- Rounded corners (12px)
-- Consistent padding (16-24px)
-- Material Design guidelines
-
-## Navigation
-- Navigator 2.0 with MaterialPageRoute
-- Deep linking: com.streaker.streaker://
-- Tab navigation with BottomNavigationBar
-
-## Form Validation
-- Email regex validation
-- Password min 6 characters
-- Real-time error display
-
-## Performance
-- SVG for logos
-- Lazy loading
-- Proper disposal of controllers
-
-## Key Features Implemented
-
-### Health Integration
-- **Native Android:** Health Connect API with direct Kotlin integration
-- **iOS:** Apple HealthKit integration via Flutter Health plugin
-- **Data Sources:** Samsung Health, Google Fit, Apple Health
-- **Metrics:** Steps, calories, heart rate, sleep, distance tracking
-
-### AI Chat System
-- **Provider:** Grok API via X.AI platform (Model: grok-3)
-- **Features:** Health coaching, nutrition advice, motivation
-- **UI:** Complete ChatGPT-style interface with markdown rendering
-- **Response Format:** Structured with titles, bullet points, and contextual suggestions
-- **Context:** Conversation history and user health data integration
-- **Enhancements:** Short, actionable responses under 150 words
-
-### Nutrition Tracking
-- **Food Logging:** Photo + text input for AI analysis
-- **Macro Tracking:** Protein, carbs, fats, calories
-- **Goal Management:** Customizable daily targets
-- **Progress Visualization:** Charts and goal achievement indicators
-
-### Achievement System 🏆
-- **15 Unique Badges:** Categorized into Milestones, Elite, and Legends
-- **3D Hexagonal Design:** Custom painter with mathematical precision
-- **Dynamic Progress:** Real-time tracking with percentage indicators
-- **Visual States:**
-  - Locked (grey with progress bar)
-  - Close to unlock (orange indicator)
-  - Unlocked (full color with checkmark)
-- **Categories:**
-  - Streak Milestones (7, 14, 21, 30, 50 days)
-  - Elite Streaks (90, 180, 365 days)
-  - Special Achievements (Comeback Kid, Iron Will, etc.)
-- **UI Components:**
-  - Achievement grid with 3x5 layout
-  - Animated badge tap interactions
-  - Detailed popup with requirements
-  - Recent unlocks carousel
-
-### Streak System
-- **Logic:** All daily goals must be met to earn a streak
-- **Tracking:** Current streak, longest streak, total days
-- **Gamification:** Dynamic badges based on streak length
-- **Social Elements:** Achievement sharing and motivation
-
-### Data Synchronization
-- **Backend:** Supabase PostgreSQL with real-time sync
-- **Offline Support:** Local storage with background sync
-- **Conflict Resolution:** Timestamp-based data merging
-- **Performance:** Optimized queries with caching strategy
-
-## Recent Critical Updates (September 2025)
-
-### September 19, 2025 - Major Stability & UX Improvements
-
-#### 🔧 Critical Rebuild Loop Fix
-**Problem**: Infinite rebuild loops causing screen blinking every 25-30ms due to Provider notification cycles
-**Solution**:
-- **main.dart**: Replaced `postFrameCallback` with `Future.microtask` for profile loading
-- **SupabaseUserProvider**: Added double-checking to prevent race conditions
-- **Impact**: Eliminated rebuild loops, improved app performance and stability
-
-#### 🔐 Google OAuth iOS Simulator Resolution
-**Problem**: Google sign-in failing with "can't connect to server" error in iOS simulator
-**Root Cause**: iOS simulator restrictions on external OAuth URL launches
-**Solution**:
-- Removed custom `redirectTo` parameter causing launch failures
-- Implemented intelligent error detection for simulator limitations
-- Added helpful fallback messaging for development environment
-- **Files**: `lib/providers/supabase_auth_provider.dart`
-- **Status**: Works perfectly on real devices, graceful fallback in simulator
-
-#### 💬 ChatGPT-Style AI Interface Transformation
-**Enhancement**: Complete redesign of AI chat interface for better user experience
-**Changes**:
-- Updated Grok API model from deprecated 'grok-beta' to 'grok-3'
-- Implemented markdown rendering with `flutter_markdown: ^0.6.18`
-- Redesigned message bubbles to ChatGPT-style layout
-- Added contextual suggestion prompts below responses
-- Structured AI responses with titles, bullet points under 150 words
-- **Files**: `lib/services/grok_service.dart`, `lib/screens/main/chat_screen.dart`, `pubspec.yaml`
-
-#### 🛠️ Widget Lifecycle Improvements
-**Problem**: App infinite reloading due to unmounted widget context access
-**Solution**: Added comprehensive `mounted` checks before any setState or context access
-**Files**: `chat_screen_agent.dart`, `profile_screen.dart`
-
-#### 📱 UI Bug Fixes
-- Fixed dropdown overflow error in onboarding screen
-- Resolved "BOTTOM OVERFLOWED BY 31 PIXELS" in activity level dropdown
-- Simplified dropdown items with Flexible widget and adjusted padding
-
-## Previous Updates (September 16, 2025)
-
-### Enhanced Database Integration
-- **EnhancedSupabaseService**: Comprehensive CRUD operations for all app modules
-- **DatabaseTestScreen**: Interactive testing interface with real-time logging
-- **Integration Testing Framework**: Automated testing for 10 dummy accounts
-- **API Documentation**: Complete specification with 17 endpoints documented
-
-### New Architecture Components
-
-#### Enhanced Services Layer
-```
-services/
-├── enhanced_supabase_service.dart    # NEW: Comprehensive database operations
-│   ├── User management (signup, signin, profile CRUD)
-│   ├── Nutrition tracking (add, retrieve, daily summaries)
-│   ├── Health metrics (save, retrieve, history)
-│   ├── Streaks management (update, calculate, retrieve)
-│   ├── Goals system (set, update progress, retrieve)
-│   ├── Dashboard aggregation (combined data views)
-│   └── Test data generation (10 dummy accounts)
-├── supabase_service.dart             # Core database service
-├── realtime_sync_service.dart        # Background synchronization
-├── daily_reset_service.dart          # Daily data reset logic
-└── bluetooth_smartwatch_service.dart # Smartwatch integration
+Samsung Health / Google Fit
+        ↓
+Health Connect API (Android)
+        ↓
+MainActivity.kt (Native Android)
+        ↓
+UnifiedHealthService (Flutter)
+        ↓
+HealthProvider (State Management)
+        ↓
+Supabase (Cloud Storage)
 ```
 
-#### Enhanced Provider Architecture
+### Nutrition Data Flow
 ```
-providers/
-├── supabase_auth_provider.dart       # OAuth + simulator fix + intelligent error handling
-├── supabase_user_provider.dart       # Rebuild loop prevention + real-time profile sync
-├── supabase_nutrition_provider.dart  # Offline-first nutrition tracking
-├── health_provider.dart              # Native health platform integration
-├── streak_provider.dart              # Gamification and progress tracking
-└── theme_provider.dart               # App theming and preferences
-```
-
-#### ChatGPT-Style UI Components
-```
-screens/main/chat_screen.dart
-├── ChatGPT-style message bubbles with distinct user/AI styling
-├── Markdown rendering for AI responses with flutter_markdown
-├── Contextual suggestion prompts below responses
-├── Structured AI responses (titles, bullet points, emojis)
-├── Loading states and error handling
-└── Intelligent response truncation (150 words max)
+Camera / Manual Input
+        ↓
+NutritionProvider
+        ↓
+Validation & Deduplication
+        ↓
+Supabase (with timestamp checking)
 ```
 
-#### Testing Infrastructure
-```
-screens/
-├── database_test_screen.dart         # Interactive testing interface
-│   ├── Test data generation UI
-│   ├── CRUD operations testing
-│   ├── Real-time logging with color coding
-│   └── Google sign-in testing
-└── main/profile_screen.dart          # Debug menu integration
-```
+## Key Components
 
-### Integration Test Results
-**Overall System Status**: 🟡 55% Functional (September 16, 2025)
+### Providers (State Management)
+- **HealthProvider**: Central health metrics state
+- **NutritionProvider**: Nutrition entries and totals
+- **StreakProvider**: Streak calculation and persistence
+- **AchievementProvider**: Achievement progress tracking
+- **UserProvider**: User profile and preferences
 
-| Component | Status | Success Rate |
-|-----------|--------|--------------|
-| Authentication | ✅ PASS | 100% |
-| Database Connection | ✅ PASS | 100% |
-| Profile Management | ⚠️ PARTIAL | 70% |
-| Nutrition Tracking | ❌ FAIL | 30% |
-| Health Metrics | ❌ FAIL | 20% |
-| Streaks Management | ❌ FAIL | 10% |
-| Goals System | ⚠️ PARTIAL | 60% |
+### Services (Business Logic)
+- **UnifiedHealthService**: Health source routing
+- **SupabaseService**: Database operations
+- **IndianFoodNutritionService**: Food database
+- **RealtimeSyncService**: Real-time data sync
+- **HealthOnboardingService**: Permission management
 
-### Current Issues Identified
-1. **Database Schema Mismatches**: Missing columns and table reference errors
-2. **Type Casting Errors**: String vs List conflicts in nutrition module
-3. **Constraint Violations**: Overly restrictive database constraints
-4. **Infinite Retry Loops**: Error handling needs circuit breaker pattern
+### UI Screens
+- **MainScreen**: Navigation container with lifecycle management
+- **HomeScreenClean**: Dashboard with health metrics
+- **NutritionScreen**: Food tracking interface
+- **ProgressScreenNew**: Streak and achievement display
+- **ProfileScreen**: User settings and health source connection
 
-### Performance Metrics
-- **App Launch**: ~3.2 seconds (Good)
-- **Authentication**: <1 second (Excellent)
-- **Database Connection**: <500ms (Excellent)
-- **API Response**: 200-800ms (Good)
-- **Real-time Sync**: Functional but needs optimization
+## Sync Strategy
 
-### Enhanced Real-time Architecture
-```
-Data Flow:
-App UI → Provider → EnhancedSupabaseService → Supabase → PostgreSQL
-                ↓
-            Offline Queue → Background Sync → Real-time Updates
-```
+### Health Data Sync
+- On app startup (with smart permission check)
+- On app resume (throttled to 60 seconds)
+- On app pause (save latest data)
+- After health source connection
 
-### Quality Assurance
-- **Comprehensive API Documentation**: 17 endpoints with field specifications
-- **Interactive Testing Interface**: Real-time validation of all operations
-- **Automated Test Scripts**: Ready for CI/CD integration
-- **Performance Monitoring**: Built-in logging and metrics collection
+### Nutrition Sync
+- Immediate after entry addition
+- Periodic sync every 5 minutes
+- On app pause
+- Network recovery sync
 
-## Version 1.0.1 Release Updates (September 19, 2025)
+## Database Schema
 
-### Android Release Signing Configuration
-- **Keystore Created**: `android/app/streaker-release-key.jks`
-- **Properties File**: `android/key.properties` (excluded from git)
-- **Build Configuration**: Updated `build.gradle.kts` with proper release signing
-- **Security**: Added keystore files to `.gitignore`
+### health_metrics
+- user_id (FK)
+- date (DATE)
+- steps, calories, heart_rate, sleep, distance
+- UNIQUE: (user_id, date)
 
-### Test Data Infrastructure
-- **5 Test User Personas**: Elite, Busy Professional, Weekend Warrior, New Beginner, Comeback Hero
-- **Comprehensive SQL Scripts**:
-  - `scripts/test_data_personas.sql` - Complete test dataset
-  - `scripts/cleanup_supabase.sql` - Database cleanup
-  - `scripts/clear_supabase_auth.sql` - Auth cleanup
-  - `scripts/add_gender_field.sql` - Schema migration
-- **Achievement Data**: Pre-configured achievements for each persona level
+### nutrition_entries
+- user_id (FK)
+- food_name, calories, protein, carbs, fat, fiber
+- quantity_grams, meal_type, food_source
+- created_at (timestamp for deduplication)
 
-### Database Schema Updates
-- **Gender Field**: Added to profiles table (Male/Female/Other/Prefer not to say)
-- **Water Intake**: Removed deprecated column from health_metrics
-- **Constraints**: Fixed duplicate key violations with ON CONFLICT clauses
+### streaks
+- user_id (FK)
+- current_streak, longest_streak
+- last_activity_date
 
-### Navigation Improvements
-- **Onboarding Back Button**: Fixed to return to welcome screen
-- **Step Navigation**: Improved flow with proper back navigation support
+### achievements
+- user_id (FK)
+- achievement_id
+- progress, unlocked_at
 
-### Build & Deployment
-- **Version**: Updated to 1.0.1 (Build 2)
-- **AAB Size**: 49.2MB (optimized)
-- **Google Play**: Ready for internal testing track
-- **Instructions**: Created comprehensive upload documentation
+## Error Handling
 
-## Future Enhancements
-- **Immediate**: Database schema consistency validation
-- **Short-term**: Implement offline-first architecture
-- **Medium-term**: Complete automated testing pipeline
-- **Long-term**: Advanced features (social, wearables, voice input)
+### Network Issues
+- Offline queue implementation
+- Retry mechanisms
+- User feedback via toast/popup
+
+### Data Validation
+- Check for uninitialized values (-1)
+- Prevent saving zero/empty data
+- Timestamp-based duplicate prevention
+
+### Permission Handling
+- Smart auto-connect on startup
+- Graceful fallback to manual entry
+- Clear permission request dialogs
+
+## Performance Optimizations
+
+### Data Loading
+1. Load from Supabase first
+2. Initialize health services
+3. Fetch latest health data
+4. Merge and deduplicate
+
+### UI Rendering
+- Flexible widgets for responsive design
+- Overflow protection with ellipsis
+- Lazy loading for large lists
+- Cached images for achievements
+
+### Sync Optimization
+- Batch operations where possible
+- Track synced items with Sets
+- Throttle sync frequency
+- Skip unnecessary syncs
+
+## Testing Strategy
+
+### Unit Tests
+- Provider logic validation
+- Service method testing
+- Data transformation verification
+
+### Integration Tests
+- Health data flow end-to-end
+- Nutrition sync verification
+- Achievement calculation
+
+### Device Testing
+- Multiple screen sizes
+- Samsung specific testing (720x1544)
+- Network condition simulation
