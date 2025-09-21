@@ -22,54 +22,71 @@ class HealthProvider with ChangeNotifier {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isOnline = true;
   Timer? _syncTimer;
+  Timer? _permissionMonitorTimer;
+  DateTime? _lastSyncTime;
+  DateTime? _lastPermissionCheck;
   
   // Expose health service for direct access
   UnifiedHealthService get healthService => _healthService;
   
-  // Today's data
-  double _todaySteps = 0;
-  double _todayCaloriesBurned = 0;
-  double _todayHeartRate = 0;
-  double _todaySleep = 0;
-  double _todayDistance = 0;
-  int _todayWater = 0;
-  int _todayWorkouts = 0;
-  double _todayWeight = 0.0;
-  int _todayBloodOxygen = 0;
+  // Today's data - Initialize with -1 to indicate no data loaded yet
+  double _todaySteps = -1;
+  double _todayCaloriesBurned = -1;
+  double _todayHeartRate = -1;
+  double _todaySleep = -1;
+  double _todayDistance = -1;
+  int _todayWater = -1;
+  int _todayWorkouts = -1;
+  double _todayWeight = -1;
+  int _todayBloodOxygen = -1;
   Map<String, int> _todayBloodPressure = {'systolic': 0, 'diastolic': 0};
-  int _todayExerciseMinutes = 0;
+  int _todayExerciseMinutes = -1;
   
   Map<MetricType, HealthMetric> get metrics => _metrics;
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
+
+  // Check if we've synced recently (within last 5 minutes)
+  bool get hasRecentSync {
+    if (_lastSyncTime == null) return false;
+    final timeSinceLastSync = DateTime.now().difference(_lastSyncTime!);
+    return timeSinceLastSync.inMinutes < 5;
+  }
+
+  // Check if currently syncing
+  bool get isSyncing => _isLoading;
   
   // Getters for today's data
-  double get todaySteps => _todaySteps;
-  double get todayCaloriesBurned => _todayCaloriesBurned;
-  double get todayHeartRate => _todayHeartRate;
-  double get todaySleep => _todaySleep;
-  double get todayDistance => _todayDistance;
-  int get todayWater => _todayWater;
-  int get todayWorkouts => _todayWorkouts;
-  double get todayWeight => _todayWeight;
-  int get todayBloodOxygen => _todayBloodOxygen;
+  // Return 0 instead of -1 for display purposes
+  double get todaySteps => _todaySteps > 0 ? _todaySteps : 0;
+  double get todayCaloriesBurned => _todayCaloriesBurned > 0 ? _todayCaloriesBurned : 0;
+  double get todayHeartRate => _todayHeartRate > 0 ? _todayHeartRate : 0;
+  double get todaySleep => _todaySleep > 0 ? _todaySleep : 0;
+  double get todayDistance => _todayDistance > 0 ? _todayDistance : 0;
+  int get todayWater => _todayWater > 0 ? _todayWater : 0;
+  int get todayWorkouts => _todayWorkouts > 0 ? _todayWorkouts : 0;
+  double get todayWeight => _todayWeight > 0 ? _todayWeight : 0;
+  int get todayBloodOxygen => _todayBloodOxygen > 0 ? _todayBloodOxygen : 0;
   Map<String, int> get todayBloodPressure => _todayBloodPressure;
-  int get todayExerciseMinutes => _todayExerciseMinutes;
+  int get todayExerciseMinutes => _todayExerciseMinutes > 0 ? _todayExerciseMinutes : 0;
   HealthDataSource get dataSource => _currentDataSource;
   Map<String, String> get dataSourceInfo => _healthService.getDataSourceInfo();
   
   Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     // Initialize SharedPreferences
     _prefs = await SharedPreferences.getInstance();
-    
+
     // Load saved data from SharedPreferences
     await _loadHealthData();
-    
+
     // Setup connectivity monitoring
     _setupConnectivityMonitoring();
-    
+
+    // Setup background permission monitoring
+    _startPermissionMonitoring();
+
     // Initialize unified health service
     await _healthService.initialize();
     
@@ -82,14 +99,17 @@ class HealthProvider with ChangeNotifier {
     if (_currentDataSource == HealthDataSource.unavailable) {
       _currentDataSource = _healthService.currentSource;
     }
-    
-    // Initialize with saved values - will be updated from health service if available
-    _metrics = {
-      MetricType.steps: HealthMetric(value: _todaySteps, timestamp: DateTime.now(), type: MetricType.steps, currentValue: _todaySteps, goalValue: 10000),
-      MetricType.caloriesIntake: HealthMetric(value: _todayCaloriesBurned, timestamp: DateTime.now(), type: MetricType.caloriesIntake, currentValue: _todayCaloriesBurned, goalValue: 2200),
-      MetricType.sleep: HealthMetric(value: _todaySleep, timestamp: DateTime.now(), type: MetricType.sleep, currentValue: _todaySleep, goalValue: 8.0),
-      MetricType.restingHeartRate: HealthMetric(value: _todayHeartRate, timestamp: DateTime.now(), type: MetricType.restingHeartRate, currentValue: _todayHeartRate, goalValue: 60),
-    };
+
+    // Only initialize metrics if they haven't been loaded yet (e.g., from Supabase)
+    if (_metrics.isEmpty) {
+      // Initialize with saved values - will be updated from health service if available
+      _metrics = {
+        MetricType.steps: HealthMetric(value: _todaySteps, timestamp: DateTime.now(), type: MetricType.steps, currentValue: _todaySteps, goalValue: 10000),
+        MetricType.caloriesIntake: HealthMetric(value: _todayCaloriesBurned, timestamp: DateTime.now(), type: MetricType.caloriesIntake, currentValue: _todayCaloriesBurned, goalValue: 2200),
+        MetricType.sleep: HealthMetric(value: _todaySleep, timestamp: DateTime.now(), type: MetricType.sleep, currentValue: _todaySleep, goalValue: 8.0),
+        MetricType.restingHeartRate: HealthMetric(value: _todayHeartRate, timestamp: DateTime.now(), type: MetricType.restingHeartRate, currentValue: _todayHeartRate, goalValue: 60),
+      };
+    }
     
     // If we have a saved connection, try to reconnect
     if (_currentDataSource != HealthDataSource.unavailable) {
@@ -118,16 +138,22 @@ class HealthProvider with ChangeNotifier {
   Future<void> fetchMetrics() async {
     _isLoading = true;
     notifyListeners();
-    
+
     try {
+      debugPrint('HealthProvider: Fetching metrics from health service...');
+
       // Fetch data from unified health service
       final data = await _healthService.fetchHealthData();
       _currentDataSource = _healthService.currentSource;
+
+      debugPrint('HealthProvider: Fetched data - Steps: ${data['steps']}, Source: $_currentDataSource');
+
       updateMetricsFromHealth(data);
+      _lastSyncTime = DateTime.now();
     } catch (e) {
       debugPrint('Error fetching metrics: $e');
     }
-    
+
     _isLoading = false;
     notifyListeners();
   }
@@ -251,9 +277,6 @@ class HealthProvider with ChangeNotifier {
         case HealthDataSource.healthKit:
           sourceString = 'healthKit';
           break;
-        case HealthDataSource.bluetooth:
-          sourceString = 'bluetooth';
-          break;
         default:
           sourceString = '';
       }
@@ -266,40 +289,25 @@ class HealthProvider with ChangeNotifier {
   }
   
   Future<void> syncWithHealth() async {
+    debugPrint('HealthProvider: Starting health sync...');
+
+    // Ensure we're connected before syncing
+    if (!_healthService.isDataSourceAvailable) {
+      debugPrint('HealthProvider: Data source not available, cannot sync');
+      return;
+    }
+
     await _healthService.syncNow();
     await fetchMetrics();
+    _lastSyncTime = DateTime.now();
+
+    debugPrint('HealthProvider: Health sync complete - Steps: $_todaySteps');
   }
   
   // Check if health source is connected
   bool get isHealthSourceConnected => _healthService.isDataSourceAvailable;
   String? get connectedDevice {
-    if (_currentDataSource == HealthDataSource.bluetooth) {
-      var deviceInfo = _healthService.getConnectedDeviceInfo();
-      return deviceInfo?['name'];
-    }
     return _healthService.getDataSourceInfo()['source'];
-  }
-  
-  // Scan for Bluetooth devices (fallback option)
-  Future<List<Map<String, dynamic>>> scanForBluetoothDevices() async {
-    return await _healthService.scanForBluetoothDevices();
-  }
-  
-  // Connect to Bluetooth device
-  Future<bool> connectBluetoothDevice(Map<String, dynamic> deviceInfo) async {
-    bool connected = await _healthService.connectBluetoothDevice(deviceInfo);
-    if (connected) {
-      _currentDataSource = HealthDataSource.bluetooth;
-      await fetchMetrics();
-    }
-    return connected;
-  }
-  
-  // Disconnect Bluetooth device
-  Future<void> disconnectBluetoothDevice() async {
-    await _healthService.disconnectBluetoothDevice();
-    _currentDataSource = _healthService.currentSource;
-    notifyListeners();
   }
   
   // Request health permissions
@@ -509,8 +517,26 @@ class HealthProvider with ChangeNotifier {
         // Save to local storage
         await _saveHealthData();
       } else {
-        // No data in Supabase, load from local
-        await _loadHealthData();
+        // No data in Supabase for today yet
+        // Load default values if we haven't loaded anything yet (values are -1)
+        if (_todaySteps < 0) {
+          debugPrint('No Supabase data for today, initializing with zeros');
+          // Initialize with zeros for today (not demo data)
+          _todaySteps = 0;
+          _todayCaloriesBurned = 0;
+          _todayHeartRate = 0;
+          _todaySleep = 0;
+          _todayDistance = 0;
+          _todayWater = 0;
+          _todayWorkouts = 0;
+          _todayWeight = 0;
+          _todayBloodOxygen = 0;
+          _todayExerciseMinutes = 0;
+          _todayBloodPressure = {'systolic': 0, 'diastolic': 0};
+        } else {
+          debugPrint('No Supabase data for today yet, keeping current synced values');
+          debugPrint('Current values - Steps: $_todaySteps, Calories: $_todayCaloriesBurned');
+        }
       }
     } catch (e) {
       debugPrint('Error loading health data from Supabase: $e');
@@ -533,26 +559,42 @@ class HealthProvider with ChangeNotifier {
       return;
     }
 
+    // CRITICAL: Don't save uninitialized or zero data to Supabase
+    // Check if we have real data (not initial -1 values or all zeros)
+    bool hasRealData = _todaySteps > 0 ||
+                      _todayCaloriesBurned > 0 ||
+                      _todayHeartRate > 0 ||
+                      _todaySleep > 0 ||
+                      _todayDistance > 0;
+
+    if (!hasRealData) {
+      debugPrint('⚠️ Skipping Supabase save - no valid health data to save');
+      debugPrint('Current values - Steps: $_todaySteps, Calories: $_todayCaloriesBurned, HR: $_todayHeartRate');
+      return;
+    }
+
     try {
       final today = DateTime.now();
       final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-      
+
+      debugPrint('📤 Saving to Supabase - Steps: $_todaySteps, Calories: $_todayCaloriesBurned, HR: $_todayHeartRate');
+
       await _supabaseService.saveHealthMetrics(
         userId: userId,
         date: todayStr,
         metrics: {
-          'steps': _todaySteps.toInt(),
-          'heart_rate': _todayHeartRate.toInt(),
-          'sleep_hours': _todaySleep,
-          'calories_burned': _todayCaloriesBurned.toInt(),
-          'distance': _todayDistance,
-          'active_minutes': _todayWorkouts * 30, // Approximate
+          'steps': _todaySteps > 0 ? _todaySteps.toInt() : 0,
+          'heart_rate': _todayHeartRate > 0 ? _todayHeartRate.toInt() : 0,
+          'sleep_hours': _todaySleep > 0 ? _todaySleep : 0,
+          'calories_burned': _todayCaloriesBurned > 0 ? _todayCaloriesBurned.toInt() : 0,
+          'distance': _todayDistance > 0 ? _todayDistance : 0,
+          'active_minutes': _todayWorkouts > 0 ? _todayWorkouts * 30 : 0, // Approximate
         },
       );
-      
-      debugPrint('Health data synced to Supabase successfully');
+
+      debugPrint('✅ Health data synced to Supabase successfully');
     } catch (e) {
-      debugPrint('Error saving health data to Supabase: $e');
+      debugPrint('❌ Error saving health data to Supabase: $e');
     }
   }
   
@@ -581,8 +623,13 @@ class HealthProvider with ChangeNotifier {
     if (_isOnline && _isInitialized) {
       debugPrint('Syncing health data on app open...');
       await syncWithHealth();
-      await saveHealthDataToSupabase();
-      debugPrint('Health data sync completed on app open');
+      // Only save if we have real data after sync
+      if (_todaySteps > 0 || _todayCaloriesBurned > 0 || _todayHeartRate > 0) {
+        await saveHealthDataToSupabase();
+        debugPrint('Health data sync completed on app open');
+      } else {
+        debugPrint('No real health data to save after sync');
+      }
     } else {
       debugPrint('Skipping sync: online=$_isOnline, initialized=$_isInitialized');
     }
@@ -594,11 +641,56 @@ class HealthProvider with ChangeNotifier {
       await saveHealthDataToSupabase();
     }
   }
-  
+
+  // Start background permission monitoring
+  void _startPermissionMonitoring() {
+    debugPrint('Starting background permission monitoring...');
+
+    // Cancel existing timer if any
+    _permissionMonitorTimer?.cancel();
+
+    // Check for permissions every 30 seconds
+    _permissionMonitorTimer = Timer.periodic(Duration(seconds: 30), (timer) async {
+      // Throttle permission checks to avoid excessive checking
+      if (_lastPermissionCheck != null) {
+        final timeSinceLastCheck = DateTime.now().difference(_lastPermissionCheck!);
+        if (timeSinceLastCheck.inSeconds < 25) {
+          return; // Skip if checked too recently
+        }
+      }
+
+      // Only check if not already connected
+      if (!_healthService.isDataSourceAvailable) {
+        debugPrint('Background permission check: Checking for newly granted permissions...');
+        _lastPermissionCheck = DateTime.now();
+
+        final autoConnected = await _healthService.checkAndAutoConnect();
+        if (autoConnected) {
+          debugPrint('✅ Background check: Auto-connected to health source!');
+          _currentDataSource = _healthService.currentSource;
+
+          // Sync data immediately after auto-connect
+          await syncWithHealth();
+
+          // Notify listeners about the connection
+          notifyListeners();
+        }
+      }
+    });
+  }
+
+  // Stop background permission monitoring
+  void _stopPermissionMonitoring() {
+    debugPrint('Stopping background permission monitoring');
+    _permissionMonitorTimer?.cancel();
+    _permissionMonitorTimer = null;
+  }
+
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
     _syncTimer?.cancel();
+    _permissionMonitorTimer?.cancel();
     super.dispose();
   }
 }

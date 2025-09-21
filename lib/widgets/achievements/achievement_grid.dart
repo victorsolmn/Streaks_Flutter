@@ -136,55 +136,20 @@ class _AchievementGridState extends State<AchievementGrid>
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Circular progress
-                  SizedBox(
-                    width: 60,
-                    height: 60,
-                    child: Stack(
-                      children: [
-                        CircularProgressIndicator(
-                          value: provider.overallProgress,
-                          strokeWidth: 6,
-                          backgroundColor: Colors.grey.shade300,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            provider.overallProgress >= 0.5
-                                ? Colors.green
-                                : Colors.orange,
-                          ),
-                        ),
-                        Center(
-                          child: Text(
-                            '${(provider.overallProgress * 100).toInt()}%',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
+                  Text(
+                    'Achievement Badges',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(width: 20),
-                  // Stats
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Achievement Badges',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${provider.totalUnlocked} of ${achievements.length} badges earned',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 4),
+                  Text(
+                    '${provider.totalUnlocked} of ${achievements.length} badges earned',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
                     ),
                   ),
                 ],

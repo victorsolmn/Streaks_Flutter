@@ -3,13 +3,13 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'bluetooth_smartwatch_service.dart';
+import 'package:app_settings/app_settings.dart';
 import '../models/health_metric_model.dart';
+import 'native_health_connect_service.dart';
 
 enum HealthDataSource {
   healthKit,        // iOS - Apple Health
   healthConnect,    // Android - Health Connect / Samsung Health
-  bluetooth,        // Direct BLE connection
   unavailable       // No source available
 }
 
@@ -44,10 +44,10 @@ class UnifiedHealthService {
 
   // Health package instance (works for both HealthKit and Health Connect)
   final Health _health = Health();
-  
-  // Bluetooth service for fallback
-  final BluetoothSmartwatchService _bluetoothService = BluetoothSmartwatchService();
-  
+
+  // Native health connect service for Android
+  final NativeHealthConnectService _nativeHealthConnectService = NativeHealthConnectService();
+
   // Current data source
   HealthDataSource _currentSource = HealthDataSource.unavailable;
   HealthDataSource get currentSource => _currentSource;
@@ -109,9 +109,6 @@ class UnifiedHealthService {
     _log('Starting initialization...');
     
     try {
-      // Initialize Bluetooth service
-      await _bluetoothService.initialize();
-      _log('Bluetooth service initialized');
       
       // Configure health services based on platform
       if (Platform.isAndroid) {
@@ -126,12 +123,6 @@ class UnifiedHealthService {
         _log('iOS detected - HealthKit ready');
       }
       
-      // Set up data update callback for Bluetooth
-      _bluetoothService.setDataUpdateCallback((data) {
-        if (_currentSource == HealthDataSource.bluetooth) {
-          _onDataUpdate?.call(data);
-        }
-      });
       
       _isInitialized = true;
       _log('Initialization complete');
@@ -165,12 +156,6 @@ class UnifiedHealthService {
       }
     }
     
-    // Check if Bluetooth device is already connected
-    if (_bluetoothService.isDeviceConnected) {
-      _currentSource = HealthDataSource.bluetooth;
-      _log('Using Bluetooth as data source');
-      return;
-    }
     
     // No source available yet
     _currentSource = HealthDataSource.unavailable;
@@ -242,34 +227,72 @@ class UnifiedHealthService {
     }
   }
   
+  // Open health settings directly
+  Future<void> openHealthSettings() async {
+    try {
+      if (Platform.isIOS) {
+        // On iOS, we can open the Health app settings
+        // The health package's requestAuthorization already opens the Health permission dialog
+        // If user wants to manually change settings, they need to go through Settings app
+        await _health.requestAuthorization(
+          _healthTypes,
+          permissions: List<HealthDataAccess>.filled(
+            _healthTypes.length,
+            HealthDataAccess.READ,
+          ),
+        );
+      } else if (Platform.isAndroid) {
+        // On Android, request permissions which will open Health Connect if needed
+        try {
+          // This will open Health Connect permission dialog
+          await _health.requestAuthorization(
+            _healthTypes,
+            permissions: List<HealthDataAccess>.filled(
+              _healthTypes.length,
+              HealthDataAccess.READ,
+            ),
+          );
+        } catch (e) {
+          _log('Could not open Health Connect: $e');
+          // Fallback to general app settings
+          await AppSettings.openAppSettings();
+        }
+      }
+    } catch (e) {
+      _log('Error opening health settings: $e');
+      // Fallback to general app settings
+      await AppSettings.openAppSettings();
+    }
+  }
+
   // Request health permissions with detailed error handling
   Future<HealthConnectionResult> requestHealthPermissions() async {
     _log('Starting health permission request...');
-    
+
     try {
       // Ensure service is initialized
       if (!_isInitialized) {
         _log('Service not initialized, initializing now...');
         await initialize();
       }
-      
+
       if (Platform.isIOS) {
         _log('Requesting HealthKit permissions...');
-        
+
         // Create a permissions list that matches the length of health types
         final permissions = List<HealthDataAccess>.filled(
-          _healthTypes.length, 
+          _healthTypes.length,
           HealthDataAccess.READ,
         );
-        
-        // Request HealthKit permissions
+
+        // Request HealthKit permissions - this will open the Health app permission dialog
         bool authorized = await _health.requestAuthorization(
           _healthTypes,
           permissions: permissions,
         );
-        
+
         _log('HealthKit authorization result: $authorized');
-        
+
         if (authorized) {
           _currentSource = HealthDataSource.healthKit;
           return HealthConnectionResult(
@@ -280,7 +303,7 @@ class UnifiedHealthService {
           return HealthConnectionResult(
             success: false,
             error: HealthConnectionError.permissionsDenied,
-            errorMessage: 'HealthKit permissions were denied',
+            errorMessage: 'HealthKit permissions were denied. Please go to Settings > Privacy & Security > Health to grant permissions.',
             debugInfo: _debugLogs.join('\n'),
           );
         }
@@ -441,13 +464,16 @@ class UnifiedHealthService {
   // Fetch health data based on current source
   Future<Map<String, dynamic>> fetchHealthData() async {
     _log('Fetching health data from source: $_currentSource');
-    
+
     switch (_currentSource) {
       case HealthDataSource.healthKit:
-      case HealthDataSource.healthConnect:
         return await _fetchFromHealthAPI();
-      case HealthDataSource.bluetooth:
-        return await _bluetoothService.fetchHealthData();
+      case HealthDataSource.healthConnect:
+        // On Android, use native method for proper deduplication
+        if (Platform.isAndroid) {
+          return await _fetchFromNativeAndroid();
+        }
+        return await _fetchFromHealthAPI();
       case HealthDataSource.unavailable:
         // Try to determine source again
         await _determineBestDataSource();
@@ -459,6 +485,38 @@ class UnifiedHealthService {
     }
   }
   
+  // Fetch from native Android Health Connect with proper deduplication
+  Future<Map<String, dynamic>> _fetchFromNativeAndroid() async {
+    try {
+      _log('Using native Android Health Connect with deduplication...');
+
+      final healthData = await _nativeHealthConnectService.readAllHealthData();
+
+      _log('Native Android data received:');
+      _log('  Steps: ${healthData['steps']} (deduplicated)');
+      _log('  Heart Rate: ${healthData['heartRate']} bpm');
+      _log('  Calories: ${healthData['calories']} kcal');
+      _log('  Distance: ${healthData['distance']} km');
+      _log('  Sleep: ${healthData['sleep']} hours');
+      _log('  Water: ${healthData['water']} ml');
+
+      // Handle steps by source information
+      if (healthData.containsKey('stepsBySource')) {
+        final stepsBySource = healthData['stepsBySource'];
+        _log('Steps by source breakdown:');
+        _log('  Samsung Health: ${stepsBySource['samsung']} steps');
+        _log('  Google Fit: ${stepsBySource['googleFit']} steps');
+        _log('  Data Source Used: ${stepsBySource['dataSource']}');
+      }
+
+      return healthData;
+    } catch (e) {
+      _log('ERROR fetching from native Android: $e');
+      _log('Falling back to health API...');
+      return await _fetchFromHealthAPI();
+    }
+  }
+
   // Fetch data from Health API (HealthKit or Health Connect)
   Future<Map<String, dynamic>> _fetchFromHealthAPI() async {
     Map<String, dynamic> healthData = _getEmptyHealthData();
@@ -480,11 +538,14 @@ class UnifiedHealthService {
           startTime: midnight,
           endTime: now,
         );
-        
+
+        _log('Steps data points found: ${stepsData.length}');
         int totalSteps = 0;
         for (var point in stepsData) {
           if (point.value is NumericHealthValue) {
-            totalSteps += (point.value as NumericHealthValue).numericValue.toInt();
+            int stepValue = (point.value as NumericHealthValue).numericValue.toInt();
+            totalSteps += stepValue;
+            _log('Step entry: $stepValue steps at ${point.dateFrom}');
           }
         }
         healthData['steps'] = totalSteps;
@@ -501,14 +562,20 @@ class UnifiedHealthService {
           startTime: now.subtract(Duration(hours: 1)),
           endTime: now,
         );
-        
+
+        _log('Heart rate data points found: ${heartRateData.length}');
         if (heartRateData.isNotEmpty) {
           // Get the most recent heart rate
           heartRateData.sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
+          for (var point in heartRateData.take(3)) {
+            _log('Heart rate entry: ${(point.value as NumericHealthValue).numericValue} bpm at ${point.dateFrom}');
+          }
           if (heartRateData.first.value is NumericHealthValue) {
             healthData['heartRate'] = (heartRateData.first.value as NumericHealthValue).numericValue.toInt();
             _log('Latest heart rate: ${healthData['heartRate']} bpm');
           }
+        } else {
+          _log('No heart rate data found');
         }
       } catch (e) {
         _log('ERROR fetching heart rate: $e');
@@ -522,16 +589,19 @@ class UnifiedHealthService {
           startTime: midnight,
           endTime: now,
         );
-        
+
+        _log('Calories data points found: ${caloriesData.length}');
         double totalCalories = 0;
         for (var point in caloriesData) {
           if (point.value is NumericHealthValue) {
-            totalCalories += (point.value as NumericHealthValue).numericValue.toDouble();
+            double calorieValue = (point.value as NumericHealthValue).numericValue.toDouble();
+            totalCalories += calorieValue;
+            _log('Calorie entry: ${calorieValue.toStringAsFixed(1)} cal at ${point.dateFrom}');
           }
         }
-        
+
         healthData['calories'] = totalCalories.toInt();
-        _log('Calories burned: ${healthData['calories']}');
+        _log('Calories burned total: ${healthData['calories']}');
       } catch (e) {
         _log('ERROR fetching calories: $e');
       }
@@ -544,20 +614,23 @@ class UnifiedHealthService {
           startTime: midnight,
           endTime: now,
         );
-        
+
+        _log('Distance data points found: ${distanceData.length}');
         double totalDistance = 0;
         for (var point in distanceData) {
           if (point.value is NumericHealthValue) {
             // Convert meters to kilometers
-            totalDistance += (point.value as NumericHealthValue).numericValue.toDouble() / 1000;
+            double distanceValue = (point.value as NumericHealthValue).numericValue.toDouble() / 1000;
+            totalDistance += distanceValue;
+            _log('Distance entry: ${distanceValue.toStringAsFixed(2)} km at ${point.dateFrom}');
           }
         }
         healthData['distance'] = totalDistance;
-        _log('Distance: ${totalDistance.toStringAsFixed(2)} km');
+        _log('Distance total: ${totalDistance.toStringAsFixed(2)} km');
       } catch (e) {
         _log('ERROR fetching distance: $e');
       }
-      
+
       // Sleep
       try {
         _log('Fetching sleep...');
@@ -566,19 +639,46 @@ class UnifiedHealthService {
           startTime: now.subtract(Duration(hours: 24)),
           endTime: now,
         );
-        
+
+        _log('Sleep data points found: ${sleepData.length}');
         double totalSleepMinutes = 0;
         for (var point in sleepData) {
           if (point.value is NumericHealthValue) {
-            totalSleepMinutes += (point.value as NumericHealthValue).numericValue.toDouble();
+            double sleepValue = (point.value as NumericHealthValue).numericValue.toDouble();
+            totalSleepMinutes += sleepValue;
+            _log('Sleep entry: ${sleepValue.toStringAsFixed(1)} minutes at ${point.dateFrom}');
           }
         }
         healthData['sleep'] = totalSleepMinutes / 60; // Convert to hours
-        _log('Sleep: ${(totalSleepMinutes / 60).toStringAsFixed(1)} hours');
+        _log('Sleep total: ${(totalSleepMinutes / 60).toStringAsFixed(1)} hours');
       } catch (e) {
         _log('ERROR fetching sleep: $e');
       }
-      
+
+      // Water intake
+      try {
+        _log('Fetching water intake...');
+        List<HealthDataPoint> waterData = await _health.getHealthDataFromTypes(
+          types: [HealthDataType.WATER],
+          startTime: midnight,
+          endTime: now,
+        );
+
+        _log('Water data points found: ${waterData.length}');
+        double totalWater = 0;
+        for (var point in waterData) {
+          if (point.value is NumericHealthValue) {
+            double waterValue = (point.value as NumericHealthValue).numericValue.toDouble();
+            totalWater += waterValue;
+            _log('Water entry: ${waterValue.toStringAsFixed(1)} ml at ${point.dateFrom}');
+          }
+        }
+        healthData['water'] = totalWater.toInt();
+        _log('Water total: ${totalWater.toStringAsFixed(0)} ml');
+      } catch (e) {
+        _log('ERROR fetching water: $e');
+      }
+
       _log('Health data fetch complete');
       return healthData;
     } catch (e) {
@@ -612,7 +712,63 @@ class UnifiedHealthService {
   
   // Check if data source is available
   bool get isDataSourceAvailable => _currentSource != HealthDataSource.unavailable;
-  
+
+  // Smart check to auto-connect if permissions exist
+  Future<bool> checkAndAutoConnect() async {
+    _log('Smart check: Checking for existing permissions...');
+
+    if (Platform.isAndroid) {
+      try {
+        // First check if Health Connect is available
+        final status = await _health.getHealthConnectSdkStatus();
+        if (status != HealthConnectSdkStatus.sdkAvailable) {
+          _log('Health Connect not available: $status');
+          return false;
+        }
+
+        // Check if we have permissions using native service
+        final nativeHealthService = NativeHealthConnectService();
+        final permissionStatus = await nativeHealthService.checkPermissions();
+
+        if (permissionStatus['granted'] == true) {
+          _log('✅ Permissions already granted! Auto-connecting...');
+
+          // Configure health service if not already configured
+          if (!_isInitialized) {
+            try {
+              await _health.configure();
+              _log('Health Connect configured successfully');
+            } catch (e) {
+              _log('Health Connect configuration warning: $e');
+            }
+          }
+
+          // Since native permissions are granted, trust that and connect
+          // The health package's hasPermissions can be unreliable on some Android versions
+          _currentSource = HealthDataSource.healthConnect;
+          _log('✅ Successfully connected to Health Connect!');
+          return true;
+        } else {
+          _log('No permissions granted yet');
+          return false;
+        }
+      } catch (e) {
+        _log('Error checking permissions: $e');
+        return false;
+      }
+    } else if (Platform.isIOS) {
+      // Check iOS permissions
+      bool hasPerms = await _checkHealthKitAvailability();
+      if (hasPerms) {
+        _currentSource = HealthDataSource.healthKit;
+        _log('✅ Successfully connected to HealthKit!');
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   // Get data source info
   Map<String, String> getDataSourceInfo() {
     switch (_currentSource) {
@@ -628,13 +784,6 @@ class UnifiedHealthService {
           'status': 'Connected',
           'icon': '🤖',
         };
-      case HealthDataSource.bluetooth:
-        final deviceInfo = _bluetoothService.getConnectedDeviceInfo();
-        return {
-          'source': deviceInfo?['name'] ?? 'Bluetooth Device',
-          'status': 'Connected via Bluetooth',
-          'icon': '⌚',
-        };
       case HealthDataSource.unavailable:
         return {
           'source': 'Not Connected',
@@ -643,39 +792,12 @@ class UnifiedHealthService {
         };
     }
   }
-  
-  // Get connected device info (for Bluetooth)
+
+  // Get connected device info
   Map<String, dynamic>? getConnectedDeviceInfo() {
-    if (_currentSource == HealthDataSource.bluetooth) {
-      return _bluetoothService.getConnectedDeviceInfo();
-    }
     return null;
   }
-  
-  // Scan for Bluetooth devices
-  Future<List<Map<String, dynamic>>> scanForBluetoothDevices() async {
-    _log('Scanning for Bluetooth devices...');
-    return await _bluetoothService.scanForDevices();
-  }
-  
-  // Connect to Bluetooth device
-  Future<bool> connectBluetoothDevice(Map<String, dynamic> deviceInfo) async {
-    _log('Connecting to Bluetooth device: ${deviceInfo['name']}');
-    bool connected = await _bluetoothService.connectDevice(deviceInfo);
-    if (connected) {
-      _currentSource = HealthDataSource.bluetooth;
-      _log('Bluetooth device connected successfully');
-    }
-    return connected;
-  }
-  
-  // Disconnect Bluetooth device
-  Future<void> disconnectBluetoothDevice() async {
-    _log('Disconnecting Bluetooth device...');
-    await _bluetoothService.disconnectDevice();
-    await _determineBestDataSource();
-  }
-  
+
   // Set data update callback
   void setDataUpdateCallback(Function(Map<String, dynamic>) callback) {
     _onDataUpdate = callback;
@@ -717,6 +839,5 @@ class UnifiedHealthService {
   // Dispose
   void dispose() {
     stopDataSync();
-    _bluetoothService.dispose();
   }
 }

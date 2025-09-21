@@ -15,7 +15,6 @@ ALTER TABLE IF EXISTS public.workouts DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.achievements DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.user_achievements DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.chat_messages DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.smartwatch_data DISABLE ROW LEVEL SECURITY;
 
 -- ================================================
 -- STEP 2: Clear all data from tables
@@ -30,7 +29,6 @@ DELETE FROM public.chat_messages WHERE 1=1;
 -- Clear health-related data
 DELETE FROM public.health_data WHERE 1=1;
 DELETE FROM public.nutrition_entries WHERE 1=1;
-DELETE FROM public.smartwatch_data WHERE 1=1;
 
 -- Clear streaks and goals
 DELETE FROM public.streaks WHERE 1=1;
@@ -85,7 +83,6 @@ ALTER TABLE IF EXISTS public.workouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.user_achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.chat_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.smartwatch_data ENABLE ROW LEVEL SECURITY;
 
 -- ================================================
 -- STEP 5: Verify cleanup
@@ -115,9 +112,6 @@ SELECT
 UNION ALL
 SELECT
     'chat_messages', COUNT(*) FROM public.chat_messages
-UNION ALL
-SELECT
-    'smartwatch_data', COUNT(*) FROM public.smartwatch_data
 ORDER BY table_name;
 
 -- ================================================

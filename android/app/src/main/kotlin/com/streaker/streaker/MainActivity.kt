@@ -608,10 +608,14 @@ class MainActivity: FlutterFragmentActivity() {
                             val heartRatesToUse = if (samsungHeartRates.isNotEmpty()) samsungHeartRates else otherHeartRates
                             
                             if (heartRatesToUse.isNotEmpty()) {
-                                // For Samsung Health, get average of all readings rather than minimum
+                                // For Samsung Health, calculate resting heart rate (lowest 10% of readings)
                                 if (samsungHeartRates.isNotEmpty()) {
-                                    heartRateValue = (samsungHeartRates.sum() / samsungHeartRates.size).toInt()
-                                    heartRateType = "samsung_average"
+                                    val sortedRates = samsungHeartRates.sorted()
+                                    val tenPercentCount = (sortedRates.size * 0.1).coerceAtLeast(1.0).toInt()
+                                    val restingRates = sortedRates.take(tenPercentCount)
+                                    heartRateValue = (restingRates.sum() / restingRates.size).toInt()
+                                    heartRateType = "samsung_resting_calculated"
+                                    Log.d(TAG, "Calculated resting HR from lowest 10% of ${samsungHeartRates.size} readings")
                                 } else {
                                     // For non-Samsung, use latest reading
                                     heartRateValue = heartRatesToUse.last().toInt()
@@ -703,15 +707,20 @@ class MainActivity: FlutterFragmentActivity() {
                         Log.d(TAG, "Total calories not available", e)
                     }
                     
-                    // Prioritize Samsung Health data - use total calories if available, otherwise active
+                    // Prioritize Samsung Health data - use ACTIVE calories first (not total which includes BMR)
                     val finalCalories = when {
-                        samsungTotalCalories > 0 -> {
-                            Log.d(TAG, "Using Samsung total calories: $samsungTotalCalories kcal")
-                            samsungTotalCalories
-                        }
                         samsungActiveCalories > 0 -> {
                             Log.d(TAG, "Using Samsung active calories: $samsungActiveCalories kcal")
                             samsungActiveCalories
+                        }
+                        samsungTotalCalories > 0 && samsungActiveCalories == 0.0 -> {
+                            // Only use total if active is not available - subtract estimated BMR
+                            // Rough BMR estimate: 1400-1800 kcal/day, so subtract proportionally
+                            val hoursElapsed = java.time.Duration.between(startOfDay, now).toHours()
+                            val bmrEstimate = (1600.0 * hoursElapsed / 24)
+                            val activeFromTotal = (samsungTotalCalories - bmrEstimate).coerceAtLeast(0.0)
+                            Log.d(TAG, "Using Samsung total calories minus BMR: $activeFromTotal kcal (total: $samsungTotalCalories, BMR estimate: $bmrEstimate)")
+                            activeFromTotal
                         }
                         googleFitCalories > 0 -> {
                             Log.d(TAG, "No Samsung data, using Google Fit: $googleFitCalories kcal")
@@ -829,12 +838,11 @@ class MainActivity: FlutterFragmentActivity() {
                             Log.d(TAG, "Sleep session: ${minutes} minutes from ${source}")
                             Log.d(TAG, "  Time: ${record.startTime} to ${record.endTime}")
                             
-                            // Prioritize Samsung Health for sleep data too
-                            if (source.contains("shealth") || 
-                                source.contains("com.sec.android") || 
+                            // Accumulate all Samsung Health sleep sessions (not just last one)
+                            if (source.contains("shealth") ||
+                                source.contains("com.sec.android") ||
                                 source.contains("samsung")) {
-                                totalSleepMinutes = minutes // Use Samsung data exclusively
-                                sleepDetails.clear()
+                                totalSleepMinutes += minutes // FIX: Accumulate all Samsung sessions
                                 sleepDetails.add(mapOf(
                                     "duration" to minutes,
                                     "startTime" to record.startTime.toString(),
@@ -843,8 +851,8 @@ class MainActivity: FlutterFragmentActivity() {
                                     "title" to (record.title ?: "Sleep"),
                                     "notes" to (record.notes ?: "")
                                 ))
-                                Log.d(TAG, "  -> Using Samsung sleep data")
-                            } else if (totalSleepMinutes == 0L) {
+                                Log.d(TAG, "  -> Adding Samsung sleep session: $minutes minutes")
+                            } else if (sleepDetails.none { (it["source"] as String).contains("samsung") || (it["source"] as String).contains("shealth") }) {
                                 // Only use non-Samsung data if no Samsung data exists
                                 totalSleepMinutes += minutes
                                 sleepDetails.add(mapOf(

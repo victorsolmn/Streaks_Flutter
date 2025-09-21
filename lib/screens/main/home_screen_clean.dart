@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/health_provider.dart';
 import '../../providers/nutrition_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/fitness_goal_summary_dialog.dart';
+import '../../widgets/health_permission_dialog.dart';
 import '../../widgets/streak_display_widget.dart';
+import '../../widgets/sync_status_indicator.dart';
 import '../../providers/streak_provider.dart';
+import '../../services/health_onboarding_service.dart';
 import 'dart:math' as math;
 import '../../services/toast_service.dart';
 
@@ -17,10 +21,12 @@ class HomeScreenClean extends StatefulWidget {
   State<HomeScreenClean> createState() => _HomeScreenCleanState();
 }
 
-class _HomeScreenCleanState extends State<HomeScreenClean> 
+class _HomeScreenCleanState extends State<HomeScreenClean>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  HealthOnboardingService? _healthOnboardingService;
+  bool _hasCheckedHealthPermission = false;
 
   @override
   void initState() {
@@ -35,34 +41,27 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
 
     _animationController.forward();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       Provider.of<UserProvider>(context, listen: false).logActivity();
-      _initializeHealthData();
+      await _initializeHealthData();
+      await _checkAndShowHealthPermissionDialog();
       _checkAndShowFitnessGoalSummary();
     });
   }
 
   Future<void> _initializeHealthData() async {
-    // Sync metrics to streak provider
+    // Sync metrics to streak provider only once
     await _syncMetricsToStreak();
-    
-    // Original health initialization
+
+    // Note: Health initialization and syncing is already handled by MainScreen
+    // We only need to ensure the provider is initialized
     final healthProvider = Provider.of<HealthProvider>(context, listen: false);
     if (!healthProvider.isInitialized) {
       await healthProvider.initialize();
     }
-    
-    // Only sync if we have a connected health source, otherwise use saved data
-    if (healthProvider.isHealthSourceConnected) {
-      try {
-        await healthProvider.syncWithHealth();
-        print('Home page: Health data synced - Steps: ${healthProvider.todaySteps}, Calories: ${healthProvider.todayCaloriesBurned}, HR: ${healthProvider.todayHeartRate}, Sleep: ${healthProvider.todaySleep}');
-      } catch (e) {
-        print('Home page: Error syncing health data: $e');
-      }
-    } else {
-      print('Home page: Using saved health data - Steps: ${healthProvider.todaySteps}, Calories: ${healthProvider.todayCaloriesBurned}, HR: ${healthProvider.todayHeartRate}, Sleep: ${healthProvider.todaySleep}');
-    }
+
+    // Don't sync here - MainScreen already handles this
+    debugPrint('Home page: Health data ready - Steps: ${healthProvider.todaySteps}, Calories: ${healthProvider.todayCaloriesBurned}');
   }
 
   Future<void> _checkAndShowFitnessGoalSummary() async {
@@ -90,6 +89,100 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
           },
         ),
       );
+    }
+  }
+
+  Future<void> _checkAndShowHealthPermissionDialog() async {
+    // Avoid showing multiple times in same session
+    if (_hasCheckedHealthPermission) return;
+    _hasCheckedHealthPermission = true;
+
+    // Initialize health onboarding service if not already done
+    if (_healthOnboardingService == null) {
+      final prefs = await SharedPreferences.getInstance();
+      final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+      _healthOnboardingService = HealthOnboardingService(
+        prefs: prefs,
+        healthProvider: healthProvider,
+      );
+    }
+
+    // Check if we should show the health permission dialog
+    final shouldShow = await _healthOnboardingService!.shouldShowHealthPrompt();
+    if (shouldShow && mounted) {
+      // Small delay to ensure the home screen is fully rendered
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      if (!mounted) return;
+
+      // Check if it's a re-engagement
+      final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+      final isReengagement = await SharedPreferences.getInstance()
+          .then((prefs) => prefs.getBool('health_prompt_shown') ?? false);
+
+      // Show the health permission dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => HealthPermissionDialog(
+          isReengagement: isReengagement,
+          onConnect: () async {
+            Navigator.of(context).pop();
+            await _handleHealthPermissionRequest();
+          },
+          onDismiss: () async {
+            Navigator.of(context).pop();
+            await _healthOnboardingService!.markHealthPromptDismissed();
+
+            // Show a subtle reminder
+            if (mounted) {
+              ToastService().showInfo('You can connect health data anytime from Settings');
+            }
+          },
+        ),
+      );
+
+      // Mark that we've shown the prompt
+      await _healthOnboardingService!.markHealthPromptShown();
+    }
+    // Note: Auto-sync is already handled by MainScreen, no need to sync here
+  }
+
+  Future<void> _handleHealthPermissionRequest() async {
+    final result = await _healthOnboardingService!.requestHealthPermissions(context);
+
+    if (result.success) {
+      // Show success message
+      if (mounted) {
+        ToastService().showSuccess(result.message);
+      }
+
+      // Refresh the UI to show real data
+      await _refreshHealthData();
+    } else {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(result.message),
+                if (result.actionRequired != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    result.actionRequired!,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ],
+            ),
+            backgroundColor: AppTheme.errorRed,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -141,8 +234,8 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
           opacity: _fadeAnimation,
           child: Consumer4<UserProvider, HealthProvider, NutritionProvider, StreakProvider>(
             builder: (context, userProvider, healthProvider, nutritionProvider, streakProvider, child) {
-              // Sync metrics whenever providers update
-              _syncMetricsToStreak();
+              // Note: Do NOT call _syncMetricsToStreak() here - it causes infinite rebuilds
+              // Sync is already handled in initState and _initializeHealthData
               return SingleChildScrollView(
                   physics: const ClampingScrollPhysics(), // Changed from AlwaysScrollableScrollPhysics to prevent pull-to-refresh
                   padding: const EdgeInsets.all(20.0),
@@ -217,25 +310,35 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
       greeting = 'Good evening';
     }
 
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Hello $displayName 👋',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            fontSize: 28,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Hello $displayName 👋',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 28,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                greeting,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
+            ],
           ),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
         ),
-        const SizedBox(height: 4),
-        Text(
-          greeting,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-          ),
-        ),
+        // Sync status indicator removed - already shown in main_screen.dart
+        // to avoid duplicate indicators
       ],
     );
   }
@@ -256,31 +359,37 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
     final caloriesBurned = healthProvider.todayCaloriesBurned.toInt();
     final caloriesGoal = profile?.dailyCaloriesTarget ?? 2000;
     
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Water glasses counter
-            Column(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Water glasses counter
+          Flexible(
+            flex: 1,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.local_drink,
                       color: Colors.blue,
-                      size: 24,
+                      size: 20,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
                     Text(
                       '$waterGlasses',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      style: TextStyle(
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
                       '/$waterGoal',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      style: TextStyle(
+                        fontSize: 14,
                         color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                       ),
                     ),
@@ -288,23 +397,22 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
                 ),
               ],
             ),
-            
-            const SizedBox(width: 40),
-            
-            // Steps Circle
-            Stack(
+          ),
+
+          // Steps Circle
+          Container(
+            width: 140,
+            height: 140,
+            child: Stack(
               alignment: Alignment.center,
               children: [
-                SizedBox(
-                  width: 160,
-                  height: 160,
-                  child: CustomPaint(
-                    painter: CircularProgressPainter(
-                      progress: progress,
-                      backgroundColor: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
-                      progressColor: Colors.blue,
-                      strokeWidth: 12,
-                    ),
+                CustomPaint(
+                  size: Size(140, 140),
+                  painter: CircularProgressPainter(
+                    progress: progress,
+                    backgroundColor: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
+                    progressColor: Colors.blue,
+                    strokeWidth: 10,
                   ),
                 ),
                 Column(
@@ -312,14 +420,15 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
                   children: [
                     Text(
                       steps.toString(),
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      style: TextStyle(
+                        fontSize: 32,
                         fontWeight: FontWeight.bold,
-                        fontSize: 36,
                       ),
                     ),
                     Text(
                       'of $stepsGoal',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      style: TextStyle(
+                        fontSize: 12,
                         color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                       ),
                     ),
@@ -327,38 +436,47 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
                 ),
               ],
             ),
-            
-            const SizedBox(width: 40),
-            
-            // Calories counter
-            Column(
+          ),
+
+          // Calories counter
+          Flexible(
+            flex: 1,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      '$caloriesBurned',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    Flexible(
+                      child: Text(
+                        '$caloriesBurned',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 2),
                     Icon(
                       Icons.local_fire_department,
                       color: Colors.orange,
-                      size: 24,
+                      size: 20,
                     ),
                   ],
                 ),
                 Text(
                   '/$caloriesGoal',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  style: TextStyle(
+                    fontSize: 12,
                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                   ),
                 ),
               ],
             ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 

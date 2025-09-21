@@ -9,8 +9,14 @@ class IndianFoodNutritionService {
   // IMPORTANT: Get your FREE key from https://makersuite.google.com/app/apikey
   static const String _geminiApiKey = 'AIzaSyAzN4cdDbDRr5TuK9hHSyVqvGlcBbyHgrA';
   
-  // Indian Food Composition Database (IFCT 2017) - Completely FREE
+  // Indian Food Composition Database (IFCT 2017) - DEPRECATED
+  // We now use Gemini AI to calculate nutrition directly for better accuracy
+  // Keeping this for reference/fallback only
   static final Map<String, Map<String, dynamic>> _indianFoodDatabase = {
+    // Vegetables and Salads
+    'mixed vegetables': {'calories': 50, 'protein': 2.5, 'carbs': 10.0, 'fat': 0.5, 'fiber': 3.0},
+    'salad': {'calories': 50, 'protein': 2.5, 'carbs': 10.0, 'fat': 0.5, 'fiber': 3.0},
+    'vegetable': {'calories': 50, 'protein': 2.5, 'carbs': 10.0, 'fat': 0.5, 'fiber': 3.0},
     // North Indian
     'roti': {'calories': 71, 'protein': 2.7, 'carbs': 15.7, 'fat': 0.4, 'fiber': 2.0},
     'chapati': {'calories': 71, 'protein': 2.7, 'carbs': 15.7, 'fat': 0.4, 'fiber': 2.0},
@@ -93,6 +99,121 @@ class IndianFoodNutritionService {
     }
   }
   
+  // New method to analyze food with description instead of individual items
+  Future<Map<String, dynamic>> analyzeWithDescription(
+    File imageFile,
+    String mealDescription,
+  ) async {
+    try {
+      debugPrint('\n📸 Starting food analysis with description...');
+      debugPrint('Description: $mealDescription');
+      debugPrint('Image path: ${imageFile.path}');
+      debugPrint('🔑 Gemini API Key Status: ${_geminiApiKey.isNotEmpty ? "Present" : "Missing"}');
+      debugPrint('🔑 Gemini Model Status: ${_model != null ? "Initialized" : "Not Initialized"}');
+
+      // Check if model is initialized
+      if (_model == null) {
+        debugPrint('⚠️ Gemini not initialized, using fallback');
+        return _getDefaultNutrition();
+      }
+
+      // Send image and description to Gemini for nutrition calculation
+      final nutritionResult = await _calculateNutritionFromDescription(
+        imageFile,
+        mealDescription,
+      );
+
+      debugPrint('Final nutrition result from Gemini: ${nutritionResult['nutrition']}');
+      return nutritionResult;
+    } catch (e) {
+      debugPrint('❌ Error in analyzeWithDescription: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  // Calculate nutrition from meal description
+  Future<Map<String, dynamic>> _calculateNutritionFromDescription(
+    File imageFile,
+    String description,
+  ) async {
+    try {
+      debugPrint('🤖 Asking Gemini to analyze meal from description...');
+
+      // Read image bytes
+      final imageBytes = await imageFile.readAsBytes();
+
+      // Create prompt for Gemini with description
+      final prompt = '''
+Analyze this food image and the provided description to calculate total nutrition.
+
+Meal Description: $description
+
+Important:
+1. Look at the image to understand portion sizes and actual foods present
+2. Use the description to identify specific items and quantities mentioned
+3. Calculate total nutrition for the ENTIRE meal shown/described
+4. Be accurate with Indian food nutritional values if applicable
+
+Return ONLY a JSON object in this exact format (no markdown, no explanation):
+{
+  "foods": ["item1", "item2", "item3"],
+  "total_calories": number,
+  "total_protein": number (in grams),
+  "total_carbs": number (in grams),
+  "total_fat": number (in grams),
+  "total_fiber": number (in grams)
+}
+''';
+
+      // Create content with image and text
+      final content = [
+        Content.multi([
+          TextPart(prompt),
+          DataPart('image/jpeg', imageBytes),
+        ]),
+      ];
+
+      // Generate response from Gemini
+      final response = await _model!.generateContent(content);
+      final responseText = response.text?.trim() ?? '';
+
+      debugPrint('Gemini raw response: $responseText');
+
+      // Parse JSON response
+      try {
+        // Clean up response (remove any markdown formatting)
+        String cleanJson = responseText;
+        if (cleanJson.contains('```')) {
+          cleanJson = cleanJson.replaceAll(RegExp(r'```[\w]*\n?'), '').trim();
+        }
+
+        final nutritionData = json.decode(cleanJson);
+
+        return {
+          'success': true,
+          'foods': nutritionData['foods'] ?? [description],
+          'nutrition': {
+            'calories': (nutritionData['total_calories'] ?? 0).round(),
+            'protein': (nutritionData['total_protein'] ?? 0).round(),
+            'carbs': (nutritionData['total_carbs'] ?? 0).round(),
+            'fat': (nutritionData['total_fat'] ?? 0).round(),
+            'fiber': (nutritionData['total_fiber'] ?? 0).round(),
+          },
+          'confidence': 0.9,
+        };
+      } catch (parseError) {
+        debugPrint('Error parsing Gemini response: $parseError');
+        return _getDefaultNutrition();
+      }
+    } catch (e) {
+      debugPrint('Error with Gemini calculation: $e');
+      return _getDefaultNutrition();
+    }
+  }
+
   // Main function to analyze food image with user-provided details
   Future<Map<String, dynamic>> analyzeIndianFoodWithDetails(
     File imageFile,
@@ -100,43 +221,27 @@ class IndianFoodNutritionService {
     String quantity,
   ) async {
     try {
-      debugPrint('\n📸 Starting Indian food analysis with user input...');
+      debugPrint('\n📸 Starting Indian food analysis with Gemini AI...');
       debugPrint('User provided: $foodName, Quantity: $quantity');
       debugPrint('Image path: ${imageFile.path}');
-      
-      // Parse quantity to extract numeric value and unit
-      final quantityParts = _parseQuantity(quantity);
-      final quantityValue = quantityParts['value'] as double;
-      final quantityUnit = quantityParts['unit'] as String;
-      
-      // Step 1: Use user-provided food name primarily
-      List<String> foodItems = [foodName];
-      
-      // Also try to identify from image for verification
-      final identifiedFoods = await _identifyFoodWithGemini(imageFile);
-      if (identifiedFoods.isNotEmpty) {
-        // Merge user input with identified foods
-        for (var food in identifiedFoods) {
-          if (!foodItems.contains(food)) {
-            foodItems.add(food);
-          }
-        }
+      debugPrint('🔑 Gemini API Key Status: ${_geminiApiKey.isNotEmpty ? "Present" : "Missing"}');
+      debugPrint('🔑 Gemini Model Status: ${_model != null ? "Initialized" : "Not Initialized"}');
+
+      // Check if model is initialized
+      if (_model == null) {
+        debugPrint('⚠️ Gemini not initialized, using fallback');
+        return _getDefaultNutrition();
       }
-      
-      debugPrint('Foods to process: $foodItems');
-      
-      // Step 2: Get nutrition from database
-      var result = _getNutritionFromDatabase(foodItems);
-      
-      // Step 3: Adjust nutrition based on quantity
-      result = _adjustNutritionForQuantity(
-        result,
-        quantityValue,
-        quantityUnit,
+
+      // Step 1: Send image and food details to Gemini for direct nutrition calculation
+      final nutritionResult = await _calculateNutritionWithGemini(
+        imageFile,
+        foodName,
+        quantity,
       );
-      
-      debugPrint('Final nutrition result (adjusted): ${result['nutrition']}');
-      return result;
+
+      debugPrint('Final nutrition result from Gemini: ${nutritionResult['nutrition']}');
+      return nutritionResult;
     } catch (e) {
       debugPrint('❌ Error in analyzeIndianFoodWithDetails: $e');
       return {
@@ -146,20 +251,128 @@ class IndianFoodNutritionService {
     }
   }
   
+  // New method to calculate nutrition directly with Gemini
+  Future<Map<String, dynamic>> _calculateNutritionWithGemini(
+    File imageFile,
+    String foodName,
+    String quantity,
+  ) async {
+    try {
+      debugPrint('🤖 Asking Gemini to calculate nutrition...');
+
+      // Read image bytes
+      final imageBytes = await imageFile.readAsBytes();
+
+      // Create prompt for Gemini
+      final prompt = '''
+Analyze this food image and calculate the nutrition information.
+
+Food Name: $foodName
+Quantity: $quantity
+
+Please provide accurate nutritional information for this specific food item and quantity.
+If the image shows Indian food, use appropriate Indian food nutritional databases.
+
+Return ONLY a JSON object in this exact format (no markdown, no explanation):
+{
+  "food_name": "actual food name",
+  "quantity": "quantity with unit",
+  "calories": number,
+  "protein": number (in grams),
+  "carbs": number (in grams),
+  "fat": number (in grams),
+  "fiber": number (in grams)
+}
+''';
+
+      // Create content with image and text
+      final content = [
+        Content.multi([
+          TextPart(prompt),
+          DataPart('image/jpeg', imageBytes),
+        ]),
+      ];
+
+      // Generate response from Gemini
+      final response = await _model!.generateContent(content);
+      final responseText = response.text?.trim() ?? '';
+
+      debugPrint('Gemini raw response: $responseText');
+
+      // Parse JSON response
+      try {
+        // Clean up response (remove any markdown formatting)
+        String cleanJson = responseText;
+        if (cleanJson.contains('```')) {
+          cleanJson = cleanJson.replaceAll(RegExp(r'```[\w]*\n?'), '').trim();
+        }
+
+        final nutritionData = json.decode(cleanJson);
+
+        return {
+          'success': true,
+          'foods': [nutritionData['food_name'] ?? foodName],
+          'nutrition': {
+            'calories': (nutritionData['calories'] ?? 0).round(),
+            'protein': (nutritionData['protein'] ?? 0).round(),
+            'carbs': (nutritionData['carbs'] ?? 0).round(),
+            'fat': (nutritionData['fat'] ?? 0).round(),
+            'fiber': (nutritionData['fiber'] ?? 0).round(),
+          },
+          'confidence': 0.9, // High confidence as Gemini calculated it directly
+        };
+      } catch (parseError) {
+        debugPrint('Error parsing Gemini response: $parseError');
+        // If parsing fails, try to extract numbers from text
+        return _extractNutritionFromText(responseText, foodName);
+      }
+    } catch (e) {
+      debugPrint('Error with Gemini calculation: $e');
+      return _getDefaultNutrition();
+    }
+  }
+
+  // Helper method to extract nutrition from text if JSON parsing fails
+  Map<String, dynamic> _extractNutritionFromText(String text, String foodName) {
+    try {
+      // Try to extract numbers from text using regex
+      final caloriesMatch = RegExp(r'calories?[:\s]*(\d+)', caseSensitive: false).firstMatch(text);
+      final proteinMatch = RegExp(r'protein[:\s]*(\d+\.?\d*)', caseSensitive: false).firstMatch(text);
+      final carbsMatch = RegExp(r'carb(?:ohydrate)?s?[:\s]*(\d+\.?\d*)', caseSensitive: false).firstMatch(text);
+      final fatMatch = RegExp(r'fat[:\s]*(\d+\.?\d*)', caseSensitive: false).firstMatch(text);
+      final fiberMatch = RegExp(r'fiber[:\s]*(\d+\.?\d*)', caseSensitive: false).firstMatch(text);
+
+      return {
+        'success': true,
+        'foods': [foodName],
+        'nutrition': {
+          'calories': int.tryParse(caloriesMatch?.group(1) ?? '0') ?? 150,
+          'protein': (double.tryParse(proteinMatch?.group(1) ?? '0') ?? 5).round(),
+          'carbs': (double.tryParse(carbsMatch?.group(1) ?? '0') ?? 20).round(),
+          'fat': (double.tryParse(fatMatch?.group(1) ?? '0') ?? 5).round(),
+          'fiber': (double.tryParse(fiberMatch?.group(1) ?? '0') ?? 2).round(),
+        },
+        'confidence': 0.7,
+      };
+    } catch (e) {
+      return _getDefaultNutrition();
+    }
+  }
+
   // Helper method to parse quantity string
   Map<String, dynamic> _parseQuantity(String quantity) {
     // Extract number and unit from quantity string like "100 grams" or "2 cups"
     final parts = quantity.split(' ');
     double value = 100; // default
     String unit = 'grams'; // default
-    
+
     if (parts.isNotEmpty) {
       value = double.tryParse(parts[0]) ?? 100;
       if (parts.length > 1) {
         unit = parts.sublist(1).join(' ');
       }
     }
-    
+
     return {'value': value, 'unit': unit};
   }
   
@@ -237,25 +450,25 @@ class IndianFoodNutritionService {
   // Main function to analyze food image
   Future<Map<String, dynamic>> analyzeIndianFood(File imageFile) async {
     try {
-      debugPrint('\n📸 Starting Indian food analysis...');
+      debugPrint('\n📸 Starting Indian food analysis with Gemini AI...');
       debugPrint('Image path: ${imageFile.path}');
-      
-      // Step 1: Use Gemini Vision to identify the food
-      final foodItems = await _identifyFoodWithGemini(imageFile);
-      
-      debugPrint('Foods identified by Gemini: $foodItems');
-      
-      if (foodItems.isEmpty) {
-        debugPrint('No foods identified, using fallback...');
-        // Fallback to basic image analysis
-        return await _fallbackAnalysis(imageFile);
+
+      // Check if model is initialized
+      if (_model == null) {
+        debugPrint('⚠️ Gemini not initialized, using fallback');
+        return _getDefaultNutrition();
       }
-      
-      // Step 2: Get nutrition from our Indian database
-      final result = _getNutritionFromDatabase(foodItems);
-      debugPrint('Final nutrition result: ${result['nutrition']}');
-      return result;
-      
+
+      // Let Gemini analyze the image and calculate nutrition directly
+      // Default to 100 grams if no quantity specified
+      final nutritionResult = await _calculateNutritionWithGemini(
+        imageFile,
+        'food item', // Generic name, Gemini will identify
+        '100 grams', // Default quantity
+      );
+
+      debugPrint('Final nutrition result from Gemini: ${nutritionResult['nutrition']}');
+      return nutritionResult;
     } catch (e) {
       debugPrint('Error analyzing Indian food: $e');
       return _getDefaultNutrition();
@@ -312,12 +525,19 @@ Analyze the image now:
         ])
       ];
       
+      debugPrint('📤 Sending request to Gemini API...');
       final response = await _model!.generateContent(content);
       final responseText = response.text ?? '';
-      
+
       // Log the full Gemini response for debugging
       debugPrint('=== GEMINI RESPONSE START ===');
-      debugPrint(responseText);
+      debugPrint('Response received: ${responseText.isNotEmpty ? "Yes" : "No"}');
+      debugPrint('Response length: ${responseText.length} characters');
+      if (responseText.isNotEmpty) {
+        debugPrint(responseText.substring(0, responseText.length > 200 ? 200 : responseText.length));
+      } else {
+        debugPrint('⚠️ Empty response from Gemini');
+      }
       debugPrint('=== GEMINI RESPONSE END ===');
       
       // Parse the JSON response (handle multi-line JSON)
@@ -350,7 +570,9 @@ Analyze the image now:
       return extractedFoods;
       
     } catch (e) {
-      debugPrint('Gemini Vision error: $e');
+      debugPrint('❌ Gemini Vision error: $e');
+      debugPrint('Error type: ${e.runtimeType}');
+      debugPrint('Stack trace: ${StackTrace.current}');
       return [];
     }
   }

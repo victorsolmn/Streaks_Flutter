@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -12,6 +14,7 @@ import '../services/supabase_service.dart';
 class NutritionEntry {
   final String id;
   final String foodName;
+  final String? quantity; // Added quantity/description field
   final int calories;
   final double protein;
   final double carbs;
@@ -22,6 +25,7 @@ class NutritionEntry {
   NutritionEntry({
     required this.id,
     required this.foodName,
+    this.quantity,
     required this.calories,
     required this.protein,
     required this.carbs,
@@ -34,6 +38,7 @@ class NutritionEntry {
     return {
       'id': id,
       'foodName': foodName,
+      'quantity': quantity,
       'calories': calories,
       'protein': protein,
       'carbs': carbs,
@@ -47,6 +52,7 @@ class NutritionEntry {
     return NutritionEntry(
       id: json['id'],
       foodName: json['foodName'],
+      quantity: json['quantity'],
       calories: json['calories'],
       protein: json['protein'].toDouble(),
       carbs: json['carbs'].toDouble(),
@@ -159,13 +165,23 @@ class NutritionProvider with ChangeNotifier {
   }
 
   void _setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
+    if (_isLoading != loading) {
+      _isLoading = loading;
+      // Only notify if we're not in a build phase
+      if (SchedulerBinding.instance.schedulerPhase != SchedulerPhase.persistentCallbacks) {
+        notifyListeners();
+      }
+    }
   }
 
   void _setError(String? error) {
-    _error = error;
-    notifyListeners();
+    if (_error != error) {
+      _error = error;
+      // Only notify if we're not in a build phase
+      if (SchedulerBinding.instance.schedulerPhase != SchedulerPhase.persistentCallbacks) {
+        notifyListeners();
+      }
+    }
   }
 
   Future<void> _loadNutritionData() async {
@@ -191,6 +207,9 @@ class NutritionProvider with ChangeNotifier {
 
     _setLoading(true);
     try {
+      // Note: clearAllNutritionEntries method available if needed for future cleanup
+      // await _supabaseService.clearAllNutritionEntries(userId);
+
       // Load nutrition history from Supabase (last 30 days)
       final history = await _supabaseService.getNutritionHistory(
         userId: userId,
@@ -294,7 +313,7 @@ class NutritionProvider with ChangeNotifier {
   Future<void> _syncToSupabase() async {
     final userId = _supabaseService.currentUser?.id;
     if (userId == null || _isSyncing) return;
-    
+
     // Throttle syncing - don't sync more than once per minute
     if (_lastSyncTime != null) {
       final timeSinceLastSync = DateTime.now().difference(_lastSyncTime!);
@@ -303,57 +322,52 @@ class NutritionProvider with ChangeNotifier {
         return;
       }
     }
-    
+
     _isSyncing = true;
+    final syncedEntryIds = <String>{}; // Track already synced entries
 
     try {
       debugPrint('NutritionProvider: Starting sync to Supabase');
-      // Group entries by date
+
+      // Get existing entries from Supabase for today to avoid duplicates
+      final today = DateTime.now();
+      final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      // Group local entries by date
       final Map<String, List<NutritionEntry>> entriesByDate = {};
-      
+
       for (final entry in _entries) {
         final dateStr = '${entry.timestamp.year}-${entry.timestamp.month.toString().padLeft(2, '0')}-${entry.timestamp.day.toString().padLeft(2, '0')}';
         entriesByDate[dateStr] ??= [];
         entriesByDate[dateStr]!.add(entry);
       }
 
-      // Save each day's data to Supabase
-      for (final date in entriesByDate.keys) {
-        final dayEntries = entriesByDate[date]!;
-        
-        // Calculate totals for the day
-        int totalCalories = 0;
-        double totalProtein = 0;
-        double totalCarbs = 0;
-        double totalFat = 0;
-        double totalFiber = 0;
-        
-        final foodItems = [];
-        
-        for (final entry in dayEntries) {
-          totalCalories += entry.calories;
-          totalProtein += entry.protein;
-          totalCarbs += entry.carbs;
-          totalFat += entry.fat;
-          totalFiber += entry.fiber;
-          
-          foodItems.add(entry.toJson());
-        }
+      // Only sync today's entries to avoid re-syncing old data
+      if (entriesByDate.containsKey(todayStr)) {
+        final todayEntries = entriesByDate[todayStr]!;
 
-        // Save each individual entry to Supabase
-        for (final entry in dayEntries) {
-          await _supabaseService.saveNutritionEntry(
-            userId: userId,
-            foodName: entry.foodName,
-            calories: entry.calories,
-            protein: entry.protein,
-            carbs: entry.carbs,
-            fat: entry.fat,
-            fiber: entry.fiber,
-          );
+        // Only save entries that haven't been synced yet
+        for (final entry in todayEntries) {
+          // Use a combination of timestamp and food name as unique identifier
+          final entryKey = '${entry.timestamp.millisecondsSinceEpoch}_${entry.foodName}';
+
+          if (!syncedEntryIds.contains(entryKey)) {
+            await _supabaseService.saveNutritionEntry(
+              userId: userId,
+              foodName: entry.foodName,
+              calories: entry.calories,
+              protein: entry.protein,
+              carbs: entry.carbs,
+              fat: entry.fat,
+              fiber: entry.fiber,
+              timestamp: entry.timestamp,
+            );
+            syncedEntryIds.add(entryKey);
+            debugPrint('Synced nutrition entry: ${entry.foodName}');
+          }
         }
       }
-      
+
       _lastSyncTime = DateTime.now();
       debugPrint('NutritionProvider: Sync to Supabase completed successfully');
     } catch (e) {
@@ -386,6 +400,66 @@ class NutritionProvider with ChangeNotifier {
     }
   }
 
+  Future<NutritionEntry?> scanFoodWithDescription(String imagePath, String mealDescription) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      final imageFile = File(imagePath);
+      debugPrint('\n🍴 ===========================================');
+      debugPrint('🍴 NUTRITION SCAN STARTED (Description Mode)');
+      debugPrint('🍴 Description: $mealDescription');
+      debugPrint('🍴 Image exists: ${imageFile.existsSync()}');
+      debugPrint('🍴 ===========================================');
+
+      // Call new description-based analysis
+      debugPrint('📱 Calling Indian Food Service with description...');
+      final result = await _indianFoodService.analyzeWithDescription(
+        imageFile,
+        mealDescription,
+      );
+
+      debugPrint('📱 Indian Food Service Result:');
+      debugPrint('   Success: ${result['success']}');
+      debugPrint('   Nutrition: ${result['nutrition']}');
+      debugPrint('   Foods: ${result['foods']}');
+
+      if (result['success'] == true && result['nutrition'] != null) {
+        final nutrition = result['nutrition'];
+        final foodName = result['foods']?.join(', ') ?? 'Mixed meal';
+
+        // Create nutrition entry from result
+        final entry = NutritionEntry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          foodName: foodName,
+          quantity: mealDescription.length > 50 ? mealDescription.substring(0, 50) + '...' : mealDescription,
+          calories: nutrition['calories'] ?? 0,
+          protein: (nutrition['protein'] ?? 0).toDouble(),
+          carbs: (nutrition['carbs'] ?? 0).toDouble(),
+          fat: (nutrition['fat'] ?? 0).toDouble(),
+          fiber: (nutrition['fiber'] ?? 0).toDouble(),
+          timestamp: DateTime.now(),
+        );
+
+        debugPrint('✅ Created nutrition entry:');
+        debugPrint('   Food: ${entry.foodName}');
+        debugPrint('   Description: ${entry.quantity}');
+        debugPrint('   Calories: ${entry.calories}');
+        debugPrint('   Protein: ${entry.protein}g');
+
+        _setLoading(false);
+        return entry;
+      } else {
+        throw Exception('Failed to analyze meal');
+      }
+    } catch (e) {
+      debugPrint('❌ Error: $e');
+      _setError('Failed to analyze meal: ${e.toString()}');
+      _setLoading(false);
+      return null;
+    }
+  }
+
   Future<NutritionEntry?> scanFoodWithDetails(String imagePath, String foodName, String quantity) async {
     _setLoading(true);
     _setError(null);
@@ -393,18 +467,29 @@ class NutritionProvider with ChangeNotifier {
     try {
       // First try Indian food recognition with user input for better accuracy
       final imageFile = File(imagePath);
-      debugPrint('Analyzing food: $foodName, Quantity: $quantity');
-      
+      debugPrint('\n🍴 ===========================================');
+      debugPrint('🍴 NUTRITION SCAN STARTED');
+      debugPrint('🍴 Food: $foodName');
+      debugPrint('🍴 Quantity: $quantity');
+      debugPrint('🍴 Image exists: ${imageFile.existsSync()}');
+      debugPrint('🍴 ===========================================');
+
       // Try Indian food service with user-provided details
+      debugPrint('📱 Calling Indian Food Service...');
       final indianResult = await _indianFoodService.analyzeIndianFoodWithDetails(
         imageFile,
         foodName,
         quantity,
       );
-      
+
+      debugPrint('📱 Indian Food Service Result:');
+      debugPrint('   Success: ${indianResult['success']}');
+      debugPrint('   Nutrition: ${indianResult['nutrition']}');
+      debugPrint('   Error: ${indianResult['error'] ?? 'None'}');
+
       if (indianResult['success'] == true && indianResult['nutrition'] != null) {
         final nutrition = indianResult['nutrition'];
-        
+
         // Create nutrition entry from Indian food result with user-provided name
         final entry = NutritionEntry(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -416,7 +501,14 @@ class NutritionProvider with ChangeNotifier {
           fiber: (nutrition['fiber'] ?? 0).toDouble(),
           timestamp: DateTime.now(),
         );
-        
+
+        debugPrint('✅ Created nutrition entry:');
+        debugPrint('   Food: ${entry.foodName}');
+        debugPrint('   Calories: ${entry.calories}');
+        debugPrint('   Protein: ${entry.protein}g');
+        debugPrint('   Carbs: ${entry.carbs}g');
+        debugPrint('   Fat: ${entry.fat}g');
+
         _setLoading(false);
         return entry;
       }

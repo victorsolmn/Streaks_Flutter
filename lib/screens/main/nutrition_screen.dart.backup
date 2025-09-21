@@ -203,33 +203,6 @@ class _NutritionScreenState extends State<NutritionScreen>
     return result ?? false;
   }
 
-  Widget _buildNutritionRow(String label, String value, IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          SizedBox(width: 12),
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-          Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).textTheme.bodyLarge?.color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<bool> _showFoodPreview(dynamic entry) async {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
@@ -731,6 +704,313 @@ class _NutritionScreenState extends State<NutritionScreen>
     );
   }
 
+  // Keep the old complex dialog structure but remove it for now
+  Future<Container> _oldComplexDialog() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+                      margin: EdgeInsets.only(bottom: 16),
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode 
+                          ? AppTheme.darkCardBackground.withOpacity(0.5)
+                          : AppTheme.cardBackgroundLight.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primaryAccent.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Header with item number and delete button
+                          Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryAccent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Food Item ${index + 1}',
+                                  style: TextStyle(
+                                    color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              if (foodItems.length > 1)
+                                IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      item['nameController'].dispose();
+                                      item['quantityController'].dispose();
+                                      foodItems.removeAt(index);
+                                    });
+                                  },
+                                  icon: Icon(
+                                    Icons.remove_circle,
+                                    color: AppTheme.errorRed,
+                                    size: 20,
+                                  ),
+                                  constraints: BoxConstraints(),
+                                  padding: EdgeInsets.all(4),
+                                ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          
+                          // Food name input
+                          TextField(
+                            controller: item['nameController'],
+                            autofocus: index == 0,
+                            decoration: InputDecoration(
+                              labelText: 'Food Name',
+                              hintText: 'e.g., Chicken Biryani, Apple, Sandwich',
+                              prefixIcon: Icon(Icons.fastfood, color: AppTheme.primaryAccent, size: 20),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: AppTheme.primaryAccent, width: 2),
+                              ),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            style: TextStyle(
+                              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
+                          SizedBox(height: 12),
+                          
+                          // Quantity and unit row
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: TextField(
+                                  controller: item['quantityController'],
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: 'Quantity',
+                                    prefixIcon: Icon(Icons.scale, color: AppTheme.primaryAccent, size: 20),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: AppTheme.primaryAccent, width: 2),
+                                    ),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                  style: TextStyle(
+                                    color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                flex: 2,
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: isDarkMode ? AppTheme.dividerDark : AppTheme.dividerLight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: item['selectedUnit'],
+                                      isExpanded: true,
+                                      dropdownColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+                                      style: TextStyle(
+                                        color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                                        fontSize: 14,
+                                      ),
+                                      items: [
+                                        'grams',
+                                        'kg',
+                                        'cups',
+                                        'pieces',
+                                        'servings',
+                                        'plates',
+                                        'bowls',
+                                        'ml',
+                                        'liters',
+                                      ].map((unit) => DropdownMenuItem(
+                                        value: unit,
+                                        child: Text(unit),
+                                      )).toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          item['selectedUnit'] = value!;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  
+                  // Add new food item button
+                  if (foodItems.length < 4)
+                    Center(
+                      child: Container(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              foodItems.add({
+                                'nameController': TextEditingController(),
+                                'quantityController': TextEditingController(text: '100'),
+                                'selectedUnit': 'grams',
+                              });
+                            });
+                          },
+                          icon: Icon(Icons.add_circle_outline, color: AppTheme.primaryAccent),
+                          label: Text(
+                            'Add Another Food Item',
+                            style: TextStyle(color: AppTheme.primaryAccent),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: AppTheme.primaryAccent),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  
+                  SizedBox(height: 16),
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryAccent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lightbulb_outline, color: AppTheme.primaryAccent, size: 14),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Be specific with food names for better nutrition accuracy',
+                            style: TextStyle(
+                              color: AppTheme.primaryAccent,
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Dispose controllers before closing
+                for (var item in foodItems) {
+                  item['nameController'].dispose();
+                  item['quantityController'].dispose();
+                }
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Validate all food items
+                List<Map<String, String>> validFoodItems = [];
+                bool hasErrors = false;
+                
+                for (int i = 0; i < foodItems.length; i++) {
+                  var item = foodItems[i];
+                  String name = item['nameController'].text.trim();
+                  String quantity = item['quantityController'].text.trim();
+                  
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Please enter name for food item ${i + 1}'),
+                        backgroundColor: AppTheme.errorRed,
+                      ),
+                    );
+                    hasErrors = true;
+                    break;
+                  }
+                  if (quantity.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Please enter quantity for food item ${i + 1}'),
+                        backgroundColor: AppTheme.errorRed,
+                      ),
+                    );
+                    hasErrors = true;
+                    break;
+                  }
+                  
+                  validFoodItems.add({
+                    'name': name,
+                    'quantity': '$quantity ${item['selectedUnit']}',
+                  });
+                }
+                
+                if (!hasErrors) {
+                  // Dispose controllers before closing
+                  for (var item in foodItems) {
+                    item['nameController'].dispose();
+                    item['quantityController'].dispose();
+                  }
+                  Navigator.of(context).pop(validFoodItems);
+                }
+              },
+              icon: Icon(Icons.analytics, size: 18),
+              label: Text('Analyze Food${foodItems.length > 1 ? 's' : ''}'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showErrorDialog(String message) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;

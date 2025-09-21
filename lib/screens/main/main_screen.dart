@@ -78,10 +78,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     
     // Handle app lifecycle changes
     if (state == AppLifecycleState.resumed) {
-      // App has come to foreground - sync health and nutrition data from Supabase
+      // App has come to foreground - only sync if needed (with throttling)
       _syncHealthDataIfNeeded();
-      healthProvider.loadHealthDataFromSupabase();
-      nutritionProvider.loadDataFromSupabase();
+      // Note: _syncHealthDataIfNeeded already handles loading data if needed
     } else if (state == AppLifecycleState.paused) {
       // App is going to background - sync data to Supabase
       healthProvider.syncOnPause();
@@ -113,7 +112,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
       // Load and sync health data
       final healthProvider = Provider.of<HealthProvider>(context, listen: false);
-      
+
+      // FIRST: Load existing data from Supabase (before any initialization)
+      debugPrint('MainScreen: Loading existing data from Supabase...');
+      await healthProvider.loadHealthDataFromSupabase();
+
+      // Check mounted after async operation
+      if (!mounted) return;
+
       // Initialize health provider if not already done
       if (!healthProvider.isInitialized) {
         await healthProvider.initialize();
@@ -122,14 +128,27 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       // Check mounted after async operation
       if (!mounted) return;
 
-      // Load health data from Supabase
-      await healthProvider.loadHealthDataFromSupabase();
+      // Smart permission check: Auto-connect if permissions already exist
+      debugPrint('MainScreen: Performing smart permission check...');
+      final autoConnected = await healthProvider.healthService.checkAndAutoConnect();
+      if (autoConnected) {
+        debugPrint('MainScreen: ✅ Auto-connected to health source!');
+
+        // IMPORTANT: Immediately sync health data after successful connection
+        debugPrint('MainScreen: Fetching health data after auto-connect...');
+        await healthProvider.syncWithHealth();
+
+        // Save the fetched data to Supabase
+        await healthProvider.saveHealthDataToSupabase();
+      } else {
+        debugPrint('MainScreen: No existing permissions found, manual connection required');
+      }
 
       // Check mounted after async operation
       if (!mounted) return;
-      
-      // Automatically sync with health sources if connected
-      if (healthProvider.isHealthSourceConnected) {
+
+      // Check if we need to sync (in case auto-connect didn't work)
+      if (!autoConnected && healthProvider.isHealthSourceConnected) {
         debugPrint('MainScreen: Auto-syncing health data on app startup...');
         await healthProvider.syncWithHealth();
 
@@ -173,20 +192,30 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   
   Future<void> _syncHealthDataIfNeeded() async {
     // Prevent multiple simultaneous syncs
-    if (_isSyncing) return;
-    
+    if (_isSyncing) {
+      debugPrint('MainScreen: Sync already in progress, skipping');
+      return;
+    }
+
     // Check if we should sync (throttle to prevent excessive syncing)
     if (_lastSyncTime != null) {
       final timeSinceLastSync = DateTime.now().difference(_lastSyncTime!);
-      // Only sync if it's been more than 30 seconds since last sync
-      if (timeSinceLastSync.inSeconds < 30) {
+      // Only sync if it's been more than 60 seconds since last sync (increased from 30)
+      if (timeSinceLastSync.inSeconds < 60) {
         debugPrint('MainScreen: Skipping sync, last sync was ${timeSinceLastSync.inSeconds} seconds ago');
         return;
       }
     }
-    
+
     final healthProvider = Provider.of<HealthProvider>(context, listen: false);
-    
+
+    // Smart permission check on app resume
+    debugPrint('MainScreen: Checking for existing permissions on app resume...');
+    final autoConnected = await healthProvider.healthService.checkAndAutoConnect();
+    if (autoConnected) {
+      debugPrint('MainScreen: ✅ Auto-connected on resume!');
+    }
+
     // Only sync if health source is connected
     if (!healthProvider.isHealthSourceConnected) {
       debugPrint('MainScreen: Health source not connected, skipping auto-sync');

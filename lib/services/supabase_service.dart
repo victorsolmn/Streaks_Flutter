@@ -197,8 +197,26 @@ class SupabaseService {
     int quantityGrams = 100,
     String mealType = 'snack',
     String? foodSource,
+    DateTime? timestamp,
   }) async {
     try {
+      final entryTimestamp = timestamp ?? DateTime.now();
+
+      // First check if entry already exists
+      final existingEntry = await _supabase
+          .from('nutrition_entries')
+          .select()
+          .eq('user_id', userId)
+          .eq('food_name', foodName)
+          .gte('created_at', entryTimestamp.subtract(Duration(seconds: 5)).toIso8601String())
+          .lte('created_at', entryTimestamp.add(Duration(seconds: 5)).toIso8601String())
+          .maybeSingle();
+
+      if (existingEntry != null) {
+        debugPrint('Nutrition entry already exists, skipping: $foodName');
+        return;
+      }
+
       await _supabase.from('nutrition_entries').insert({
         'user_id': userId,
         'food_name': foodName,
@@ -210,8 +228,9 @@ class SupabaseService {
         'quantity_grams': quantityGrams,
         'meal_type': mealType,
         'food_source': foodSource,
+        'created_at': entryTimestamp.toIso8601String(),
       });
-      debugPrint('Nutrition entry saved: $foodName');
+      debugPrint('Nutrition entry saved: $foodName ($quantityGrams grams)');
     } catch (e) {
       debugPrint('Error saving nutrition entry: $e');
       throw e;
@@ -268,6 +287,75 @@ class SupabaseService {
       debugPrint('Nutrition entry deleted: $entryId');
     } catch (e) {
       debugPrint('Error deleting nutrition entry: $e');
+      throw e;
+    }
+  }
+
+  // Clear duplicate nutrition entries for a specific date
+  Future<void> clearDuplicateNutritionEntries(String userId, DateTime date) async {
+    try {
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+      // Get all entries for the date
+      final response = await _supabase
+          .from('nutrition_entries')
+          .select()
+          .eq('user_id', userId)
+          .eq('date', dateStr)
+          .order('created_at', ascending: false);
+
+      final entries = response as List<dynamic>;
+
+      if (entries.isEmpty) {
+        debugPrint('No nutrition entries found for $dateStr');
+        return;
+      }
+
+      // Group entries by food_name and timestamp
+      final uniqueEntries = <String, dynamic>{};
+      final duplicateIds = <String>[];
+
+      for (final entry in entries) {
+        final key = '${entry['food_name']}_${entry['calories']}_${entry['protein']}_${entry['carbs']}';
+
+        if (uniqueEntries.containsKey(key)) {
+          // This is a duplicate, mark for deletion
+          duplicateIds.add(entry['id']);
+        } else {
+          // Keep the first occurrence
+          uniqueEntries[key] = entry;
+        }
+      }
+
+      // Delete duplicates
+      if (duplicateIds.isNotEmpty) {
+        for (final id in duplicateIds) {
+          await _supabase.from('nutrition_entries').delete().eq('id', id);
+        }
+        debugPrint('Deleted ${duplicateIds.length} duplicate nutrition entries for $dateStr');
+      } else {
+        debugPrint('No duplicate nutrition entries found for $dateStr');
+      }
+    } catch (e) {
+      debugPrint('Error clearing duplicate nutrition entries: $e');
+      throw e;
+    }
+  }
+
+  // Clear all nutrition entries for a user
+  Future<void> clearAllNutritionEntries(String userId) async {
+    try {
+      debugPrint('Clearing all nutrition entries for user: $userId');
+
+      // Delete all nutrition entries for the user
+      final response = await _supabase
+          .from('nutrition_entries')
+          .delete()
+          .eq('user_id', userId);
+
+      debugPrint('✅ Successfully cleared all nutrition entries for user: $userId');
+    } catch (e) {
+      debugPrint('Error clearing all nutrition entries: $e');
       throw e;
     }
   }
