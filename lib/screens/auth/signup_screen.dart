@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +10,8 @@ import '../../services/toast_service.dart';
 import '../../services/popup_service.dart';
 import '../../utils/app_theme.dart';
 import '../onboarding/supabase_onboarding_screen.dart';
+import '../legal/privacy_policy_screen.dart';
+import '../legal/terms_conditions_screen.dart';
 import 'signin_screen.dart';
 import 'otp_verification_screen.dart';
 
@@ -327,7 +330,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     style: TextStyle(
                                       color: AppTheme.primaryAccent,
                                       fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
                                     ),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) => const TermsConditionsScreen(),
+                                          ),
+                                        );
+                                      },
                                   ),
                                   const TextSpan(text: ' and '),
                                   TextSpan(
@@ -335,7 +347,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     style: TextStyle(
                                       color: AppTheme.primaryAccent,
                                       fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
                                     ),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) => const PrivacyPolicyScreen(),
+                                          ),
+                                        );
+                                      },
                                   ),
                                 ],
                               ),

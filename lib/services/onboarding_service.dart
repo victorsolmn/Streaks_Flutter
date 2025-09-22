@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/profile_model.dart';
 import '../models/supabase_enums.dart';
+import 'native_health_connect_service.dart';
 
 /// Onboarding Service - Handles all Supabase interactions for onboarding
 ///
@@ -8,6 +9,7 @@ import '../models/supabase_enums.dart';
 /// and saved to Supabase according to the database schema constraints
 class OnboardingService {
   final SupabaseClient _client;
+  final NativeHealthConnectService _healthService = NativeHealthConnectService();
 
   OnboardingService() : _client = Supabase.instance.client;
 
@@ -35,7 +37,25 @@ class OnboardingService {
 
       if (response != null) {
         print('✅ OnboardingService: Profile found for user ${user.id}');
-        return ProfileModel.fromJson(response);
+        final profile = ProfileModel.fromJson(response);
+
+        // Sync profile to native side if it has the required data
+        if (profile.age != null && profile.gender != null &&
+            profile.height != null && profile.weight != null) {
+          try {
+            await _healthService.syncUserProfile(
+              age: profile.age!,
+              gender: profile.gender!,
+              height: profile.height!,
+              weight: profile.weight!,
+            );
+            print('✅ OnboardingService: Existing profile synced to native side');
+          } catch (e) {
+            print('⚠️ OnboardingService: Failed to sync existing profile to native: $e');
+          }
+        }
+
+        return profile;
       }
 
       // Create new profile with minimal data
@@ -111,6 +131,21 @@ class OnboardingService {
           .eq('id', user.id);
 
       print('✅ OnboardingService: Step 1 saved successfully');
+
+      // Sync profile to native side for calorie calculations
+      try {
+        await _healthService.syncUserProfile(
+          age: age,
+          gender: gender,
+          height: height,
+          weight: weight,
+        );
+        print('✅ OnboardingService: Profile synced to native side');
+      } catch (e) {
+        print('⚠️ OnboardingService: Failed to sync profile to native: $e');
+        // Don't fail the onboarding if sync fails
+      }
+
       return true;
     } catch (e) {
       print('❌ OnboardingService: Error saving Step 1: $e');

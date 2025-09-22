@@ -493,15 +493,15 @@ class NativeHealthConnectService {
     try {
       _log('Getting last sync info...');
       final Map<dynamic, dynamic> result = await _channel.invokeMethod('getLastSyncInfo');
-      
+
       final syncInfo = Map<String, dynamic>.from(result);
       _log('Last sync info: $syncInfo');
-      
+
       // Format the time for display
       if (syncInfo['lastSyncTime'] != null && syncInfo['lastSyncTime'] > 0) {
         final lastSyncDate = DateTime.fromMillisecondsSinceEpoch(syncInfo['lastSyncTime'] as int);
         final timeDiff = DateTime.now().difference(lastSyncDate);
-        
+
         String timeAgo;
         if (timeDiff.inMinutes < 1) {
           timeAgo = 'Just now';
@@ -512,13 +512,13 @@ class NativeHealthConnectService {
         } else {
           timeAgo = '${timeDiff.inDays} days ago';
         }
-        
+
         syncInfo['timeAgo'] = timeAgo;
         syncInfo['lastSyncDateTime'] = lastSyncDate.toIso8601String();
       } else {
         syncInfo['timeAgo'] = 'Never synced';
       }
-      
+
       return syncInfo;
     } on PlatformException catch (e) {
       _log('ERROR getting last sync info: ${e.message}');
@@ -527,6 +527,42 @@ class NativeHealthConnectService {
         'lastSyncTime': 0,
         'timeAgo': 'Error',
       };
+    }
+  }
+
+  /// Sync user profile data to SharedPreferences for native calorie calculation
+  Future<bool> syncUserProfile({
+    required int age,
+    required String gender,
+    required double height,
+    required double weight,
+  }) async {
+    try {
+      _log('Syncing user profile to native side...');
+      _log('Profile: age=$age, gender=$gender, height=$height, weight=$weight');
+
+      final Map<String, dynamic> profileData = {
+        'age': age,
+        'gender': gender,
+        'height': height,
+        'weight': weight,
+      };
+
+      final bool result = await _channel.invokeMethod('syncUserProfile', profileData);
+
+      if (result) {
+        _log('✅ Profile synced successfully to SharedPreferences');
+      } else {
+        _log('⚠️ Failed to sync profile to SharedPreferences');
+      }
+
+      return result;
+    } on PlatformException catch (e) {
+      _log('ERROR syncing user profile: ${e.message}');
+      return false;
+    } catch (e) {
+      _log('ERROR syncing user profile: $e');
+      return false;
     }
   }
 }

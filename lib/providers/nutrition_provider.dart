@@ -218,23 +218,42 @@ class NutritionProvider with ChangeNotifier {
 
       _entries.clear();
 
+      // Track unique entries to prevent duplicates
+      final uniqueEntryKeys = <String>{};
+
       // Each entry from the database is a nutrition entry itself
       for (final entry in history) {
+        final timestamp = DateTime.parse(entry['created_at'] ?? entry['date'] ?? DateTime.now().toIso8601String());
+        final foodName = entry['food_name'] ?? 'Unknown';
+
+        // Create a unique key for duplicate detection
+        final entryKey = '${timestamp.millisecondsSinceEpoch}_$foodName';
+
+        // Skip if we already have this entry (duplicate)
+        if (uniqueEntryKeys.contains(entryKey)) {
+          debugPrint('Skipping duplicate entry while loading: $foodName at $timestamp');
+          continue;
+        }
+
+        uniqueEntryKeys.add(entryKey);
+
         _entries.add(NutritionEntry(
-          id: entry['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-          foodName: entry['food_name'] ?? 'Unknown', // Database uses snake_case
+          id: entry['id'] ?? entryKey, // Use consistent ID
+          foodName: foodName, // Database uses snake_case
           calories: entry['calories'] ?? 0,
           protein: (entry['protein'] ?? 0).toDouble(),
           carbs: (entry['carbs'] ?? 0).toDouble(),
           fat: (entry['fat'] ?? 0).toDouble(),
           fiber: (entry['fiber'] ?? 0).toDouble(),
-          timestamp: DateTime.parse(entry['created_at'] ?? entry['date'] ?? DateTime.now().toIso8601String()),
+          timestamp: timestamp,
         ));
       }
 
+      debugPrint('Loaded ${_entries.length} unique nutrition entries from Supabase');
+
       // Save to local storage as well
       await _saveNutritionData();
-      
+
       _setLoading(false);
       notifyListeners();
     } catch (e) {
@@ -333,6 +352,21 @@ class NutritionProvider with ChangeNotifier {
       final today = DateTime.now();
       final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
+      // First, get existing entries from Supabase to check for duplicates
+      final existingEntries = await _supabaseService.getNutritionHistory(
+        userId: userId,
+        days: 1, // Only check today's entries
+      );
+
+      // Create a set of existing entry identifiers to prevent duplicates
+      final existingEntryKeys = <String>{};
+      for (final existing in existingEntries) {
+        final timestamp = DateTime.parse(existing['created_at'] ?? existing['date'] ?? '');
+        final foodName = existing['food_name'] ?? '';
+        final key = '${timestamp.millisecondsSinceEpoch}_$foodName';
+        existingEntryKeys.add(key);
+      }
+
       // Group local entries by date
       final Map<String, List<NutritionEntry>> entriesByDate = {};
 
@@ -351,7 +385,8 @@ class NutritionProvider with ChangeNotifier {
           // Use a combination of timestamp and food name as unique identifier
           final entryKey = '${entry.timestamp.millisecondsSinceEpoch}_${entry.foodName}';
 
-          if (!syncedEntryIds.contains(entryKey)) {
+          // Check if entry already exists in database
+          if (!existingEntryKeys.contains(entryKey) && !syncedEntryIds.contains(entryKey)) {
             await _supabaseService.saveNutritionEntry(
               userId: userId,
               foodName: entry.foodName,
@@ -364,6 +399,8 @@ class NutritionProvider with ChangeNotifier {
             );
             syncedEntryIds.add(entryKey);
             debugPrint('Synced nutrition entry: ${entry.foodName}');
+          } else {
+            debugPrint('Skipping duplicate entry: ${entry.foodName}');
           }
         }
       }

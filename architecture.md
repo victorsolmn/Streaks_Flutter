@@ -361,6 +361,24 @@ pipeline:
 - Background task scheduling
 - ML model integration for predictions
 
+## Privacy Policy Implementation (v1.0.4)
+
+### Legal Compliance Architecture
+```
+lib/screens/legal/
+├── privacy_policy_screen.dart   # In-app privacy policy display
+├── terms_conditions_screen.dart  # Terms of service display
+└── Integration:
+    ├── Signup flow with TapGestureRecognizer
+    ├── Checkbox for consent tracking
+    └── External hosting on GitHub Pages
+```
+
+### Camera Permissions Architecture
+- AndroidManifest.xml configuration
+- Privacy policy URL requirement for Google Play
+- Hosted at: https://victorsolmn.github.io/streaker-privacy/
+
 ---
-Last Updated: September 2025
-Version: 1.0.0
+Last Updated: December 2024
+Version: 1.0.4

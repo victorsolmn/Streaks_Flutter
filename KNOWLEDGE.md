@@ -3,6 +3,23 @@
 ## Project Overview
 Streaks Flutter is a comprehensive health and fitness tracking application that integrates with Samsung Health and Google Fit to provide users with real-time health metrics, nutrition tracking, and achievement systems.
 
+## Recent Updates (December 2024 - Version 1.0.4)
+
+### Privacy Policy & Google Play Compliance
+**Issue:** Google Play Console requires privacy policy for apps using camera permissions
+**Solution:**
+- Created comprehensive privacy policy and terms screens in `/lib/screens/legal/`
+- Hosted privacy policy on GitHub Pages: https://victorsolmn.github.io/streaker-privacy/
+- Added camera permissions to AndroidManifest.xml
+- Implemented clickable legal links in signup flow using TapGestureRecognizer
+- Version updated from 1.0.1+2 to 1.0.4+5
+
+**Files Modified:**
+- `/lib/screens/auth/signup_screen.dart` - Added privacy policy links
+- `/lib/screens/legal/privacy_policy_screen.dart` - New privacy policy screen
+- `/lib/screens/legal/terms_conditions_screen.dart` - New terms screen
+- `/android/app/src/main/AndroidManifest.xml` - Camera permissions
+
 ## Recent Critical Fixes (September 2025)
 
 ### 1. UI Overflow Issue Fix

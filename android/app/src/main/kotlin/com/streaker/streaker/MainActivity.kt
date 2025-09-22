@@ -21,6 +21,13 @@ import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import android.content.Context
 import androidx.work.WorkManager
+import java.io.File
+import java.io.FileWriter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import org.json.JSONObject
+import org.json.JSONArray
 
 class MainActivity: FlutterFragmentActivity() {
     private val CHANNEL = "com.streaker/health_connect"
@@ -77,6 +84,14 @@ class MainActivity: FlutterFragmentActivity() {
                 "startBackgroundSync" -> startBackgroundSync(result)
                 "stopBackgroundSync" -> stopBackgroundSync(result)
                 "getLastSyncInfo" -> getLastSyncInfo(result)
+                "captureHealthDataLogs" -> captureHealthDataLogs(result)
+                "syncUserProfile" -> {
+                    val age = call.argument<Int>("age") ?: 30
+                    val gender = call.argument<String>("gender") ?: "male"
+                    val height = call.argument<Double>("height") ?: 170.0
+                    val weight = call.argument<Double>("weight") ?: 70.0
+                    syncUserProfile(age, gender, height, weight, result)
+                }
                 else -> result.notImplemented()
             }
         }
@@ -707,28 +722,65 @@ class MainActivity: FlutterFragmentActivity() {
                         Log.d(TAG, "Total calories not available", e)
                     }
                     
-                    // Prioritize Samsung Health data - use ACTIVE calories first (not total which includes BMR)
+                    // Get user profile from shared preferences if available
+                    val sharedPrefs = getSharedPreferences("user_profile", Context.MODE_PRIVATE)
+                    val userAge = sharedPrefs.getInt("age", 30)
+                    val userGender = sharedPrefs.getString("gender", "Male") ?: "Male"
+                    val userWeight = sharedPrefs.getFloat("weight", 70f).toDouble()
+                    val userHeight = sharedPrefs.getFloat("height", 170f).toDouble()
+
+                    // Calculate precise BMR using gender-specific formula (Mifflin-St Jeor equation)
+                    val dailyBMR = if (userGender.lowercase() == "male") {
+                        (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
+                    } else {
+                        (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) - 161
+                    }
+                    val hourlyBMR = dailyBMR / 24
+                    val hoursElapsed = java.time.Duration.between(startOfDay, now).toHours().toDouble()
+                    val bmrEstimate = hourlyBMR * hoursElapsed
+
+                    Log.d(TAG, "User profile - Age: $userAge, Gender: $userGender, Weight: $userWeight kg, Height: $userHeight cm")
+                    Log.d(TAG, "Calculated BMR: $dailyBMR kcal/day, Hourly: $hourlyBMR kcal/hour")
+
+                    // Check if we have heart rate data for better calculation
+                    val hasElevatedHR = healthData["heartRate"] as? Int ?: 0 > 90
+
+                    // Prioritize Samsung Health data with improved calculation
                     val finalCalories = when {
                         samsungActiveCalories > 0 -> {
                             Log.d(TAG, "Using Samsung active calories: $samsungActiveCalories kcal")
                             samsungActiveCalories
                         }
                         samsungTotalCalories > 0 && samsungActiveCalories == 0.0 -> {
-                            // Only use total if active is not available - subtract estimated BMR
-                            // Rough BMR estimate: 1400-1800 kcal/day, so subtract proportionally
-                            val hoursElapsed = java.time.Duration.between(startOfDay, now).toHours()
-                            val bmrEstimate = (1600.0 * hoursElapsed / 24)
+                            // Use accurate BMR calculation
                             val activeFromTotal = (samsungTotalCalories - bmrEstimate).coerceAtLeast(0.0)
-                            Log.d(TAG, "Using Samsung total calories minus BMR: $activeFromTotal kcal (total: $samsungTotalCalories, BMR estimate: $bmrEstimate)")
+                            Log.d(TAG, "Samsung total minus precise BMR: $activeFromTotal kcal (total: $samsungTotalCalories, BMR: $bmrEstimate)")
                             activeFromTotal
                         }
                         googleFitCalories > 0 -> {
-                            Log.d(TAG, "No Samsung data, using Google Fit: $googleFitCalories kcal")
-                            googleFitCalories
+                            // Google Fit usually gives total calories, so subtract BMR
+                            val activeFromGoogle = if (googleFitCalories > bmrEstimate) {
+                                googleFitCalories - bmrEstimate
+                            } else {
+                                googleFitCalories // Assume it's already active calories if less than BMR
+                            }
+                            Log.d(TAG, "Google Fit adjusted: $activeFromGoogle kcal (original: $googleFitCalories)")
+                            activeFromGoogle
                         }
                         else -> {
-                            Log.d(TAG, "Using other sources: $otherCalories kcal")
-                            otherCalories
+                            // If low activity (steps < 2000) and we have steps, use step-based calculation
+                            val steps = healthData["steps"] as? Int ?: 0
+                            if (steps in 1..1999) {
+                                val stepCalories = steps * 0.045 // Average calories per step
+                                Log.d(TAG, "Low activity detected, using step-based: $stepCalories kcal from $steps steps")
+                                stepCalories
+                            } else if (otherCalories > 0) {
+                                Log.d(TAG, "Using other sources: $otherCalories kcal")
+                                otherCalories
+                            } else {
+                                Log.d(TAG, "No calorie data available, using minimal estimate")
+                                0.0
+                            }
                         }
                     }
                     
@@ -1253,7 +1305,7 @@ class MainActivity: FlutterFragmentActivity() {
             val lastSyncHeartRate = sharedPrefs.getInt("last_sync_heart_rate", 0)
             val lastSyncCalories = sharedPrefs.getFloat("last_sync_calories", 0f)
             val dataSources = sharedPrefs.getStringSet("data_sources", emptySet()) ?: emptySet()
-            
+
             val syncInfo = mapOf(
                 "lastSyncTime" to lastSyncTime,
                 "lastSyncTimeString" to if (lastSyncTime > 0) Instant.ofEpochMilli(lastSyncTime).toString() else "Never",
@@ -1261,18 +1313,498 @@ class MainActivity: FlutterFragmentActivity() {
                 "lastSyncHeartRate" to lastSyncHeartRate,
                 "lastSyncCalories" to lastSyncCalories,
                 "dataSources" to dataSources.toList(),
-                "hasSamsungData" to dataSources.any { 
-                    it.contains("samsung") || 
-                    it.contains("shealth") || 
-                    it.contains("com.sec.android") || 
-                    it.contains("gear") 
+                "hasSamsungData" to dataSources.any {
+                    it.contains("samsung") ||
+                    it.contains("shealth") ||
+                    it.contains("com.sec.android") ||
+                    it.contains("gear")
                 }
             )
-            
+
             Log.d(TAG, "Last sync info: $syncInfo")
             result.success(syncInfo)
         } catch (e: Exception) {
             Log.e(TAG, "Error getting last sync info", e)
+            result.error("SYNC_ERROR", e.message, null)
+        }
+    }
+
+    private fun captureHealthDataLogs(result: MethodChannel.Result) {
+        coroutineScope.launch {
+            try {
+                val now = Instant.now()
+                val startOfDay = ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS).toInstant()
+                val yesterday = startOfDay.minus(1, ChronoUnit.DAYS)
+
+                val logData = JSONObject()
+                val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+
+                // Add metadata
+                logData.put("captureTime", now.toString())
+                logData.put("captureTimeFormatted", dateFormatter.format(Date()))
+                logData.put("timeRange", JSONObject().apply {
+                    put("startOfDay", startOfDay.toString())
+                    put("now", now.toString())
+                    put("yesterday", yesterday.toString())
+                })
+
+                // LOG ALL AVAILABLE HEALTH CONNECT DATA TYPES
+                val allHealthData = JSONObject()
+
+                // Check Health Connect availability and permissions
+                val availabilityInfo = JSONObject()
+                try {
+                    val availability = HealthConnectClient.getSdkStatus(this@MainActivity, "com.google.android.apps.healthdata")
+                    availabilityInfo.put("status", availability.toString())
+                    availabilityInfo.put("statusCode", availability)
+
+                    // Get granted permissions
+                    val granted = healthConnectClient.permissionController.getGrantedPermissions()
+                    val grantedArray = JSONArray()
+                    granted.forEach { permission ->
+                        grantedArray.put(permission.toString())
+                    }
+                    availabilityInfo.put("grantedPermissions", grantedArray)
+                    availabilityInfo.put("grantedCount", granted.size)
+
+                    // List requested permissions
+                    val requestedArray = JSONArray()
+                    permissions.forEach { permission ->
+                        requestedArray.put(permission.toString())
+                    }
+                    availabilityInfo.put("requestedPermissions", requestedArray)
+                    availabilityInfo.put("requestedCount", permissions.size)
+
+                } catch (e: Exception) {
+                    availabilityInfo.put("error", e.toString())
+                }
+                allHealthData.put("healthConnectInfo", availabilityInfo)
+
+                // COMPREHENSIVE CALORIE DATA CAPTURE
+                val calorieData = JSONObject()
+
+                // 1. Active Calories Burned (Exercise calories)
+                try {
+                    val activeCaloriesArray = JSONArray()
+                    val activeCaloriesResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            ActiveCaloriesBurnedRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(yesterday, now)
+                        )
+                    )
+
+                    activeCaloriesResponse.records.forEach { record ->
+                        val recordJson = JSONObject().apply {
+                            put("recordType", "ActiveCaloriesBurned")
+                            put("energyKcal", record.energy.inKilocalories)
+                            put("energyJoules", record.energy.inJoules)
+                            put("energyKilojoules", record.energy.inKilojoules)
+                            put("energyCalories", record.energy.inCalories)
+                            put("startTime", record.startTime.toString())
+                            put("endTime", record.endTime.toString())
+                            put("startZoneOffset", record.startZoneOffset?.toString() ?: "null")
+                            put("endZoneOffset", record.endZoneOffset?.toString() ?: "null")
+
+                            // Metadata
+                            val metadata = JSONObject().apply {
+                                put("id", record.metadata.id)
+                                put("dataOrigin", record.metadata.dataOrigin.packageName)
+                                put("lastModifiedTime", record.metadata.lastModifiedTime.toString())
+                                put("clientRecordId", record.metadata.clientRecordId ?: "null")
+                                put("clientRecordVersion", record.metadata.clientRecordVersion)
+                                put("device", record.metadata.device?.let { device ->
+                                    JSONObject().apply {
+                                        put("manufacturer", device.manufacturer ?: "unknown")
+                                        put("model", device.model ?: "unknown")
+                                        put("type", device.type.toString())
+                                    }
+                                } ?: "null")
+                            }
+                            put("metadata", metadata)
+                        }
+                        activeCaloriesArray.put(recordJson)
+                    }
+
+                    calorieData.put("activeCaloriesRecords", activeCaloriesArray)
+                    calorieData.put("activeCaloriesCount", activeCaloriesArray.length())
+
+                    // Calculate totals by source
+                    val activeBySource = mutableMapOf<String, Double>()
+                    for (i in 0 until activeCaloriesArray.length()) {
+                        val record = activeCaloriesArray.getJSONObject(i)
+                        val source = record.getJSONObject("metadata").getString("dataOrigin")
+                        val calories = record.getDouble("energyKcal")
+                        activeBySource[source] = (activeBySource[source] ?: 0.0) + calories
+                    }
+                    calorieData.put("activeCaloriesBySource", JSONObject(activeBySource as Map<*, *>))
+
+                } catch (e: Exception) {
+                    calorieData.put("activeCaloriesError", e.toString())
+                    Log.e(TAG, "Error reading active calories for log", e)
+                }
+
+                // 2. Total Calories Burned (includes BMR + active)
+                try {
+                    val totalCaloriesArray = JSONArray()
+                    val totalCaloriesResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            TotalCaloriesBurnedRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(yesterday, now)
+                        )
+                    )
+
+                    totalCaloriesResponse.records.forEach { record ->
+                        val recordJson = JSONObject().apply {
+                            put("recordType", "TotalCaloriesBurned")
+                            put("energyKcal", record.energy.inKilocalories)
+                            put("energyJoules", record.energy.inJoules)
+                            put("energyKilojoules", record.energy.inKilojoules)
+                            put("energyCalories", record.energy.inCalories)
+                            put("startTime", record.startTime.toString())
+                            put("endTime", record.endTime.toString())
+                            put("startZoneOffset", record.startZoneOffset?.toString() ?: "null")
+                            put("endZoneOffset", record.endZoneOffset?.toString() ?: "null")
+
+                            // Metadata
+                            val metadata = JSONObject().apply {
+                                put("id", record.metadata.id)
+                                put("dataOrigin", record.metadata.dataOrigin.packageName)
+                                put("lastModifiedTime", record.metadata.lastModifiedTime.toString())
+                                put("clientRecordId", record.metadata.clientRecordId ?: "null")
+                                put("clientRecordVersion", record.metadata.clientRecordVersion)
+                                put("device", record.metadata.device?.let { device ->
+                                    JSONObject().apply {
+                                        put("manufacturer", device.manufacturer ?: "unknown")
+                                        put("model", device.model ?: "unknown")
+                                        put("type", device.type.toString())
+                                    }
+                                } ?: "null")
+                            }
+                            put("metadata", metadata)
+                        }
+                        totalCaloriesArray.put(recordJson)
+                    }
+
+                    calorieData.put("totalCaloriesRecords", totalCaloriesArray)
+                    calorieData.put("totalCaloriesCount", totalCaloriesArray.length())
+
+                    // Calculate totals by source
+                    val totalBySource = mutableMapOf<String, Double>()
+                    for (i in 0 until totalCaloriesArray.length()) {
+                        val record = totalCaloriesArray.getJSONObject(i)
+                        val source = record.getJSONObject("metadata").getString("dataOrigin")
+                        val calories = record.getDouble("energyKcal")
+                        totalBySource[source] = (totalBySource[source] ?: 0.0) + calories
+                    }
+                    calorieData.put("totalCaloriesBySource", JSONObject(totalBySource as Map<*, *>))
+
+                } catch (e: Exception) {
+                    calorieData.put("totalCaloriesError", e.toString())
+                    Log.e(TAG, "Error reading total calories for log", e)
+                }
+
+                // 3. Basal Metabolic Rate (if available)
+                try {
+                    val bmrArray = JSONArray()
+                    val bmrResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            BasalMetabolicRateRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(yesterday, now)
+                        )
+                    )
+
+                    bmrResponse.records.forEach { record ->
+                        val recordJson = JSONObject().apply {
+                            put("recordType", "BasalMetabolicRate")
+                            put("basalMetabolicRateKcalPerDay", record.basalMetabolicRate.inKilocaloriesPerDay)
+                            put("time", record.time.toString())
+                            put("zoneOffset", record.zoneOffset?.toString() ?: "null")
+
+                            // Metadata
+                            val metadata = JSONObject().apply {
+                                put("id", record.metadata.id)
+                                put("dataOrigin", record.metadata.dataOrigin.packageName)
+                                put("lastModifiedTime", record.metadata.lastModifiedTime.toString())
+                            }
+                            put("metadata", metadata)
+                        }
+                        bmrArray.put(recordJson)
+                    }
+
+                    calorieData.put("basalMetabolicRateRecords", bmrArray)
+                    calorieData.put("basalMetabolicRateCount", bmrArray.length())
+
+                } catch (e: Exception) {
+                    calorieData.put("basalMetabolicRateError", e.toString())
+                    Log.e(TAG, "Error reading BMR for log", e)
+                }
+
+                // 4. Exercise Sessions with calorie data
+                try {
+                    val exerciseArray = JSONArray()
+                    val exerciseResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            ExerciseSessionRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(yesterday, now)
+                        )
+                    )
+
+                    exerciseResponse.records.forEach { record ->
+                        val recordJson = JSONObject().apply {
+                            put("recordType", "ExerciseSession")
+                            put("exerciseType", record.exerciseType.toString())
+                            put("title", record.title ?: "No title")
+                            put("notes", record.notes ?: "No notes")
+                            put("startTime", record.startTime.toString())
+                            put("endTime", record.endTime.toString())
+                            put("durationMinutes", java.time.Duration.between(record.startTime, record.endTime).toMinutes())
+
+                            // Metadata
+                            val metadata = JSONObject().apply {
+                                put("id", record.metadata.id)
+                                put("dataOrigin", record.metadata.dataOrigin.packageName)
+                                put("lastModifiedTime", record.metadata.lastModifiedTime.toString())
+                                put("device", record.metadata.device?.let { device ->
+                                    JSONObject().apply {
+                                        put("manufacturer", device.manufacturer ?: "unknown")
+                                        put("model", device.model ?: "unknown")
+                                        put("type", device.type.toString())
+                                    }
+                                } ?: "null")
+                            }
+                            put("metadata", metadata)
+                        }
+                        exerciseArray.put(recordJson)
+                    }
+
+                    calorieData.put("exerciseSessionRecords", exerciseArray)
+                    calorieData.put("exerciseSessionCount", exerciseArray.length())
+
+                } catch (e: Exception) {
+                    calorieData.put("exerciseSessionError", e.toString())
+                    Log.e(TAG, "Error reading exercise sessions for log", e)
+                }
+
+                logData.put("calorieData", calorieData)
+
+                // CAPTURE ALL RAW HEALTH CONNECT RESPONSES
+                val rawResponses = JSONObject()
+
+                // 1. RAW STEPS DATA
+                try {
+                    val stepsRequest = ReadRecordsRequest(
+                        StepsRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(yesterday, now)
+                    )
+                    rawResponses.put("stepsRequest", JSONObject().apply {
+                        put("recordType", "StepsRecord")
+                        put("timeRangeStart", yesterday.toString())
+                        put("timeRangeEnd", now.toString())
+                    })
+
+                    val stepsResponse = healthConnectClient.readRecords(stepsRequest)
+                    val stepsArray = JSONArray()
+                    stepsResponse.records.forEach { record ->
+                        stepsArray.put(JSONObject().apply {
+                            put("count", record.count)
+                            put("startTime", record.startTime.toString())
+                            put("endTime", record.endTime.toString())
+                            put("startZoneOffset", record.startZoneOffset?.toString())
+                            put("endZoneOffset", record.endZoneOffset?.toString())
+                            put("dataOrigin", record.metadata.dataOrigin.packageName)
+                            put("id", record.metadata.id)
+                            put("lastModifiedTime", record.metadata.lastModifiedTime.toString())
+                            put("clientRecordId", record.metadata.clientRecordId)
+                            put("clientRecordVersion", record.metadata.clientRecordVersion)
+                            put("device", record.metadata.device?.let { device ->
+                                JSONObject().apply {
+                                    put("manufacturer", device.manufacturer)
+                                    put("model", device.model)
+                                    put("type", device.type.toString())
+                                }
+                            })
+                        })
+                    }
+                    rawResponses.put("stepsResponse", stepsArray)
+                    rawResponses.put("stepsRecordCount", stepsResponse.records.size)
+                    rawResponses.put("stepsPageToken", stepsResponse.pageToken ?: "null")
+                } catch (e: Exception) {
+                    rawResponses.put("stepsError", e.toString())
+                    rawResponses.put("stepsErrorMessage", e.message)
+                    rawResponses.put("stepsErrorStackTrace", e.stackTrace.take(5).joinToString("\n"))
+                }
+
+                // 2. RAW HEART RATE DATA
+                try {
+                    val heartRateRequest = ReadRecordsRequest(
+                        HeartRateRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(yesterday, now)
+                    )
+                    rawResponses.put("heartRateRequest", JSONObject().apply {
+                        put("recordType", "HeartRateRecord")
+                        put("timeRangeStart", yesterday.toString())
+                        put("timeRangeEnd", now.toString())
+                    })
+
+                    val heartRateResponse = healthConnectClient.readRecords(heartRateRequest)
+                    val heartRateArray = JSONArray()
+                    heartRateResponse.records.forEach { record ->
+                        val samplesArray = JSONArray()
+                        record.samples.forEach { sample ->
+                            samplesArray.put(JSONObject().apply {
+                                put("beatsPerMinute", sample.beatsPerMinute)
+                                put("time", sample.time.toString())
+                            })
+                        }
+                        heartRateArray.put(JSONObject().apply {
+                            put("startTime", record.startTime.toString())
+                            put("endTime", record.endTime.toString())
+                            put("samples", samplesArray)
+                            put("sampleCount", record.samples.size)
+                            put("dataOrigin", record.metadata.dataOrigin.packageName)
+                            put("id", record.metadata.id)
+                        })
+                    }
+                    rawResponses.put("heartRateResponse", heartRateArray)
+                    rawResponses.put("heartRateRecordCount", heartRateResponse.records.size)
+                } catch (e: Exception) {
+                    rawResponses.put("heartRateError", e.toString())
+                }
+
+                // 3. RAW DISTANCE DATA
+                try {
+                    val distanceRequest = ReadRecordsRequest(
+                        DistanceRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(yesterday, now)
+                    )
+                    val distanceResponse = healthConnectClient.readRecords(distanceRequest)
+                    val distanceArray = JSONArray()
+                    distanceResponse.records.forEach { record ->
+                        distanceArray.put(JSONObject().apply {
+                            put("distanceMeters", record.distance.inMeters)
+                            put("distanceKilometers", record.distance.inKilometers)
+                            put("distanceMiles", record.distance.inMiles)
+                            put("distanceFeet", record.distance.inFeet)
+                            put("startTime", record.startTime.toString())
+                            put("endTime", record.endTime.toString())
+                            put("dataOrigin", record.metadata.dataOrigin.packageName)
+                        })
+                    }
+                    rawResponses.put("distanceResponse", distanceArray)
+                    rawResponses.put("distanceRecordCount", distanceResponse.records.size)
+                } catch (e: Exception) {
+                    rawResponses.put("distanceError", e.toString())
+                }
+
+                allHealthData.put("rawApiResponses", rawResponses)
+                logData.put("allHealthData", allHealthData)
+
+                // Also capture other metrics for context
+                val otherMetrics = JSONObject()
+
+                // Steps
+                try {
+                    val stepsResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            StepsRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
+                        )
+                    )
+
+                    val stepsBySource = mutableMapOf<String, Long>()
+                    stepsResponse.records.forEach { record ->
+                        val source = record.metadata.dataOrigin.packageName
+                        stepsBySource[source] = (stepsBySource[source] ?: 0L) + record.count
+                    }
+                    otherMetrics.put("stepsBySource", JSONObject(stepsBySource as Map<*, *>))
+                    otherMetrics.put("totalStepRecords", stepsResponse.records.size)
+                } catch (e: Exception) {
+                    otherMetrics.put("stepsError", e.toString())
+                }
+
+                // Distance
+                try {
+                    val distanceResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            DistanceRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
+                        )
+                    )
+
+                    val distanceBySource = mutableMapOf<String, Double>()
+                    distanceResponse.records.forEach { record ->
+                        val source = record.metadata.dataOrigin.packageName
+                        distanceBySource[source] = (distanceBySource[source] ?: 0.0) + record.distance.inKilometers
+                    }
+                    otherMetrics.put("distanceBySource", JSONObject(distanceBySource as Map<*, *>))
+                    otherMetrics.put("totalDistanceRecords", distanceResponse.records.size)
+                } catch (e: Exception) {
+                    otherMetrics.put("distanceError", e.toString())
+                }
+
+                logData.put("otherMetrics", otherMetrics)
+
+                // Analysis and recommendations
+                val analysis = JSONObject()
+                analysis.put("notes", "Check the following fields for accurate active calorie burn:")
+                analysis.put("recommendation1", "ActiveCaloriesBurnedRecord.energy.inKilocalories - This is exercise/activity calories only")
+                analysis.put("recommendation2", "TotalCaloriesBurnedRecord.energy.inKilocalories - This includes BMR + active calories")
+                analysis.put("recommendation3", "To get active calories from total: Total - BMR (if BMR available) or Total - estimated BMR")
+                analysis.put("recommendation4", "Samsung Health may provide both or only one type - check 'dataOrigin' field")
+
+                logData.put("analysis", analysis)
+
+                // Convert to pretty JSON string
+                val jsonString = logData.toString(4)
+
+                // Return the JSON string to Flutter
+                result.success(mapOf(
+                    "logData" to jsonString,
+                    "summary" to "Captured ${calorieData.optInt("activeCaloriesCount", 0)} active calorie records and ${calorieData.optInt("totalCaloriesCount", 0)} total calorie records"
+                ))
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error capturing health data logs", e)
+                result.error("LOG_ERROR", e.message, null)
+            }
+        }
+    }
+
+    private fun syncUserProfile(age: Int, gender: String, height: Double, weight: Double, result: MethodChannel.Result) {
+        try {
+            Log.d(TAG, "=== SYNCING USER PROFILE ===")
+            Log.d(TAG, "Age: $age, Gender: $gender, Height: $height, Weight: $weight")
+
+            // Save to SharedPreferences
+            val sharedPrefs = getSharedPreferences("user_profile", Context.MODE_PRIVATE)
+            val editor = sharedPrefs.edit()
+
+            editor.putInt("age", age)
+            editor.putString("gender", gender)
+            editor.putFloat("height", height.toFloat())
+            editor.putFloat("weight", weight.toFloat())
+            editor.putLong("lastSynced", System.currentTimeMillis())
+
+            val success = editor.commit()
+
+            if (success) {
+                Log.d(TAG, "✅ Profile successfully saved to SharedPreferences")
+
+                // Verify the data was saved
+                val savedAge = sharedPrefs.getInt("age", 0)
+                val savedGender = sharedPrefs.getString("gender", "unknown")
+                val savedHeight = sharedPrefs.getFloat("height", 0f)
+                val savedWeight = sharedPrefs.getFloat("weight", 0f)
+
+                Log.d(TAG, "Verification - Age: $savedAge, Gender: $savedGender, Height: $savedHeight, Weight: $savedWeight")
+
+                result.success(true)
+            } else {
+                Log.e(TAG, "Failed to save profile to SharedPreferences")
+                result.success(false)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error syncing user profile", e)
             result.error("SYNC_ERROR", e.message, null)
         }
     }

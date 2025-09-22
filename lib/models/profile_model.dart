@@ -13,6 +13,7 @@ class ProfileModel {
 
   // Optional fields (NULL allowed in database)
   final int? age; // 13-120
+  final String? gender; // Male, Female, Other, Prefer not to say
   final double? height; // 50-300 cm
   final double? weight; // 20-500 kg
   final String? activityLevel;
@@ -38,6 +39,7 @@ class ProfileModel {
     this.createdAt,
     this.updatedAt,
     this.age,
+    this.gender,
     this.height,
     this.weight,
     this.activityLevel,
@@ -70,6 +72,7 @@ class ProfileModel {
           ? DateTime.parse(json['updated_at'])
           : null,
       age: json['age'] as int?,
+      gender: json['gender'] as String?,
       height: json['height'] != null
           ? (json['height'] as num).toDouble()
           : null,
@@ -109,6 +112,7 @@ class ProfileModel {
       'email': email,
       'has_completed_onboarding': hasCompletedOnboarding,
       if (age != null) 'age': age,
+      if (gender != null) 'gender': gender,
       if (height != null) 'height': height,
       if (weight != null) 'weight': weight,
       if (activityLevel != null) 'activity_level': activityLevel,
@@ -138,6 +142,7 @@ class ProfileModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     int? age,
+    String? gender,
     double? height,
     double? weight,
     String? activityLevel,
@@ -163,6 +168,7 @@ class ProfileModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       age: age ?? this.age,
+      gender: gender ?? this.gender,
       height: height ?? this.height,
       weight: weight ?? this.weight,
       activityLevel: activityLevel ?? this.activityLevel,

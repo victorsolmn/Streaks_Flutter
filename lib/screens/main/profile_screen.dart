@@ -24,6 +24,7 @@ import '../../widgets/weight_progress_card.dart';
 import '../../utils/app_theme.dart';
 import '../auth/welcome_screen.dart';
 import 'edit_goals_screen.dart';
+import '../../services/health_log_capture_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -669,7 +670,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: () => _showHelpDialog(),
           ),
           // Debug menu (only in debug mode)
-          if (const bool.fromEnvironment('dart.vm.product') == false)
+          if (const bool.fromEnvironment('dart.vm.product') == false) ...[
             _buildSettingItem(
               icon: Icons.bug_report_outlined,
               title: 'Database Test',
@@ -682,6 +683,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               },
             ),
+            _buildSettingItem(
+              icon: Icons.api_outlined,
+              title: 'Capture Health Data Logs',
+              subtitle: 'Export detailed Health Connect API responses',
+              onTap: () async {
+                _captureHealthDataLogs();
+              },
+            ),
+          ],
           _buildSettingItem(
             icon: Icons.info_outline,
             title: 'About',
@@ -1128,6 +1138,189 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  void _captureHealthDataLogs() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? AppTheme.darkCardBackground : Colors.white,
+        title: Row(
+          children: [
+            Icon(Icons.api_outlined, color: AppTheme.primaryAccent),
+            SizedBox(width: 12),
+            Text('Capturing Health Data'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppTheme.primaryAccent),
+            const SizedBox(height: 16),
+            Text('Fetching Health Connect API responses...'),
+            const SizedBox(height: 8),
+            Text(
+              'This may take a few seconds',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Capture the health logs
+      final result = await HealthLogCaptureService.captureAndSaveHealthLogs();
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      if (result['success']) {
+        // Show success dialog with analysis
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: isDarkMode ? AppTheme.darkCardBackground : Colors.white,
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 12),
+                Text('Logs Captured Successfully'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Health data logs have been exported!',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 12),
+                  Text('📁 Saved to:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    result['filePath'] ?? 'Unknown location',
+                    style: TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                  ),
+                  SizedBox(height: 16),
+                  if (result['analysis'] != null) ...[
+                    Text('📊 Data Found:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    SizedBox(height: 8),
+                    if (result['analysis']['hasActiveCalories'] == true)
+                      Text('✅ Active Calories: ${result['analysis']['activeCaloriesCount']} records'),
+                    if (result['analysis']['hasTotalCalories'] == true)
+                      Text('✅ Total Calories: ${result['analysis']['totalCaloriesCount']} records'),
+                    if (result['analysis']['hasBasalMetabolicRate'] == true)
+                      Text('✅ BMR: ${result['analysis']['basalMetabolicRateCount']} records'),
+                    if (result['analysis']['hasExerciseSessions'] == true)
+                      Text('✅ Exercise: ${result['analysis']['exerciseSessionCount']} sessions'),
+                    SizedBox(height: 12),
+                    if (result['analysis']['recommendations'] != null &&
+                        (result['analysis']['recommendations'] as List).isNotEmpty) ...[
+                      Text('💡 Recommendations:', style: TextStyle(fontWeight: FontWeight.w600)),
+                      SizedBox(height: 4),
+                      ...(result['analysis']['recommendations'] as List).map((rec) =>
+                          Padding(
+                            padding: EdgeInsets.only(top: 4),
+                            child: Text(
+                              '• $rec',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          )),
+                    ],
+                  ],
+                  SizedBox(height: 16),
+                  Text(
+                    'Please share this log file with the developer to debug calorie tracking issues.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  // Copy file path to clipboard
+                  Clipboard.setData(ClipboardData(text: result['filePath'] ?? ''));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('📋 File path copied to clipboard'),
+                      backgroundColor: AppTheme.primaryAccent,
+                    ),
+                  );
+                },
+                child: Text('Copy Path'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('OK', style: TextStyle(color: AppTheme.primaryAccent)),
+              ),
+            ],
+          ),
+        );
+
+        // Also print summary to console
+        await HealthLogCaptureService.printLogSummary(result);
+
+      } else {
+        // Show error dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: isDarkMode ? AppTheme.darkCardBackground : Colors.white,
+            title: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red),
+                SizedBox(width: 12),
+                Text('Failed to Capture Logs'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(result['error'] ?? 'Unknown error occurred'),
+                SizedBox(height: 12),
+                Text(
+                  'Please ensure:\n• Health Connect is installed\n• Permissions are granted\n• Device has health data',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('OK', style: TextStyle(color: AppTheme.primaryAccent)),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      Navigator.of(context).pop();
+
+      // Show error dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: isDarkMode ? AppTheme.darkCardBackground : Colors.white,
+          title: Text('Error'),
+          content: Text('Failed to capture health logs: $e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   void _showLogoutDialog() {

@@ -592,140 +592,132 @@ class _NutritionScreenState extends State<NutritionScreen>
       context: context,
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
-          title: Row(
-            children: [
-              Icon(Icons.restaurant_menu, color: AppTheme.primaryAccent, size: 24),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Describe Your Meal',
-                  style: TextStyle(
-                    color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Container(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+        builder: (context, setState) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.fromLTRB(20, 80, 20, 40),
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height -
+                        MediaQuery.of(context).viewInsets.bottom - 120,
+            ),
+            child: AlertDialog(
+              backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+              contentPadding: EdgeInsets.fromLTRB(24, 16, 24, 0),
+              actionsPadding: EdgeInsets.fromLTRB(24, 0, 24, 16),
+            title: Row(
               children: [
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryAccent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.primaryAccent.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: AppTheme.primaryAccent, size: 16),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Describe what you ate in detail. Gemini AI will analyze your description and image to calculate nutrition.',
-                          style: TextStyle(
-                            color: AppTheme.primaryAccent,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 20),
-
-                // Description input field
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDarkMode
-                      ? AppTheme.darkCardBackground.withOpacity(0.5)
-                      : AppTheme.cardBackgroundLight.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppTheme.primaryAccent.withOpacity(0.2),
+                Icon(Icons.restaurant_menu, color: AppTheme.primaryAccent, size: 24),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Describe Your Meal',
+                    style: TextStyle(
+                      color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Meal Description',
-                        style: TextStyle(
-                          color: AppTheme.primaryAccent,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      SizedBox(height: 12),
-                      TextFormField(
-                        controller: descriptionController,
-                        maxLines: 4,
-                        maxLength: 250,
-                        decoration: InputDecoration(
-                          hintText: 'Example: 1 plate rice with dal, mixed vegetable curry, 2 chapatis, and a small bowl of curd',
-                          hintStyle: TextStyle(
-                            color: isDarkMode
-                              ? AppTheme.textSecondaryDark
-                              : AppTheme.textSecondary,
-                            fontSize: 14,
-                          ),
-                          filled: true,
-                          fillColor: isDarkMode
-                            ? AppTheme.darkBackground.withOpacity(0.5)
-                            : Colors.grey.shade100,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide.none,
-                          ),
-                          counterText: '${descriptionController.text.length}/250',
-                          counterStyle: TextStyle(
-                            color: AppTheme.primaryAccent,
-                            fontSize: 12,
-                          ),
-                        ),
-                        style: TextStyle(
-                          color: isDarkMode
-                            ? AppTheme.textPrimaryDark
-                            : AppTheme.textPrimary,
-                        ),
-                        onChanged: (value) {
-                          setState(() {});
-                        },
-                      ),
-                    ],
                   ),
                 ),
               ],
             ),
+            content: SingleChildScrollView(
+              child: Container(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Description input field
+                    Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode
+                          ? AppTheme.darkCardBackground.withOpacity(0.5)
+                          : AppTheme.cardBackgroundLight.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primaryAccent.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Meal Description',
+                            style: TextStyle(
+                              color: AppTheme.primaryAccent,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          SizedBox(height: 12),
+                          TextFormField(
+                            controller: descriptionController,
+                            maxLines: 2,
+                            minLines: 2,
+                            maxLength: 250,
+                            autofocus: false,
+                            textInputAction: TextInputAction.done,
+                            decoration: InputDecoration(
+                              hintText: 'Example: 1 plate rice with dal, mixed vegetable curry, 2 chapatis, and a small bowl of curd',
+                              hintStyle: TextStyle(
+                                color: isDarkMode
+                                  ? AppTheme.textSecondaryDark
+                                  : AppTheme.textSecondary,
+                                fontSize: 14,
+                              ),
+                              filled: true,
+                              fillColor: isDarkMode
+                                ? AppTheme.darkBackground.withOpacity(0.5)
+                                : Colors.grey.shade100,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: EdgeInsets.all(12),
+                              counterText: '${descriptionController.text.length}/250',
+                              counterStyle: TextStyle(
+                                color: AppTheme.primaryAccent,
+                                fontSize: 12,
+                              ),
+                            ),
+                            style: TextStyle(
+                              color: isDarkMode
+                                ? AppTheme.textPrimaryDark
+                                : AppTheme.textPrimary,
+                            ),
+                            onChanged: (value) {
+                              setState(() {});
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: descriptionController.text.trim().isEmpty
+                  ? null
+                  : () => Navigator.of(context).pop(descriptionController.text.trim()),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryAccent,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Analyze'),
+              ),
+            ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: descriptionController.text.trim().isEmpty
-                ? null
-                : () => Navigator.of(context).pop(descriptionController.text.trim()),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryAccent,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Analyze'),
-            ),
-          ],
         ),
       ),
     );
@@ -772,102 +764,117 @@ class _NutritionScreenState extends State<NutritionScreen>
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
-        title: Text(
-          'Add Food Manually',
-          style: TextStyle(
-            color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
-          ),
+      builder: (context) => AnimatedContainer(
+        duration: Duration(milliseconds: 300),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Food Name'),
-                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                SizedBox(height: 16),
-                
-                TextFormField(
-                  controller: caloriesController,
-                  decoration: const InputDecoration(labelText: 'Calories'),
-                  keyboardType: TextInputType.number,
-                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                SizedBox(height: 16),
-                
-                TextFormField(
-                  controller: proteinController,
-                  decoration: const InputDecoration(labelText: 'Protein (g)'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                SizedBox(height: 16),
-                
-                TextFormField(
-                  controller: carbsController,
-                  decoration: const InputDecoration(labelText: 'Carbs (g)'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                SizedBox(height: 16),
-                
-                TextFormField(
-                  controller: fatController,
-                  decoration: const InputDecoration(labelText: 'Fat (g)'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                SizedBox(height: 16),
-                
-                TextFormField(
-                  controller: fiberController,
-                  decoration: const InputDecoration(labelText: 'Fiber (g) - Optional'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-              ],
+        child: AlertDialog(
+          backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+          scrollable: true,
+          insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          title: Text(
+            'Add Food Manually',
+            style: TextStyle(
+              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
             ),
           ),
+          content: Container(
+            width: double.maxFinite,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
+            ),
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: 'Food Name'),
+                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                      autofocus: true,
+                    ),
+                    SizedBox(height: 16),
+
+                    TextFormField(
+                      controller: caloriesController,
+                      decoration: const InputDecoration(labelText: 'Calories'),
+                      keyboardType: TextInputType.number,
+                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                    ),
+                    SizedBox(height: 16),
+
+                    TextFormField(
+                      controller: proteinController,
+                      decoration: const InputDecoration(labelText: 'Protein (g)'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                    ),
+                    SizedBox(height: 16),
+
+                    TextFormField(
+                      controller: carbsController,
+                      decoration: const InputDecoration(labelText: 'Carbs (g)'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                    ),
+                    SizedBox(height: 16),
+
+                    TextFormField(
+                      controller: fatController,
+                      decoration: const InputDecoration(labelText: 'Fat (g)'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                    ),
+                    SizedBox(height: 16),
+
+                    TextFormField(
+                      controller: fiberController,
+                      decoration: const InputDecoration(labelText: 'Fiber (g) - Optional'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState?.validate() ?? false) {
+                  final entry = NutritionEntry(
+                    id: 'manual_${DateTime.now().millisecondsSinceEpoch}',
+                    foodName: nameController.text,
+                    calories: int.parse(caloriesController.text),
+                    protein: double.parse(proteinController.text),
+                    carbs: double.parse(carbsController.text),
+                    fat: double.parse(fatController.text),
+                    fiber: fiberController.text.isNotEmpty ? double.parse(fiberController.text) : 0.0,
+                    timestamp: DateTime.now(),
+                  );
+
+                  final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
+                  await nutritionProvider.addNutritionEntry(entry);
+
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Added ${entry.foodName} to your nutrition log'),
+                      backgroundColor: AppTheme.successGreen,
+                    ),
+                  );
+                }
+              },
+              child: Text('Add'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState?.validate() ?? false) {
-                final entry = NutritionEntry(
-                  id: 'manual_${DateTime.now().millisecondsSinceEpoch}',
-                  foodName: nameController.text,
-                  calories: int.parse(caloriesController.text),
-                  protein: double.parse(proteinController.text),
-                  carbs: double.parse(carbsController.text),
-                  fat: double.parse(fatController.text),
-                  fiber: fiberController.text.isNotEmpty ? double.parse(fiberController.text) : 0.0,
-                  timestamp: DateTime.now(),
-                );
-
-                final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
-                await nutritionProvider.addNutritionEntry(entry);
-
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Added ${entry.foodName} to your nutrition log'),
-                    backgroundColor: AppTheme.successGreen,
-                  ),
-                );
-              }
-            },
-            child: Text('Add'),
-          ),
-        ],
       ),
     );
   }
