@@ -80,9 +80,12 @@ class UnifiedHealthService {
   ] : [
     HealthDataType.STEPS,
     HealthDataType.HEART_RATE,
+    HealthDataType.RESTING_HEART_RATE,  // Added for iOS to get resting heart rate
     HealthDataType.ACTIVE_ENERGY_BURNED,
     HealthDataType.DISTANCE_WALKING_RUNNING,
     HealthDataType.SLEEP_ASLEEP,
+    HealthDataType.SLEEP_AWAKE,  // Added for iOS to get complete sleep data
+    HealthDataType.SLEEP_IN_BED,  // Added for iOS to get complete sleep data
     HealthDataType.WATER,
     HealthDataType.WEIGHT,
     HealthDataType.BLOOD_OXYGEN,
@@ -262,6 +265,38 @@ class UnifiedHealthService {
       _log('Error opening health settings: $e');
       // Fallback to general app settings
       await AppSettings.openAppSettings();
+    }
+  }
+
+  // Force re-request all permissions (including new data types)
+  Future<bool> forceRequestAllPermissions() async {
+    _log('Force re-requesting all health permissions including new data types...');
+
+    try {
+      // Create permissions for all data types including new ones
+      final permissions = List<HealthDataAccess>.filled(
+        _healthTypes.length,
+        HealthDataAccess.READ,
+      );
+
+      // Always request authorization even if we think we have it
+      bool authorized = await _health.requestAuthorization(
+        _healthTypes,
+        permissions: permissions,
+      );
+
+      _log('Force permission request result: $authorized');
+
+      if (authorized && Platform.isIOS) {
+        // For iOS, set the data source after successful authorization
+        _currentSource = HealthDataSource.healthKit;
+        _log('HealthKit permissions updated successfully');
+      }
+
+      return authorized;
+    } catch (e) {
+      _log('ERROR force requesting permissions: $e');
+      return false;
     }
   }
 
@@ -554,49 +589,82 @@ class UnifiedHealthService {
         _log('ERROR fetching steps: $e');
       }
       
-      // Heart Rate (latest reading)
+      // Heart Rate (latest reading) and Resting Heart Rate for iOS
       try {
         _log('Fetching heart rate...');
+
+        // For iOS, fetch both regular and resting heart rate
+        List<HealthDataType> heartRateTypes = Platform.isIOS
+          ? [HealthDataType.HEART_RATE, HealthDataType.RESTING_HEART_RATE]
+          : [HealthDataType.HEART_RATE];
+
         List<HealthDataPoint> heartRateData = await _health.getHealthDataFromTypes(
-          types: [HealthDataType.HEART_RATE],
-          startTime: now.subtract(Duration(hours: 1)),
+          types: heartRateTypes,
+          startTime: now.subtract(Duration(hours: 24)),  // Extended time range for resting heart rate
           endTime: now,
         );
 
         _log('Heart rate data points found: ${heartRateData.length}');
-        if (heartRateData.isNotEmpty) {
-          // Get the most recent heart rate
-          heartRateData.sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
-          for (var point in heartRateData.take(3)) {
+
+        // Process regular heart rate
+        var regularHeartRateData = heartRateData.where((point) => point.type == HealthDataType.HEART_RATE).toList();
+        if (regularHeartRateData.isNotEmpty) {
+          regularHeartRateData.sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
+          for (var point in regularHeartRateData.take(3)) {
             _log('Heart rate entry: ${(point.value as NumericHealthValue).numericValue} bpm at ${point.dateFrom}');
           }
-          if (heartRateData.first.value is NumericHealthValue) {
-            healthData['heartRate'] = (heartRateData.first.value as NumericHealthValue).numericValue.toInt();
+          if (regularHeartRateData.first.value is NumericHealthValue) {
+            healthData['heartRate'] = (regularHeartRateData.first.value as NumericHealthValue).numericValue.toInt();
             _log('Latest heart rate: ${healthData['heartRate']} bpm');
           }
         } else {
           _log('No heart rate data found');
         }
+
+        // Process resting heart rate for iOS
+        if (Platform.isIOS) {
+          var restingHeartRateData = heartRateData.where((point) => point.type == HealthDataType.RESTING_HEART_RATE).toList();
+          if (restingHeartRateData.isNotEmpty) {
+            restingHeartRateData.sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
+            if (restingHeartRateData.first.value is NumericHealthValue) {
+              int restingHR = (restingHeartRateData.first.value as NumericHealthValue).numericValue.toInt();
+              // If no regular heart rate but we have resting, use resting as the main heart rate
+              if (healthData['heartRate'] == 0 && restingHR > 0) {
+                healthData['heartRate'] = restingHR;
+                _log('Using resting heart rate as main heart rate: $restingHR bpm');
+              }
+              _log('Resting heart rate: $restingHR bpm');
+            }
+          } else {
+            _log('No resting heart rate data found');
+          }
+        }
       } catch (e) {
         _log('ERROR fetching heart rate: $e');
       }
       
-      // Calories burned
+      // Calories burned - Both iOS and Android use active energy burned
       try {
         _log('Fetching calories...');
+
+        // Both platforms use ACTIVE_ENERGY_BURNED as TOTAL_CALORIES_BURNED is not supported on iOS
+        List<HealthDataType> calorieTypes = [HealthDataType.ACTIVE_ENERGY_BURNED];
+
         List<HealthDataPoint> caloriesData = await _health.getHealthDataFromTypes(
-          types: [HealthDataType.ACTIVE_ENERGY_BURNED],
+          types: calorieTypes,
           startTime: midnight,
           endTime: now,
         );
 
         _log('Calories data points found: ${caloriesData.length}');
+
+        // Process active energy burned for both platforms
         double totalCalories = 0;
         for (var point in caloriesData) {
           if (point.value is NumericHealthValue) {
             double calorieValue = (point.value as NumericHealthValue).numericValue.toDouble();
             totalCalories += calorieValue;
-            _log('Calorie entry: ${calorieValue.toStringAsFixed(1)} cal at ${point.dateFrom}');
+            _log('Active calorie entry: ${calorieValue.toStringAsFixed(1)} cal at ${point.dateFrom}');
           }
         }
 
@@ -631,26 +699,64 @@ class UnifiedHealthService {
         _log('ERROR fetching distance: $e');
       }
 
-      // Sleep
+      // Sleep - iOS gets comprehensive sleep data, Android gets basic
       try {
         _log('Fetching sleep...');
+
+        // For iOS, fetch all sleep types; for Android, just SLEEP_ASLEEP
+        List<HealthDataType> sleepTypes = Platform.isIOS
+          ? [HealthDataType.SLEEP_ASLEEP, HealthDataType.SLEEP_AWAKE, HealthDataType.SLEEP_IN_BED]
+          : [HealthDataType.SLEEP_ASLEEP];
+
         List<HealthDataPoint> sleepData = await _health.getHealthDataFromTypes(
-          types: [HealthDataType.SLEEP_ASLEEP],
+          types: sleepTypes,
           startTime: now.subtract(Duration(hours: 24)),
           endTime: now,
         );
 
         _log('Sleep data points found: ${sleepData.length}');
-        double totalSleepMinutes = 0;
-        for (var point in sleepData) {
-          if (point.value is NumericHealthValue) {
-            double sleepValue = (point.value as NumericHealthValue).numericValue.toDouble();
-            totalSleepMinutes += sleepValue;
-            _log('Sleep entry: ${sleepValue.toStringAsFixed(1)} minutes at ${point.dateFrom}');
+
+        if (Platform.isIOS) {
+          // For iOS, calculate actual sleep time more accurately
+          double asleepMinutes = 0;
+          double awakeMinutes = 0;
+          double inBedMinutes = 0;
+
+          for (var point in sleepData) {
+            // For iOS, sleep data points represent time periods (from dateFrom to dateTo)
+            double durationMinutes = point.dateTo.difference(point.dateFrom).inMinutes.toDouble();
+
+            if (point.type == HealthDataType.SLEEP_ASLEEP) {
+              asleepMinutes += durationMinutes;
+              _log('Sleep asleep: ${durationMinutes.toStringAsFixed(1)} minutes from ${point.dateFrom} to ${point.dateTo}');
+            } else if (point.type == HealthDataType.SLEEP_AWAKE) {
+              awakeMinutes += durationMinutes;
+              _log('Sleep awake: ${durationMinutes.toStringAsFixed(1)} minutes from ${point.dateFrom} to ${point.dateTo}');
+            } else if (point.type == HealthDataType.SLEEP_IN_BED) {
+              inBedMinutes += durationMinutes;
+              _log('Sleep in bed: ${durationMinutes.toStringAsFixed(1)} minutes from ${point.dateFrom} to ${point.dateTo}');
+            }
           }
+
+          // Use actual sleep time (asleep) if available, otherwise use in bed time
+          double totalSleepMinutes = asleepMinutes > 0 ? asleepMinutes : inBedMinutes;
+          healthData['sleep'] = totalSleepMinutes / 60; // Convert to hours
+
+          _log('iOS Sleep - Asleep: ${(asleepMinutes/60).toStringAsFixed(1)}h, Awake: ${(awakeMinutes/60).toStringAsFixed(1)}h, In Bed: ${(inBedMinutes/60).toStringAsFixed(1)}h');
+          _log('Total sleep hours: ${healthData['sleep'].toStringAsFixed(1)}');
+        } else {
+          // For Android, use the existing logic
+          double totalSleepMinutes = 0;
+          for (var point in sleepData) {
+            if (point.value is NumericHealthValue) {
+              double sleepValue = (point.value as NumericHealthValue).numericValue.toDouble();
+              totalSleepMinutes += sleepValue;
+              _log('Sleep entry: ${sleepValue.toStringAsFixed(1)} minutes at ${point.dateFrom}');
+            }
+          }
+          healthData['sleep'] = totalSleepMinutes / 60; // Convert to hours
+          _log('Android sleep total: ${(totalSleepMinutes / 60).toStringAsFixed(1)} hours');
         }
-        healthData['sleep'] = totalSleepMinutes / 60; // Convert to hours
-        _log('Sleep total: ${(totalSleepMinutes / 60).toStringAsFixed(1)} hours');
       } catch (e) {
         _log('ERROR fetching sleep: $e');
       }

@@ -18,7 +18,7 @@ class FlutterHealthService {
     // Basic activity data
     HealthDataType.STEPS,
     HealthDataType.ACTIVE_ENERGY_BURNED,
-    HealthDataType.TOTAL_CALORIES_BURNED,
+    // Note: TOTAL_CALORIES_BURNED is not supported on iOS
     HealthDataType.DISTANCE_WALKING_RUNNING,
     
     // Heart rate data  

@@ -1492,6 +1492,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            // Force re-request all permissions including new data types
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => AlertDialog(
+                                title: Text('Re-authorizing Health Permissions'),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    CircularProgressIndicator(color: AppTheme.primaryAccent),
+                                    const SizedBox(height: 16),
+                                    Text('Please grant all requested health permissions...'),
+                                  ],
+                                ),
+                              ),
+                            );
+
+                            final success = await healthProvider.healthService.forceRequestAllPermissions();
+                            Navigator.pop(context); // Close dialog
+
+                            if (success) {
+                              await healthProvider.fetchMetrics();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('✅ Permissions updated! Health data syncing...'),
+                                  backgroundColor: AppTheme.successGreen,
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('❌ Failed to update permissions. Please try again.'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                          icon: Icon(Icons.security, size: 20),
+                          label: Text('Re-authorize'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ] else ...[
