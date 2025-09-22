@@ -56,3 +56,35 @@ Streaks Flutter is a comprehensive health and fitness tracking application that 
 - Load Supabase data BEFORE initializing health services
 - Implemented native Android deduplication for proper step counting
 - Samsung Health now properly prioritized over Google Fit
+
+### 4. iOS HealthKit Integration Fix (September 2025)
+**Problem:** Only steps were syncing on iOS; calories, heart rate, and sleep data showed 0 despite having permissions
+
+**Root Causes Identified:**
+1. Missing HealthKit entitlements file (`Runner.entitlements`)
+2. Invalid data type `TOTAL_CALORIES_BURNED` not supported on iOS
+3. Missing data types: `RESTING_HEART_RATE`, `SLEEP_AWAKE`, `SLEEP_IN_BED`
+4. Inconsistent implementation between `UnifiedHealthService` and `FlutterHealthService`
+
+**Solution:**
+- Created `/ios/Runner/Runner.entitlements` with HealthKit permissions
+- Added HealthKit capability in Xcode project settings
+- Removed unsupported `TOTAL_CALORIES_BURNED` type for iOS
+- Added iOS-specific health data types:
+  - `RESTING_HEART_RATE` for Apple Watch resting heart rate
+  - `SLEEP_AWAKE` and `SLEEP_IN_BED` for comprehensive sleep tracking
+- Implemented `forceRequestAllPermissions()` method to re-request permissions for new data types
+- Added "Re-authorize" button in Profile screen for permission refresh
+
+**Files Modified:**
+- `/ios/Runner/Runner.entitlements` - New file with HealthKit entitlements
+- `/ios/Runner.xcodeproj/project.pbxproj` - Added HealthKit capability
+- `/lib/services/unified_health_service.dart` - Fixed iOS data types and added force permission request
+- `/lib/services/flutter_health_service.dart` - Removed invalid TOTAL_CALORIES_BURNED
+- `/lib/screens/main/profile_screen.dart` - Added Re-authorize button
+
+**Key Implementation Details:**
+- iOS uses different health data types than Android
+- HealthKit requires explicit permission for each data type
+- Must re-request permissions when adding new data types
+- Platform-specific code for fetching different metrics

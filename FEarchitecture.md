@@ -62,11 +62,13 @@ Supabase (with timestamp checking)
 - **UserProvider**: User profile and preferences
 
 ### Services (Business Logic)
-- **UnifiedHealthService**: Health source routing
+- **UnifiedHealthService**: Health source routing with platform-specific data types
+- **FlutterHealthService**: Alternative health service with cross-platform support
 - **SupabaseService**: Database operations
 - **IndianFoodNutritionService**: Food database
 - **RealtimeSyncService**: Real-time data sync
 - **HealthOnboardingService**: Permission management
+- **NativeHealthConnectService**: Android-specific native health integration
 
 ### UI Screens
 - **MainScreen**: Navigation container with lifecycle management
@@ -150,6 +152,29 @@ Supabase (with timestamp checking)
 - Throttle sync frequency
 - Skip unnecessary syncs
 
+## Platform-Specific Health Implementation
+
+### iOS (HealthKit)
+**Supported Data Types:**
+- STEPS, HEART_RATE, RESTING_HEART_RATE
+- ACTIVE_ENERGY_BURNED (not TOTAL_CALORIES_BURNED)
+- SLEEP_ASLEEP, SLEEP_AWAKE, SLEEP_IN_BED
+- DISTANCE_WALKING_RUNNING, WATER, WEIGHT
+- BLOOD_OXYGEN, WORKOUT
+
+**Key Requirements:**
+- Runner.entitlements file with HealthKit capabilities
+- Info.plist with NSHealthShareUsageDescription
+- Must re-request permissions when adding new data types
+- Use forceRequestAllPermissions() for permission updates
+
+### Android (Health Connect)
+**Supported Data Types:**
+- All standard health metrics including TOTAL_CALORIES_BURNED
+- Native deduplication for accurate step counting
+- Samsung Health prioritization over Google Fit
+- Background sync support
+
 ## Testing Strategy
 
 ### Unit Tests
@@ -165,4 +190,5 @@ Supabase (with timestamp checking)
 ### Device Testing
 - Multiple screen sizes
 - Samsung specific testing (720x1544)
+- iOS iPhone testing with HealthKit
 - Network condition simulation
