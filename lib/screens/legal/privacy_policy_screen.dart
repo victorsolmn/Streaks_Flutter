@@ -112,6 +112,21 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
             _buildSection(
               context,
+              '7.1 Account Deletion',
+              'You have the right to delete your account and all associated data at any time.\n\n'
+              'To request account deletion:\n'
+              '• Email us at: privacy@streaker.app\n'
+              '• Include "Account Deletion Request" in the subject line\n'
+              '• Provide your registered email address\n\n'
+              'Upon receiving your request:\n'
+              '• We will verify your identity\n'
+              '• Your account and all associated data will be permanently deleted within 7 days\n'
+              '• You will receive a confirmation email once deletion is complete\n\n'
+              'Please note that account deletion is irreversible and you will lose access to all your health data, nutrition history, achievements, and streak progress.',
+            ),
+
+            _buildSection(
+              context,
               '8. Children\'s Privacy',
               'Our service is not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us.',
             ),
