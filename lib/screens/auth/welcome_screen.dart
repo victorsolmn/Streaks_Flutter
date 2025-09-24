@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../utils/app_theme.dart';
 import 'signin_screen.dart';
-import 'signup_screen.dart';
+import 'unified_auth_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({Key? key}) : super(key: key);
@@ -83,24 +83,29 @@ class WelcomeScreen extends StatelessWidget {
               // Action buttons
               Column(
                 children: [
+                  // Primary CTA - Unified auth with OTP
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => const SignUpScreen(),
+                            builder: (context) => const UnifiedAuthScreen(),
                           ),
                         );
                       },
                       child: Text('Get Started'),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                      ),
                     ),
                   ),
                   SizedBox(height: 16),
-                  
+
+                  // Secondary option - Traditional password login
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton(
+                    child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -108,7 +113,11 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                         );
                       },
-                      child: Text('Sign In'),
+                      icon: Icon(Icons.lock_outline, size: 20),
+                      label: Text('Sign In with Password'),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                      ),
                     ),
                   ),
                 ],

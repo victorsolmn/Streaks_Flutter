@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     
     <!-- Bluetooth permissions for device discovery and connection -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
@@ -37,6 +38,9 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+
+    <!-- Explicitly remove AD_ID permission added by Firebase Analytics -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
     
     <application
         android:label="streaker"
@@ -96,6 +100,16 @@
             </intent-filter>
         </activity-alias>
         
+        <!-- Disable Firebase Analytics advertising ID collection -->
+        <meta-data
+            android:name="google_analytics_adid_collection_enabled"
+            android:value="false" />
+
+        <!-- Disable automatic Firebase Analytics collection to prevent AD_ID -->
+        <meta-data
+            android:name="firebase_analytics_collection_deactivated"
+            android:value="false" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

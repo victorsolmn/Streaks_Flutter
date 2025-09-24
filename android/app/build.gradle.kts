@@ -40,6 +40,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Disable AD_ID collection for Firebase Analytics
+        manifestPlaceholders["firebase_analytics_collection_enabled"] = "true"
+        manifestPlaceholders["google_analytics_adid_collection_enabled"] = "false"
     }
 
     signingConfigs {

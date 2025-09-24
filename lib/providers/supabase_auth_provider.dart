@@ -163,15 +163,40 @@ class SupabaseAuthProvider with ChangeNotifier {
     }
   }
 
-  // Legacy OTP method - kept for compatibility
+  // Send OTP/Magic Link to email
   Future<bool> sendOTP(String email, {bool isSignUp = false}) async {
-    // Redirect to password auth
-    if (isSignUp) {
-      _setError('Please use the Sign Up screen');
-    } else {
-      _setError('Please use the Sign In screen');
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      // Clean email
+      final cleanEmail = email.toLowerCase().trim();
+
+      // Send OTP via Supabase (this will send a magic link with current config)
+      // Note: Supabase sends either OTP or Magic Link based on email template settings
+      await _supabaseService.client.auth.signInWithOtp(
+        email: cleanEmail,
+        emailRedirectTo: 'com.streaker.streaker://auth-callback',
+        shouldCreateUser: true, // Allow creating new users
+      );
+
+      _setLoading(false);
+      return true;
+    } on AuthException catch (e) {
+      if (e.message.contains('Email logins are disabled')) {
+        _setError('Email authentication is not enabled. Please contact support.');
+      } else if (e.message.contains('rate_limit')) {
+        _setError('Too many attempts. Please wait a moment and try again.');
+      } else {
+        _setError('Failed to send verification code. Please try again.');
+      }
+      _setLoading(false);
+      return false;
+    } catch (e) {
+      _setError('Failed to send verification code. Please check your connection.');
+      _setLoading(false);
+      return false;
     }
-    return false;
   }
 
   // Verify OTP and complete authentication
@@ -373,6 +398,26 @@ class SupabaseAuthProvider with ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  // Check if email exists in our system (for internal routing only)
+  // This doesn't reveal to the UI whether the email exists
+  Future<bool> checkUserExists(String email) async {
+    try {
+      final cleanEmail = email.toLowerCase().trim();
+
+      // Check if profile exists in our profiles table
+      final response = await _supabaseService.client
+          .from('profiles')
+          .select('id')
+          .eq('email', cleanEmail)
+          .maybeSingle();
+
+      return response != null;
+    } catch (e) {
+      // If error, assume user doesn't exist (safe default for new signups)
+      return false;
+    }
   }
 
   // Helper method to ensure user profile exists

@@ -108,11 +108,11 @@ class UnifiedHealthService {
       _log('Already initialized');
       return;
     }
-    
+
     _log('Starting initialization...');
-    
+
     try {
-      
+
       // Configure health services based on platform
       if (Platform.isAndroid) {
         _log('Android detected - configuring Health Connect...');
@@ -125,11 +125,11 @@ class UnifiedHealthService {
       } else if (Platform.isIOS) {
         _log('iOS detected - HealthKit ready');
       }
-      
-      
+
+
       _isInitialized = true;
       _log('Initialization complete');
-      
+
       // Determine best available data source
       await _determineBestDataSource();
     } catch (e) {

@@ -89,12 +89,12 @@ class HealthProvider with ChangeNotifier {
 
     // Initialize unified health service
     await _healthService.initialize();
-    
+
     // Set up callback for data updates
     _healthService.setDataUpdateCallback((data) {
       updateMetricsFromHealth(data);
     });
-    
+
     // Get current data source (prefer saved one over detected)
     if (_currentDataSource == HealthDataSource.unavailable) {
       _currentDataSource = _healthService.currentSource;
