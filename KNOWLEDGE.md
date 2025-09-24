@@ -1,7 +1,7 @@
-# Streaks Flutter App - Knowledge Base
+# Streaker App - Knowledge Base
 
 ## Project Overview
-Streaks Flutter is a comprehensive health and fitness tracking application that integrates with Samsung Health and Google Fit to provide users with real-time health metrics, nutrition tracking, and achievement systems.
+Streaker (formerly Streaks Flutter) is a comprehensive health and fitness tracking application that integrates with Samsung Health, Google Fit, and Apple HealthKit to provide users with real-time health metrics, nutrition tracking, and achievement systems. The app features a unified OTP authentication system for seamless and secure user access.
 
 ## Recent Updates (December 2024 - Version 1.0.4)
 
@@ -88,3 +88,75 @@ Streaks Flutter is a comprehensive health and fitness tracking application that 
 - HealthKit requires explicit permission for each data type
 - Must re-request permissions when adding new data types
 - Platform-specific code for fetching different metrics
+
+## OTP Authentication Implementation (January 2025)
+
+### Overview
+Implemented a unified passwordless authentication system using OTP (One-Time Password) codes sent via email. This replaces the traditional password-based authentication while maintaining backward compatibility.
+
+### Key Features
+- **Unified Auth Screen**: Single entry point for all authentication methods
+- **6-Digit OTP Codes**: Secure time-limited verification codes
+- **Auto User Detection**: Seamlessly handles both new signups and existing users
+- **Multiple Auth Methods**: Email OTP, Google OAuth, and password fallback
+- **Beautiful Email Templates**: Branded HTML emails with gradient design
+
+### Technical Implementation
+
+#### 1. UnifiedAuthScreen (`/lib/screens/auth/unified_auth_screen.dart`)
+- Single email input field for both signin/signup
+- Terms & Privacy Policy acceptance checkbox
+- Google OAuth integration button
+- Password login fallback option
+- Security benefits information display
+
+#### 2. SupabaseAuthProvider Updates
+- **sendOTP()**: Sends 6-digit verification code to email
+- **verifyOTP()**: Validates the entered code
+- **checkUserExists()**: Internal helper for user detection
+- Maintains all existing auth methods for backward compatibility
+
+#### 3. Email Template Configuration
+```html
+<div style="background: linear-gradient(135deg, #FF6B1A 0%, #FF9051 100%);">
+  <h1 style="color: white;">🔥 Streaker</h1>
+  <div style="background: linear-gradient(135deg, #FF6B1A 0%, #FF9051 100%);">
+    <h1 style="color: white; font-size: 48px; letter-spacing: 12px;">{{ .Token }}</h1>
+  </div>
+</div>
+```
+
+### Authentication Flow
+```
+Welcome Screen → Unified Auth Screen → Send OTP → Verify Code
+                                     ↓
+                                Google OAuth
+                                     ↓
+                              Password Fallback
+```
+
+### Security Improvements
+- No password storage (eliminates password vulnerabilities)
+- Time-limited codes (5-minute expiration)
+- Rate limiting protection
+- Email ownership verification
+- JWT-based session management
+
+### Supabase Configuration Required
+1. Enable Email Provider in Supabase Dashboard
+2. Set "Confirm email" toggle to ON
+3. Configure OTP expiry to 300 seconds
+4. Add redirect URL: `com.streaker.streaker://auth-callback`
+
+### Files Modified/Created
+- `/lib/screens/auth/unified_auth_screen.dart` - New unified auth screen
+- `/lib/providers/supabase_auth_provider.dart` - Added OTP methods
+- `/lib/screens/auth/welcome_screen.dart` - Updated navigation
+- `/send_test_otp.dart` - Test script for OTP emails
+- `/UNIFIED_AUTH_IMPLEMENTATION.md` - Complete implementation guide
+
+### Testing
+- Created test scripts for OTP configuration and flow testing
+- Successfully tested with victorsolmn@gmail.com
+- Verified email delivery with branded templates
+- Tested on iOS simulator (iPhone 16 Pro)
