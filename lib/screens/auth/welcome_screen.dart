@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../utils/app_theme.dart';
-import 'signin_screen.dart';
 import 'unified_auth_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -80,47 +79,26 @@ class WelcomeScreen extends StatelessWidget {
               
               const Spacer(flex: 2),
               
-              // Action buttons
-              Column(
-                children: [
-                  // Primary CTA - Unified auth with OTP
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const UnifiedAuthScreen(),
-                          ),
-                        );
-                      },
-                      child: Text('Get Started'),
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 16),
+              // Action button - Single CTA for simplified flow
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const UnifiedAuthScreen(),
                       ),
+                    );
+                  },
+                  child: Text('Get Started'),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    textStyle: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  SizedBox(height: 16),
-
-                  // Secondary option - Traditional password login
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const SignInScreen(),
-                          ),
-                        );
-                      },
-                      icon: Icon(Icons.lock_outline, size: 20),
-                      label: Text('Sign In with Password'),
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
               
               SizedBox(height: 32),

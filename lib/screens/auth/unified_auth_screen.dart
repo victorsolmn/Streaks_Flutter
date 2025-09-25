@@ -11,7 +11,6 @@ import '../legal/privacy_policy_screen.dart';
 import '../legal/terms_conditions_screen.dart';
 import '../onboarding/supabase_onboarding_screen.dart';
 import '../main/main_screen.dart';
-import 'signin_screen.dart'; // Fallback for password auth
 import 'package:url_launcher/url_launcher.dart';
 
 class UnifiedAuthScreen extends StatefulWidget {
@@ -75,49 +74,9 @@ class _UnifiedAuthScreenState extends State<UnifiedAuthScreen> {
         ),
       );
     } else if (mounted && authProvider.error != null) {
-      // Check if email auth is disabled
-      if (authProvider.error!.contains('Email authentication is not enabled')) {
-        // Show dialog to use alternative auth
-        _showAlternativeAuthDialog();
-      } else {
-        ToastService().showError(authProvider.error!);
-      }
+      // Show error message directly
+      ToastService().showError(authProvider.error!);
     }
-  }
-
-  void _showAlternativeAuthDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Email Login Setup Required'),
-          content: Text(
-            'Email login is currently being configured. '
-            'Please use the password login option for now.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Navigate to old sign in screen as fallback
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const SignInScreen(),
-                  ),
-                );
-              },
-              child: Text('Use Password Login'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Future<void> _signInWithGoogle() async {
@@ -436,28 +395,6 @@ class _UnifiedAuthScreenState extends State<UnifiedAuthScreen> {
                           side: BorderSide(color: Colors.grey.withOpacity(0.5)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(height: 16),
-
-                    // Alternative auth link
-                    Center(
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const SignInScreen(),
-                            ),
-                          );
-                        },
-                        child: Text(
-                          'Use password login',
-                          style: TextStyle(
-                            color: Theme.of(context).textTheme.bodyMedium?.color,
-                            fontSize: 12,
                           ),
                         ),
                       ),
