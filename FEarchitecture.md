@@ -71,6 +71,9 @@ lib/
 ├── services/            # Business Logic (Models)
 │   ├── supabase_service.dart         # Database
 │   ├── unified_health_service.dart   # Health data
+│   ├── permission_flow_manager.dart  # Permission lifecycle management
+│   ├── health_onboarding_service.dart # Health permission dialogs
+│   ├── calorie_tracking_service.dart # Advanced calorie management
 │   ├── toast_service.dart            # UI feedback
 │   └── realtime_sync_service.dart    # Real-time sync
 │
@@ -78,7 +81,9 @@ lib/
 │   ├── user_model.dart
 │   ├── health_metric_model.dart
 │   ├── nutrition_entry_model.dart
-│   └── achievement_model.dart
+│   ├── achievement_model.dart
+│   ├── calorie_segment.dart          # Time-based calorie data
+│   └── daily_calorie_total.dart      # Daily calorie aggregation
 │
 ├── utils/               # Utilities
 │   ├── app_theme.dart                # Theme & colors
@@ -233,10 +238,12 @@ Supabase (with timestamp checking)
 ### Services (Business Logic)
 - **UnifiedHealthService**: Health source routing with platform-specific data types
 - **FlutterHealthService**: Alternative health service with cross-platform support
+- **PermissionFlowManager**: App lifecycle-aware permission state management
+- **HealthOnboardingService**: Enhanced permission dialogs with Samsung-specific handling
+- **CalorieTrackingService**: Advanced time-segmented calorie data management
 - **SupabaseService**: Database operations
 - **IndianFoodNutritionService**: Food database
 - **RealtimeSyncService**: Real-time data sync
-- **HealthOnboardingService**: Permission management with device-specific guidance
 - **NativeHealthConnectService**: Android-specific native health integration
 - **VersionManagerService**: Force update management with caching
 
@@ -539,6 +546,149 @@ App Launch → AppWrapper → Version Check → Cache Check
 - **Required**: Strong prompt, limited dismiss, orange gradient
 - **Recommended**: Soft prompt, skip version option, primary gradient
 - **Optional**: No dialog shown
+
+## Permission Flow Management System (December 2024)
+
+### PermissionFlowManager Service
+New singleton service that manages Health Connect permission flows with app lifecycle awareness:
+
+```dart
+class PermissionFlowManager with WidgetsBindingObserver {
+  static final _instance = PermissionFlowManager._internal();
+
+  // Permission flow states
+  enum PermissionFlowState {
+    idle,
+    requesting,
+    inSettings,
+    checkingPermissions,
+    completed,
+    failed
+  }
+
+  // Stream-based state updates for real-time UI synchronization
+  StreamController<PermissionFlowState> _flowStateController;
+
+  // App lifecycle tracking
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isWaitingForSettingsReturn) {
+      _recheckPermissionsAfterResume();
+    }
+  }
+}
+```
+
+### Key Features
+- **Lifecycle Management**: Implements `WidgetsBindingObserver` for app resume detection
+- **State Streaming**: Real-time permission flow state updates via StreamController
+- **Samsung Integration**: Handles Samsung Health permission manager intents
+- **Navigation Protection**: Prevents app navigation during permission flows
+- **Auto-Resume Logic**: Rechecks permissions when returning from settings
+
+### Enhanced Health Onboarding Service
+Improved permission request handling with Samsung-specific flows:
+
+```dart
+// Samsung-specific permission handling
+if (settingsOpened && Platform.isAndroid) {
+  permissionManager.markOpeningSettings(onReturn: () async {
+    await _recheckPermissionsAfterSettings(context);
+  });
+
+  await _showWaitingForPermissionsDialog(context);
+}
+```
+
+### Dialog Management Architecture
+Complete overhaul of health permission dialog handling:
+
+1. **Integrated Permission Requests**: Permission flow integrated directly into dialog callbacks
+2. **State-Aware Closing**: Dialogs close automatically based on permission flow state
+3. **Waiting Dialogs**: Stream-based waiting dialogs with auto-close functionality
+4. **Error Prevention**: Prevents duplicate popups through flow state tracking
+
+### OTP Input Enhancement System
+Fixed theme-dependent text visibility issues with forced styling:
+
+```dart
+Container(
+  decoration: BoxDecoration(
+    color: Colors.white,  // Force white background
+    border: Border.all(color: Colors.grey.withOpacity(0.5), width: 2),
+    borderRadius: BorderRadius.circular(12),
+    boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1))],
+  ),
+  child: TextField(
+    style: TextStyle(
+      color: Colors.black87,  // Force dark text
+      decorationThickness: 0,
+    ),
+    cursorColor: Colors.black,
+    showCursor: true,
+  ),
+)
+```
+
+### Advanced Calorie Tracking System
+New time-segmented calorie data management:
+
+#### Database Schema (calorie_segments table)
+```sql
+- user_id: UUID (foreign key)
+- date: DATE
+- hour_start: INTEGER (0-23)
+- calories: REAL
+- source: TEXT
+- created_at: TIMESTAMP
+- UNIQUE: (user_id, date, hour_start, source)
+```
+
+#### CalorieTrackingService Features
+- **Hourly Segmentation**: Breaks down calorie data by hour for accurate tracking
+- **Source Deduplication**: Prevents duplicate entries from multiple health sources
+- **Intelligent Aggregation**: Smart daily total calculation with gap filling
+- **Sync Integration**: Seamlessly integrates with HealthProvider for real-time updates
+
+### Files Architecture Update
+New service files added to the architecture:
+
+```
+lib/services/
+├── permission_flow_manager.dart      # App lifecycle permission management
+├── health_onboarding_service.dart    # Enhanced dialog and permission handling
+├── calorie_tracking_service.dart     # Advanced calorie data management
+├── unified_health_service.dart       # Enhanced with Samsung support
+└── ...existing services
+```
+
+```
+lib/models/
+├── calorie_segment.dart              # Time-based calorie data model
+├── daily_calorie_total.dart          # Daily aggregation model
+└── ...existing models
+```
+
+### Native Android Enhancement
+Enhanced MainActivity.kt with Samsung-specific Health Connect handling:
+
+```kotlin
+// Samsung device detection and handling
+when {
+  isSamsung -> {
+    val intent = Intent().apply {
+      setClassName(
+        "com.samsung.android.shealthpermissionmanager",
+        "com.samsung.android.shealthpermissionmanager.PermissionActivity"
+      )
+      putExtra("packageName", packageName)
+    }
+    startActivity(intent)
+    settingsOpened = true
+  }
+  // ...other manufacturer handling
+}
+```
 
 ## Future Enhancements
 

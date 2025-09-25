@@ -257,6 +257,86 @@ Implemented a comprehensive force update system to ensure users are on the lates
 - Version comparison unit tests included
 - Successfully tested on iOS simulator
 
+## Health Connect Permission Flow Fixes (December 2024)
+
+### Critical Issues Resolved
+**Problem:** Samsung Health Connect popup was not opening settings correctly and required double confirmation. OTP input fields were invisible on certain device themes.
+
+### Technical Solutions Implemented
+
+#### 1. Samsung-Specific Health Connect Handling
+**Root Cause:** Samsung devices integrate Health Connect at system level differently than standard Android
+**Solution:**
+- Added Samsung device detection in `MainActivity.kt:1860-1902`
+- Implemented Samsung Health permission manager intent:
+  ```kotlin
+  setClassName(
+    "com.samsung.android.shealthpermissionmanager",
+    "com.samsung.android.shealthpermissionmanager.PermissionActivity"
+  )
+  ```
+- Returns `"settings_opened"` status instead of immediate permission check
+- Enhanced fallback chain for different Android versions and manufacturers
+
+#### 2. Permission Flow Lifecycle Management
+**Root Cause:** Dialog state management and app lifecycle conflicts during permission requests
+**Solution:**
+- Created `PermissionFlowManager` service (`/lib/services/permission_flow_manager.dart`)
+- Implements `WidgetsBindingObserver` for app lifecycle tracking
+- Prevents navigation state loss during settings transitions
+- Manages permission flow states: idle → requesting → inSettings → completed/failed
+- Stream-based state updates for real-time UI synchronization
+
+#### 3. Dialog Management Overhaul
+**Root Cause:** Multiple dialogs competing and improper lifecycle handling
+**Solution:**
+- Complete rewrite of dialog handling in `home_screen_clean.dart:449-467`
+- Integrated permission request directly into dialog callback
+- Proper dialog closing based on permission flow completion
+- Enhanced waiting dialogs with state-aware auto-closing
+- Prevention of duplicate popups through flow state tracking
+
+#### 4. OTP Input Visibility Fix
+**Root Cause:** Theme-dependent text colors causing invisible digits on dark themes
+**Solution:**
+- Forced styling in `otp_verification_screen.dart:172-241`
+- White background (`Colors.white`) with explicit black text (`Colors.black87`)
+- Enhanced container decoration with box shadows for depth
+- Proper cursor styling: `cursorColor: Colors.black, cursorWidth: 2, showCursor: true`
+- Removed theme inheritance for critical input fields
+
+#### 5. Auto-Permission Request Removal
+**Root Cause:** Health permissions being requested immediately after OTP authentication
+**Solution:**
+- Modified `health_provider.dart:125-129` to remove auto-permission requests
+- Changed from automatic to user-initiated permission flow
+- Eliminated unwanted redirects after authentication
+- Improved user control over when to connect health data
+
+### Key Files Modified
+- `/android/app/src/main/kotlin/com/streaker/streaker/MainActivity.kt` - Samsung-specific settings handling
+- `/lib/services/permission_flow_manager.dart` - New lifecycle management service
+- `/lib/screens/main/home_screen_clean.dart` - Dialog management overhaul
+- `/lib/screens/auth/otp_verification_screen.dart` - Input visibility fixes
+- `/lib/providers/health_provider.dart` - Removed auto-permission requests
+- `/lib/services/health_onboarding_service.dart` - Enhanced permission handling
+- `/lib/services/unified_health_service.dart` - Better error handling
+- `/lib/main.dart` - Permission flow integration
+
+### Technical Achievements
+- Eliminated double popup confirmations
+- Fixed Samsung S22 Ultra specific permission issues
+- Resolved OTP input invisibility across all themes
+- Enhanced user experience with proper feedback during permission flows
+- Implemented robust error handling for different Android manufacturers
+- Added app lifecycle state preservation during settings navigation
+
+### Testing Results
+- Successfully tested on Samsung S22 Ultra (R5CT32TLWGB)
+- Fixed both reported issues: popup navigation and OTP visibility
+- Proper settings opening with user feedback
+- Smooth permission flow without navigation disruption
+
 ## Codebase Analysis (September 2025)
 
 ### Identified Issues
