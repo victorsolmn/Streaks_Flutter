@@ -6,6 +6,8 @@ import '../models/health_metric_model.dart';
 import '../services/unified_health_service.dart';
 import '../services/realtime_sync_service.dart';
 import '../services/supabase_service.dart';
+import '../services/calorie_tracking_service.dart';
+import '../models/daily_calorie_total.dart';
 
 class HealthProvider with ChangeNotifier {
   Map<MetricType, HealthMetric> _metrics = {};
@@ -14,6 +16,7 @@ class HealthProvider with ChangeNotifier {
   final UnifiedHealthService _healthService = UnifiedHealthService();
   final RealtimeSyncService _syncService = RealtimeSyncService();
   final SupabaseService _supabaseService = SupabaseService();
+  final CalorieTrackingService _calorieService = CalorieTrackingService();
   SharedPreferences? _prefs;
   HealthDataSource _currentDataSource = HealthDataSource.unavailable;
   
@@ -90,6 +93,9 @@ class HealthProvider with ChangeNotifier {
     // Initialize unified health service
     await _healthService.initialize();
 
+    // Initialize calorie tracking service
+    await _calorieService.initialize();
+
     // Set up callback for data updates
     _healthService.setDataUpdateCallback((data) {
       updateMetricsFromHealth(data);
@@ -116,16 +122,12 @@ class HealthProvider with ChangeNotifier {
       await connectToHealthSource(_currentDataSource);
     }
     
-    // Request permissions and fetch initial data if source available
+    // Fetch initial data if source available
     if (_healthService.isDataSourceAvailable) {
       await fetchMetrics();
     } else if (_currentDataSource == HealthDataSource.unavailable) {
-      // Only try to request permissions if we don't have a saved connection
-      final result = await _healthService.requestHealthPermissions();
-      if (result.success) {
-        _currentDataSource = _healthService.currentSource;
-        await fetchMetrics();
-      }
+      // Don't auto-request permissions - let user initiate via dialog
+      debugPrint('HealthProvider: No health data source available. User can connect via settings.');
     }
     
     // Start automatic sync
@@ -149,6 +151,17 @@ class HealthProvider with ChangeNotifier {
       debugPrint('HealthProvider: Fetched data - Steps: ${data['steps']}, Source: $_currentDataSource');
 
       updateMetricsFromHealth(data);
+
+      // Sync calories using the new tracking service
+      await _calorieService.syncCalories();
+
+      // Get today's total from the new system
+      final dailyTotal = await _calorieService.getTodayTotal();
+      if (dailyTotal != null) {
+        _todayCaloriesBurned = dailyTotal.totalCalories;
+        debugPrint('HealthProvider: Updated calories from tracking service: ${_todayCaloriesBurned}');
+      }
+
       _lastSyncTime = DateTime.now();
     } catch (e) {
       debugPrint('Error fetching metrics: $e');
@@ -334,13 +347,9 @@ class HealthProvider with ChangeNotifier {
         await fetchMetrics();
         return true;
       } else {
-        // Try to request permissions
-        final result = await _healthService.requestHealthPermissions();
-        if (result.success) {
-          _currentDataSource = _healthService.currentSource;
-          await fetchMetrics();
-          return true;
-        }
+        // Don't auto-request - return false to let UI handle permission request
+        debugPrint('HealthProvider: No health source available, user needs to connect manually');
+        return false;
       }
       
       return false;
@@ -357,17 +366,17 @@ class HealthProvider with ChangeNotifier {
     final today = DateTime.now();
     final todayKey = '${today.year}-${today.month}-${today.day}';
     
-    // Load today's data with demo values as fallback for testing - All Samsung Health metrics
-    _todaySteps = _prefs!.getDouble('steps_$todayKey') ?? 5432.0;
-    _todayCaloriesBurned = _prefs!.getDouble('calories_burned_$todayKey') ?? 345.0;
-    _todayHeartRate = _prefs!.getDouble('heart_rate_$todayKey') ?? 72.0;
-    _todaySleep = _prefs!.getDouble('sleep_$todayKey') ?? 7.5;
-    _todayDistance = _prefs!.getDouble('distance_$todayKey') ?? 3.2;
-    _todayWater = _prefs!.getInt('water_$todayKey') ?? 1800;
-    _todayWorkouts = _prefs!.getInt('workouts_$todayKey') ?? 1;
-    _todayWeight = _prefs!.getDouble('weight_$todayKey') ?? 70.0;
-    _todayBloodOxygen = _prefs!.getInt('blood_oxygen_$todayKey') ?? 98;
-    _todayExerciseMinutes = _prefs!.getInt('exercise_minutes_$todayKey') ?? 45;
+    // Load today's data with 0 as fallback (no more hardcoded demo values)
+    _todaySteps = _prefs!.getDouble('steps_$todayKey') ?? 0.0;
+    _todayCaloriesBurned = _prefs!.getDouble('calories_burned_$todayKey') ?? 0.0;
+    _todayHeartRate = _prefs!.getDouble('heart_rate_$todayKey') ?? 0.0;
+    _todaySleep = _prefs!.getDouble('sleep_$todayKey') ?? 0.0;
+    _todayDistance = _prefs!.getDouble('distance_$todayKey') ?? 0.0;
+    _todayWater = _prefs!.getInt('water_$todayKey') ?? 0;
+    _todayWorkouts = _prefs!.getInt('workouts_$todayKey') ?? 0;
+    _todayWeight = _prefs!.getDouble('weight_$todayKey') ?? 0.0;
+    _todayBloodOxygen = _prefs!.getInt('blood_oxygen_$todayKey') ?? 0;
+    _todayExerciseMinutes = _prefs!.getInt('exercise_minutes_$todayKey') ?? 0;
     _todayBloodPressure = {
       'systolic': _prefs!.getInt('bp_systolic_$todayKey') ?? 120,
       'diastolic': _prefs!.getInt('bp_diastolic_$todayKey') ?? 80,

@@ -10,6 +10,7 @@ import 'services/enhanced_supabase_service.dart';
 import 'services/firebase_analytics_service.dart';
 import 'services/realtime_sync_service.dart';
 import 'services/daily_reset_service.dart';
+import 'services/permission_flow_manager.dart';
 // Using Supabase providers for cloud storage
 import 'providers/supabase_auth_provider.dart';
 import 'providers/supabase_nutrition_provider.dart';
@@ -94,9 +95,9 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer3<SupabaseAuthProvider, SupabaseUserProvider, ThemeProvider>(
         builder: (context, auth, userProvider, themeProvider, _) {
-          // Removed debug print statements that were causing rebuilds
-          // print('Auth state: authenticated=${auth.isAuthenticated}, loading=${auth.isLoading}');
-          // print('User profile: hasProfile=${userProvider.hasProfile}, onboarding=${userProvider.hasCompletedOnboarding}');
+          // Check if permission flow is active - if so, maintain current navigation state
+          final permissionManager = PermissionFlowManager();
+          final isPermissionFlowActive = permissionManager.isPermissionFlowActive;
 
           // Enhanced routing logic with email-based user validation
           // Only trigger profile load once per authentication session
@@ -112,8 +113,11 @@ class MyApp extends StatelessWidget {
 
           Widget home;
 
-          // Show loading if auth is in loading state or user profile is loading
-          if (auth.isLoading || (auth.isAuthenticated && userProvider.isLoading)) {
+          // If permission flow is active, keep user on MainScreen
+          if (isPermissionFlowActive && auth.isAuthenticated && userProvider.hasProfile) {
+            home = const MainScreen(); // Stay on home screen during permission flow
+          } else if (auth.isLoading || (auth.isAuthenticated && userProvider.isLoading)) {
+            // Show loading if auth is in loading state or user profile is loading
             home = const Scaffold(
               body: Center(
                 child: CircularProgressIndicator(),

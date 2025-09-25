@@ -1852,11 +1852,47 @@ class MainActivity: FlutterFragmentActivity() {
             Log.d(TAG, "Android Version: $androidVersion (${Build.VERSION.RELEASE})")
             Log.d(TAG, "Is Samsung: $isSamsung")
 
-            var intentOpened = false
-            var errorMessage = ""
+            var settingsOpened = false
+            var openMethod = ""
 
-            // Try different approaches based on Android version
+            // Try different approaches based on Android version and manufacturer
             when {
+                // Samsung devices need special handling
+                isSamsung -> {
+                    Log.d(TAG, "Samsung device detected - Using Samsung-specific approach")
+
+                    // Try Samsung Health first
+                    try {
+                        val intent = Intent().apply {
+                            setClassName(
+                                "com.samsung.android.shealthpermissionmanager",
+                                "com.samsung.android.shealthpermissionmanager.PermissionActivity"
+                            )
+                            putExtra("packageName", packageName)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        settingsOpened = true
+                        openMethod = "samsung_health_permissions"
+                        Log.d(TAG, "✅ Opened Samsung Health permissions")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Samsung Health permission manager not found, trying standard approach", e)
+
+                        // Fallback to standard Health Connect for Samsung
+                        try {
+                            val intent = Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS").apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(intent)
+                            settingsOpened = true
+                            openMethod = "health_connect_settings_samsung"
+                            Log.d(TAG, "✅ Opened Health Connect settings on Samsung")
+                        } catch (e2: Exception) {
+                            Log.e(TAG, "Standard Health Connect also failed on Samsung", e2)
+                        }
+                    }
+                }
+
                 // Android 14+ (API 34+) - Health Connect is integrated into system settings
                 androidVersion >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
                     Log.d(TAG, "Android 14+ detected - Using ACTION_MANAGE_HEALTH_PERMISSIONS")
@@ -1868,7 +1904,8 @@ class MainActivity: FlutterFragmentActivity() {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         startActivity(intent)
-                        intentOpened = true
+                        settingsOpened = true
+                        openMethod = "health_permissions_manager"
                         Log.d(TAG, "✅ Opened Health Connect permissions for app")
                     } catch (e: ActivityNotFoundException) {
                         Log.e(TAG, "ACTION_MANAGE_HEALTH_PERMISSIONS not found, trying alternative", e)
@@ -1879,11 +1916,11 @@ class MainActivity: FlutterFragmentActivity() {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             startActivity(intent)
-                            intentOpened = true
+                            settingsOpened = true
+                            openMethod = "health_connect_settings"
                             Log.d(TAG, "✅ Opened Health Connect settings (fallback)")
                         } catch (e2: Exception) {
                             Log.e(TAG, "Health Connect settings intent failed", e2)
-                            errorMessage = "Health Connect settings not found"
                         }
                     }
                 }
@@ -1898,7 +1935,8 @@ class MainActivity: FlutterFragmentActivity() {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         startActivity(intent)
-                        intentOpened = true
+                        settingsOpened = true
+                        openMethod = "health_connect_app"
                         Log.d(TAG, "✅ Opened Health Connect app")
                     } catch (e: ActivityNotFoundException) {
                         Log.e(TAG, "Health Connect app not found, trying Play Store", e)
@@ -1910,19 +1948,18 @@ class MainActivity: FlutterFragmentActivity() {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             startActivity(playStoreIntent)
-                            intentOpened = true
+                            settingsOpened = true
+                            openMethod = "play_store"
                             Log.d(TAG, "✅ Opened Health Connect in Play Store")
-                            errorMessage = "Please install Health Connect from Play Store"
                         } catch (e2: Exception) {
                             Log.e(TAG, "Could not open Play Store", e2)
-                            errorMessage = "Health Connect not installed. Please install from Play Store."
                         }
                     }
                 }
             }
 
             // If nothing worked, try generic app settings as last resort
-            if (!intentOpened) {
+            if (!settingsOpened) {
                 Log.d(TAG, "All Health Connect intents failed, opening app settings")
                 try {
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -1930,35 +1967,37 @@ class MainActivity: FlutterFragmentActivity() {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     startActivity(intent)
-                    intentOpened = true
+                    settingsOpened = true
+                    openMethod = "app_settings"
                     Log.d(TAG, "✅ Opened app settings page")
-                    errorMessage = "Please grant health permissions manually in app settings"
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to open app settings", e)
-                    errorMessage = "Could not open settings. Please manually open Settings > Apps > Streaker > Permissions"
+                    openMethod = "failed"
                 }
             }
 
-            // Return result to Flutter
+            // Return result to Flutter - indicate actual status
             val response = mapOf(
-                "success" to intentOpened,
+                "status" to if (settingsOpened) "settings_opened" else "failed",
+                "settingsOpened" to settingsOpened,
+                "openMethod" to openMethod,
                 "androidVersion" to androidVersion,
                 "isSamsung" to isSamsung,
                 "manufacturer" to manufacturer,
-                "message" to if (intentOpened) {
-                    when {
-                        androidVersion >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
-                            "Opening Health Connect permissions. Please enable all requested permissions."
-                        else ->
-                            "Opening Health Connect. Please grant access to health data."
-                    }
-                } else {
-                    errorMessage
+                "message" to when (openMethod) {
+                    "samsung_health_permissions" -> "Opening Samsung Health permissions. Please grant all permissions and return to the app."
+                    "health_connect_settings_samsung" -> "Opening Health Connect on Samsung. Please grant all permissions and return to the app."
+                    "health_permissions_manager" -> "Opening Health Connect permissions. Please grant all permissions and return to the app."
+                    "health_connect_settings" -> "Opening Health Connect settings. Please grant all permissions and return to the app."
+                    "health_connect_app" -> "Opening Health Connect. Please grant all permissions and return to the app."
+                    "play_store" -> "Please install Health Connect from Play Store, then return to the app."
+                    "app_settings" -> "Please grant health permissions in app settings, then return to the app."
+                    else -> "Could not open Health Connect settings. Please open Settings > Apps > Streaker > Permissions manually."
                 }
             )
 
             result.success(response)
-            Log.d(TAG, "Settings navigation result: $response")
+            Log.d(TAG, "Settings navigation completed: $response")
 
         } catch (e: Exception) {
             Log.e(TAG, "Error opening Health Connect settings", e)

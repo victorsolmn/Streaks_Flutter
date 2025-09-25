@@ -290,6 +290,46 @@ class UnifiedHealthService {
     }
   }
 
+  // Public method to check if health permissions are granted
+  Future<bool> hasHealthPermissions() async {
+    _log('Checking if health permissions are granted...');
+
+    try {
+      if (Platform.isIOS) {
+        // Check HealthKit permissions
+        final hasPermissions = await _health.hasPermissions(
+          _healthTypes,
+          permissions: List<HealthDataAccess>.filled(
+            _healthTypes.length,
+            HealthDataAccess.READ,
+          ),
+        ) ?? false;
+        _log('HealthKit permissions check: $hasPermissions');
+        return hasPermissions;
+      } else if (Platform.isAndroid) {
+        // Check Health Connect permissions
+        try {
+          final status = await _health.getHealthConnectSdkStatus();
+          if (status == HealthConnectSdkStatus.sdkAvailable) {
+            // Try to read some data to verify permissions
+            final now = DateTime.now();
+            final midnight = DateTime(now.year, now.month, now.day);
+            final steps = await _health.getTotalStepsInInterval(midnight, now);
+            // If we can read data, we have permissions
+            _log('Health Connect permissions check: ${steps != null}');
+            return steps != null;
+          }
+        } catch (e) {
+          _log('Error checking Health Connect permissions: $e');
+        }
+      }
+    } catch (e) {
+      _log('Error checking health permissions: $e');
+    }
+
+    return false;
+  }
+
   // Force re-request all permissions (including new data types)
   Future<bool> forceRequestAllPermissions() async {
     _log('Force re-requesting all health permissions including new data types...');
@@ -391,14 +431,9 @@ class UnifiedHealthService {
           _log('WARNING: Could not check SDK status: $e');
         }
         
-        // Request activity recognition permission for steps
-        _log('Requesting activity recognition permission...');
-        var activityStatus = await Permission.activityRecognition.request();
-        _log('Activity recognition permission: $activityStatus');
-        
-        if (activityStatus.isDenied || activityStatus.isPermanentlyDenied) {
-          _log('WARNING: Activity recognition permission denied');
-        }
+        // Activity recognition permission is not needed with Health Connect
+        // Health Connect handles step tracking internally
+        _log('Skipping activity recognition permission - using Health Connect directly');
         
         // Configure Health Connect if not already done
         _log('Configuring Health Connect...');
@@ -466,15 +501,27 @@ class UnifiedHealthService {
           // Call native Android method to open Health Connect settings
           try {
             const platform = MethodChannel('com.streaker/health_connect');
-            final result = await platform.invokeMethod('openHealthConnectSettings');
-            _log('Health Connect settings navigation result: $result');
+            final settingsResult = await platform.invokeMethod('openHealthConnectSettings');
+            _log('Health Connect settings navigation result: $settingsResult');
 
-            return HealthConnectionResult(
-              success: false,
-              error: HealthConnectionError.permissionsDenied,
-              errorMessage: 'Please grant all health permissions in the settings page that just opened.',
-              debugInfo: _debugLogs.join('\n'),
-            );
+            // Check if settings were successfully opened
+            if (settingsResult != null && settingsResult['settingsOpened'] == true) {
+              // Settings were opened, return a special status indicating pending permission
+              return HealthConnectionResult(
+                success: false,
+                error: HealthConnectionError.permissionsDenied,
+                errorMessage: settingsResult['message'] ?? 'Please grant all permissions in Health Connect and return to the app.',
+                debugInfo: 'settings_opened:${settingsResult['openMethod']}',
+              );
+            } else {
+              // Failed to open settings
+              return HealthConnectionResult(
+                success: false,
+                error: HealthConnectionError.permissionsDenied,
+                errorMessage: 'Could not open Health Connect settings. Please grant permissions manually in Settings > Apps > Streaker.',
+                debugInfo: _debugLogs.join('\n'),
+              );
+            }
           } catch (e) {
             _log('Error opening Health Connect settings: $e');
 

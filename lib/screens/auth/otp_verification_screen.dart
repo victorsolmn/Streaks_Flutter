@@ -174,43 +174,68 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       width: 50,
       height: 60,
       decoration: BoxDecoration(
+        color: Colors.white,  // White background for visibility
         border: Border.all(
           color: _otpControllers[index].text.isNotEmpty
               ? AppTheme.primaryAccent
-              : Colors.grey.withOpacity(0.3),
+              : Colors.grey.withOpacity(0.5),
           width: 2,
         ),
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextFormField(
-        controller: _otpControllers[index],
-        focusNode: _focusNodes[index],
-        textAlign: TextAlign.center,
-        keyboardType: TextInputType.number,
-        maxLength: 1,
-        style: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
-        decoration: const InputDecoration(
-          counterText: '',
-          border: InputBorder.none,
-        ),
-        inputFormatters: [
-          FilteringTextInputFormatter.digitsOnly,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
         ],
-        onChanged: (value) {
-          if (value.isNotEmpty && index < 5) {
-            _focusNodes[index + 1].requestFocus();
-          } else if (value.isEmpty && index > 0) {
-            _focusNodes[index - 1].requestFocus();
-          }
-          
-          // Auto-verify when all fields are filled
-          if (_getOTP().length == 6) {
-            _verifyOTP();
-          }
-        },
+      ),
+      child: Center(
+        child: TextField(
+          controller: _otpControllers[index],
+          focusNode: _focusNodes[index],
+          textAlign: TextAlign.center,
+          keyboardType: TextInputType.number,
+          maxLength: 1,
+          cursorColor: Colors.black,
+          cursorWidth: 2,
+          showCursor: true,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,  // Slightly softer black
+            decorationThickness: 0,
+          ),
+          decoration: const InputDecoration(
+            counterText: '',
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+            isDense: true,
+          ),
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(1),
+          ],
+          onChanged: (value) {
+            setState(() {
+              // Force rebuild to update border color
+            });
+
+            if (value.isNotEmpty && index < 5) {
+              _focusNodes[index + 1].requestFocus();
+            } else if (value.isEmpty && index > 0) {
+              _focusNodes[index - 1].requestFocus();
+            }
+
+            // Auto-verify when all fields are filled
+            if (_getOTP().length == 6) {
+              _verifyOTP();
+            }
+          },
+        ),
       ),
     );
   }

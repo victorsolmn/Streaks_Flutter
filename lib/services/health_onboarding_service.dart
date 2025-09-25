@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../providers/health_provider.dart';
 import '../services/unified_health_service.dart';
+import '../services/permission_flow_manager.dart';
 import '../widgets/android_health_permission_guide.dart';
 
 class HealthOnboardingService {
@@ -25,8 +26,16 @@ class HealthOnboardingService {
 
   // Check if we should show the health permission dialog
   Future<bool> shouldShowHealthPrompt() async {
-    // If already connected, don't show
+    // Check if already marked as connected in preferences
+    final isConnected = _prefs.getBool(_healthConnectedKey) ?? false;
+    if (isConnected) {
+      return false;
+    }
+
+    // If already connected via provider, don't show
     if (healthProvider.isHealthSourceConnected) {
+      // Also mark in preferences to avoid future checks
+      await _prefs.setBool(_healthConnectedKey, true);
       return false;
     }
 
@@ -81,6 +90,11 @@ class HealthOnboardingService {
   // Request health permissions with proper error handling
   Future<HealthPermissionResult> requestHealthPermissions(BuildContext context) async {
     try {
+      // Initialize and start permission flow
+      final permissionManager = PermissionFlowManager();
+      permissionManager.initialize();
+      permissionManager.startPermissionFlow();
+
       // Show loading indicator
       _showLoadingDialog(context);
 
@@ -99,12 +113,52 @@ class HealthOnboardingService {
         // Trigger immediate sync
         await healthProvider.syncWithHealth();
 
+        // End permission flow with success
+        permissionManager.endPermissionFlow(success: true);
+
         return HealthPermissionResult(
           success: true,
           message: 'Health data connected successfully!',
         );
       } else {
-        // Handle specific errors
+        // Check if settings were opened (special case for Android)
+        final settingsOpened = result.debugInfo?.contains('settings_opened') ?? false;
+
+        if (settingsOpened && Platform.isAndroid) {
+          // Settings were opened successfully, don't show error
+          if (context.mounted) {
+            // Mark that we're waiting for settings return
+            permissionManager.markOpeningSettings(onReturn: () async {
+              // Recheck permissions when app resumes
+              if (context.mounted) {
+                await _recheckPermissionsAfterSettings(context);
+              }
+            });
+
+            // Show waiting dialog
+            await _showWaitingForPermissionsDialog(context);
+
+            // After waiting dialog closes, permissions were either granted or denied
+            // The dialog self-closes based on state, so we can check here
+            final finalState = permissionManager.currentState;
+
+            if (finalState == PermissionFlowState.completed) {
+              return HealthPermissionResult(
+                success: true,
+                message: 'Health Connect permissions granted successfully!',
+              );
+            } else {
+              return HealthPermissionResult(
+                success: false,
+                message: 'Health Connect setup incomplete',
+                actionRequired: 'You can grant permissions later from Settings',
+                error: result.error,
+              );
+            }
+          }
+        }
+
+        // Handle other errors
         String errorMessage = 'Failed to connect health data.';
         String actionRequired = '';
 
@@ -114,62 +168,8 @@ class HealthOnboardingService {
             actionRequired = 'Please install Health Connect from the Play Store.';
             break;
           case HealthConnectionError.permissionsDenied:
-            // On Android, show guidance dialog if permissions were denied
-            if (Platform.isAndroid && context.mounted) {
-              // Close the loading dialog first
-              if (Navigator.canPop(context)) {
-                Navigator.of(context).pop();
-              }
-
-              // Get device info
-              Map<String, dynamic> deviceInfo = {
-                'isSamsung': false,
-                'androidVersion': 33,
-              };
-
-              try {
-                const platform = MethodChannel('com.streaker/health_connect');
-                final result = await platform.invokeMethod('getDeviceInfo');
-                if (result != null) {
-                  deviceInfo = Map<String, dynamic>.from(result);
-                }
-              } catch (e) {
-                // Use defaults if we can't get device info
-                print('Error getting device info: $e');
-              }
-
-              // Show guidance dialog
-              final bool shouldProceed = await showDialog<bool>(
-                context: context,
-                barrierDismissible: false,
-                builder: (dialogContext) => AndroidHealthPermissionGuide(
-                  isSamsung: deviceInfo['isSamsung'] ?? false,
-                  androidVersion: deviceInfo['androidVersion'] ?? 33,
-                  onProceed: () {
-                    Navigator.of(dialogContext).pop(true);
-                  },
-                  onCancel: () {
-                    Navigator.of(dialogContext).pop(false);
-                  },
-                ),
-              ) ?? false;
-
-              if (!shouldProceed) {
-                return HealthPermissionResult(
-                  success: false,
-                  message: 'Health permission setup cancelled',
-                  actionRequired: 'You can connect health data later from Settings',
-                  error: result.error,
-                );
-              }
-
-              // The settings have already been opened by UnifiedHealthService
-              errorMessage = 'Please grant all permissions and return to the app';
-              actionRequired = 'After granting permissions, your health data will sync automatically';
-            } else {
-              errorMessage = 'Health permissions were denied.';
-              actionRequired = 'You can grant permissions later in Settings.';
-            }
+            errorMessage = 'Health permissions were denied.';
+            actionRequired = 'You can grant permissions later in Settings.';
             break;
           case HealthConnectionError.configurationFailed:
             errorMessage = 'Failed to configure health services.';
@@ -178,6 +178,9 @@ class HealthOnboardingService {
           default:
             errorMessage = result.errorMessage ?? 'An unknown error occurred.';
         }
+
+        // End permission flow with failure
+        permissionManager.endPermissionFlow(success: false);
 
         return HealthPermissionResult(
           success: false,
@@ -192,10 +195,137 @@ class HealthOnboardingService {
         Navigator.of(context).pop();
       }
 
+      // End permission flow with failure
+      PermissionFlowManager().endPermissionFlow(success: false);
+
       return HealthPermissionResult(
         success: false,
         message: 'An unexpected error occurred: ${e.toString()}',
       );
+    }
+  }
+
+  // Show waiting dialog while user is in settings
+  Future<void> _showWaitingForPermissionsDialog(BuildContext context) async {
+    final permissionManager = PermissionFlowManager();
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StreamBuilder<PermissionFlowState>(
+        stream: permissionManager.flowStateStream,
+        initialData: permissionManager.currentState,
+        builder: (context, snapshot) {
+          final state = snapshot.data ?? PermissionFlowState.idle;
+
+          // Auto-close dialog when permissions are granted or failed
+          if (state == PermissionFlowState.completed || state == PermissionFlowState.failed) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (Navigator.canPop(dialogContext)) {
+                Navigator.of(dialogContext).pop();
+              }
+            });
+          }
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (state == PermissionFlowState.checkingPermissions)
+                    const CircularProgressIndicator()
+                  else
+                    const Icon(
+                      Icons.health_and_safety,
+                      size: 48,
+                      color: Colors.blue,
+                    ),
+                  const SizedBox(height: 16),
+                  Text(
+                    state == PermissionFlowState.checkingPermissions
+                        ? 'Checking permissions...'
+                        : 'Waiting for Health Connect',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    state == PermissionFlowState.checkingPermissions
+                        ? 'Please wait while we verify your permissions...'
+                        : 'Please grant all permissions in Health Connect settings and return to the app.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (state == PermissionFlowState.inSettings) ...[
+                    const SizedBox(height: 16),
+                    LinearProgressIndicator(
+                      backgroundColor: Colors.grey[300],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Recheck permissions after returning from settings
+  Future<void> _recheckPermissionsAfterSettings(BuildContext context) async {
+    final permissionManager = PermissionFlowManager();
+
+    try {
+      // State will be updated automatically by the manager on app resume
+
+      // Wait a bit for system to update
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Check if permissions were granted
+      final hasPermissions = await healthService.hasHealthPermissions();
+
+      if (hasPermissions) {
+        // Permissions granted!
+        await markHealthConnected();
+        await healthProvider.syncWithHealth();
+
+        permissionManager.endPermissionFlow(success: true);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Health Connect permissions granted successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        // Permissions still not granted
+        permissionManager.endPermissionFlow(success: false);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Health Connect permissions were not granted. You can try again from Settings.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      permissionManager.endPermissionFlow(success: false);
+      print('Error rechecking permissions: $e');
     }
   }
 
