@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../providers/health_provider.dart';
 import '../services/unified_health_service.dart';
+import '../widgets/android_health_permission_guide.dart';
 
 class HealthOnboardingService {
   static const String _healthPromptShownKey = 'health_prompt_shown';
@@ -112,8 +114,62 @@ class HealthOnboardingService {
             actionRequired = 'Please install Health Connect from the Play Store.';
             break;
           case HealthConnectionError.permissionsDenied:
-            errorMessage = 'Health permissions were denied.';
-            actionRequired = 'You can grant permissions later in Settings.';
+            // On Android, show guidance dialog if permissions were denied
+            if (Platform.isAndroid && context.mounted) {
+              // Close the loading dialog first
+              if (Navigator.canPop(context)) {
+                Navigator.of(context).pop();
+              }
+
+              // Get device info
+              Map<String, dynamic> deviceInfo = {
+                'isSamsung': false,
+                'androidVersion': 33,
+              };
+
+              try {
+                const platform = MethodChannel('com.streaker/health_connect');
+                final result = await platform.invokeMethod('getDeviceInfo');
+                if (result != null) {
+                  deviceInfo = Map<String, dynamic>.from(result);
+                }
+              } catch (e) {
+                // Use defaults if we can't get device info
+                print('Error getting device info: $e');
+              }
+
+              // Show guidance dialog
+              final bool shouldProceed = await showDialog<bool>(
+                context: context,
+                barrierDismissible: false,
+                builder: (dialogContext) => AndroidHealthPermissionGuide(
+                  isSamsung: deviceInfo['isSamsung'] ?? false,
+                  androidVersion: deviceInfo['androidVersion'] ?? 33,
+                  onProceed: () {
+                    Navigator.of(dialogContext).pop(true);
+                  },
+                  onCancel: () {
+                    Navigator.of(dialogContext).pop(false);
+                  },
+                ),
+              ) ?? false;
+
+              if (!shouldProceed) {
+                return HealthPermissionResult(
+                  success: false,
+                  message: 'Health permission setup cancelled',
+                  actionRequired: 'You can connect health data later from Settings',
+                  error: result.error,
+                );
+              }
+
+              // The settings have already been opened by UnifiedHealthService
+              errorMessage = 'Please grant all permissions and return to the app';
+              actionRequired = 'After granting permissions, your health data will sync automatically';
+            } else {
+              errorMessage = 'Health permissions were denied.';
+              actionRequired = 'You can grant permissions later in Settings.';
+            }
             break;
           case HealthConnectionError.configurationFailed:
             errorMessage = 'Failed to configure health services.';

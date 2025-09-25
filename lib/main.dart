@@ -26,6 +26,7 @@ import 'screens/auth/welcome_screen.dart';
 import 'screens/onboarding/supabase_onboarding_screen.dart';
 import 'screens/main/main_screen.dart';
 import 'utils/app_theme.dart';
+import 'widgets/app_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -138,7 +139,9 @@ class MyApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
-            home: home,
+            home: AppWrapper(
+              child: home,
+            ),
             debugShowCheckedModeBanner: false,
           );
         },

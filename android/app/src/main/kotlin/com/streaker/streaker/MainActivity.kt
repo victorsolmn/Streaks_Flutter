@@ -28,6 +28,10 @@ import java.util.Date
 import java.util.Locale
 import org.json.JSONObject
 import org.json.JSONArray
+import android.os.Build
+import android.provider.Settings
+import android.net.Uri
+import android.content.ActivityNotFoundException
 
 class MainActivity: FlutterFragmentActivity() {
     private val CHANNEL = "com.streaker/health_connect"
@@ -92,6 +96,8 @@ class MainActivity: FlutterFragmentActivity() {
                     val weight = call.argument<Double>("weight") ?: 70.0
                     syncUserProfile(age, gender, height, weight, result)
                 }
+                "openHealthConnectSettings" -> openHealthConnectSettings(result)
+                "getDeviceInfo" -> getDeviceInfo(result)
                 else -> result.notImplemented()
             }
         }
@@ -1806,6 +1812,157 @@ class MainActivity: FlutterFragmentActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing user profile", e)
             result.error("SYNC_ERROR", e.message, null)
+        }
+    }
+
+    private fun getDeviceInfo(result: MethodChannel.Result) {
+        try {
+            val manufacturer = Build.MANUFACTURER.lowercase(Locale.getDefault())
+            val model = Build.MODEL
+            val androidVersion = Build.VERSION.SDK_INT
+            val isSamsung = manufacturer.contains("samsung")
+
+            val deviceInfo = mapOf(
+                "manufacturer" to manufacturer,
+                "model" to model,
+                "androidVersion" to androidVersion,
+                "androidVersionName" to Build.VERSION.RELEASE,
+                "isSamsung" to isSamsung
+            )
+
+            Log.d(TAG, "Device info: $deviceInfo")
+            result.success(deviceInfo)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting device info", e)
+            result.error("DEVICE_INFO_ERROR", e.message, null)
+        }
+    }
+
+    private fun openHealthConnectSettings(result: MethodChannel.Result) {
+        try {
+            Log.d(TAG, "=== OPENING HEALTH CONNECT SETTINGS ===")
+
+            // Get device info for logging
+            val manufacturer = Build.MANUFACTURER.lowercase(Locale.getDefault())
+            val model = Build.MODEL
+            val androidVersion = Build.VERSION.SDK_INT
+            val isSamsung = manufacturer.contains("samsung")
+
+            Log.d(TAG, "Device: $manufacturer $model")
+            Log.d(TAG, "Android Version: $androidVersion (${Build.VERSION.RELEASE})")
+            Log.d(TAG, "Is Samsung: $isSamsung")
+
+            var intentOpened = false
+            var errorMessage = ""
+
+            // Try different approaches based on Android version
+            when {
+                // Android 14+ (API 34+) - Health Connect is integrated into system settings
+                androidVersion >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
+                    Log.d(TAG, "Android 14+ detected - Using ACTION_MANAGE_HEALTH_PERMISSIONS")
+
+                    try {
+                        // Try the new Health Connect manager intent for Android 14+
+                        val intent = Intent("android.health.connect.action.MANAGE_HEALTH_PERMISSIONS").apply {
+                            putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        intentOpened = true
+                        Log.d(TAG, "✅ Opened Health Connect permissions for app")
+                    } catch (e: ActivityNotFoundException) {
+                        Log.e(TAG, "ACTION_MANAGE_HEALTH_PERMISSIONS not found, trying alternative", e)
+
+                        // Fallback: Try direct Health Connect settings
+                        try {
+                            val intent = Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS").apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(intent)
+                            intentOpened = true
+                            Log.d(TAG, "✅ Opened Health Connect settings (fallback)")
+                        } catch (e2: Exception) {
+                            Log.e(TAG, "Health Connect settings intent failed", e2)
+                            errorMessage = "Health Connect settings not found"
+                        }
+                    }
+                }
+
+                // Android 13 and below - Health Connect is a separate app
+                else -> {
+                    Log.d(TAG, "Android 13 or below - Using legacy Health Connect intents")
+
+                    try {
+                        // Try the standard Health Connect settings intent
+                        val intent = Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS").apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        intentOpened = true
+                        Log.d(TAG, "✅ Opened Health Connect app")
+                    } catch (e: ActivityNotFoundException) {
+                        Log.e(TAG, "Health Connect app not found, trying Play Store", e)
+
+                        // Try to open Health Connect in Play Store
+                        try {
+                            val playStoreIntent = Intent(Intent.ACTION_VIEW).apply {
+                                data = Uri.parse("market://details?id=com.google.android.apps.healthdata")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(playStoreIntent)
+                            intentOpened = true
+                            Log.d(TAG, "✅ Opened Health Connect in Play Store")
+                            errorMessage = "Please install Health Connect from Play Store"
+                        } catch (e2: Exception) {
+                            Log.e(TAG, "Could not open Play Store", e2)
+                            errorMessage = "Health Connect not installed. Please install from Play Store."
+                        }
+                    }
+                }
+            }
+
+            // If nothing worked, try generic app settings as last resort
+            if (!intentOpened) {
+                Log.d(TAG, "All Health Connect intents failed, opening app settings")
+                try {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.parse("package:$packageName")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                    intentOpened = true
+                    Log.d(TAG, "✅ Opened app settings page")
+                    errorMessage = "Please grant health permissions manually in app settings"
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to open app settings", e)
+                    errorMessage = "Could not open settings. Please manually open Settings > Apps > Streaker > Permissions"
+                }
+            }
+
+            // Return result to Flutter
+            val response = mapOf(
+                "success" to intentOpened,
+                "androidVersion" to androidVersion,
+                "isSamsung" to isSamsung,
+                "manufacturer" to manufacturer,
+                "message" to if (intentOpened) {
+                    when {
+                        androidVersion >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
+                            "Opening Health Connect permissions. Please enable all requested permissions."
+                        else ->
+                            "Opening Health Connect. Please grant access to health data."
+                    }
+                } else {
+                    errorMessage
+                }
+            )
+
+            result.success(response)
+            Log.d(TAG, "Settings navigation result: $response")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening Health Connect settings", e)
+            result.error("SETTINGS_ERROR", e.message, null)
         }
     }
 }

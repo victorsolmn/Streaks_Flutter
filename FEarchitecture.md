@@ -236,8 +236,9 @@ Supabase (with timestamp checking)
 - **SupabaseService**: Database operations
 - **IndianFoodNutritionService**: Food database
 - **RealtimeSyncService**: Real-time data sync
-- **HealthOnboardingService**: Permission management
+- **HealthOnboardingService**: Permission management with device-specific guidance
 - **NativeHealthConnectService**: Android-specific native health integration
+- **VersionManagerService**: Force update management with caching
 
 ### UI Screens
 - **MainScreen**: Navigation container with lifecycle management
@@ -343,6 +344,13 @@ Supabase (with timestamp checking)
 - Native deduplication for accurate step counting
 - Samsung Health prioritization over Google Fit
 - Background sync support
+
+**Version-Aware Navigation (September 2025):**
+- Android 14+ (SDK 34+): Uses `ACTION_MANAGE_HEALTH_PERMISSIONS`
+- Android 13- (SDK 33-): Uses `ACTION_HEALTH_CONNECT_SETTINGS`
+- Samsung devices: Deep system integration similar to iOS
+- Native Kotlin methods in MainActivity for proper intent handling
+- Device-specific user guidance via AndroidHealthPermissionGuide widget
 
 ## Testing Strategy
 
@@ -473,6 +481,64 @@ const PROD_ANON_KEY = 'production-key';
 - **Main Repository**: https://github.com/victorsolmn/Streaks_Flutter
 - **OTP Version**: https://github.com/victorsolmn/Streaker_OTP
 - **Privacy Policy**: https://victorsolmn.github.io/streaker-privacy/
+
+## Force Update System (September 2025)
+
+### Overview
+Comprehensive force update mechanism ensuring users stay on the latest app version with graceful handling of updates and maintenance modes.
+
+### Architecture Components
+
+1. **AppWrapper Widget**: Wraps entire app for version checking
+   - Checks version on app launch and foreground
+   - Shows loading state during initial check
+   - Blocks app usage for critical updates
+
+2. **VersionManagerService**: Core update logic
+   - Semantic version comparison (major.minor.patch)
+   - 12-hour local caching to reduce server calls
+   - Platform-specific store URL handling
+   - Offline graceful fallback
+
+3. **ForceUpdateDialog**: Update UI component
+   - Severity-based gradient icons
+   - Version upgrade path display (1.0.4 → 2.0.0)
+   - "What's New" feature lists
+   - Skip version option for soft updates
+   - Maintenance mode screen
+
+4. **Database Configuration** (app_config table):
+   ```sql
+   - platform: ios/android/all
+   - min_version: Required minimum version
+   - recommended_version: Optional update version
+   - force_update: Boolean for mandatory updates
+   - update_severity: critical/required/recommended/optional
+   - maintenance_mode: Service downtime handling
+   - features_list: Array of new features to display
+   ```
+
+### Update Flow
+```
+App Launch → AppWrapper → Version Check → Cache Check
+                                       ↓
+                              Fetch from Supabase
+                                       ↓
+                              Compare Versions
+                                       ↓
+                    [No Update] ← → [Update Required]
+                                           ↓
+                                   Show Update Dialog
+                                           ↓
+                                   [Force] → Block App
+                                   [Soft] → Allow Dismiss
+```
+
+### Severity Levels
+- **Critical**: App blocked, no dismiss, red gradient
+- **Required**: Strong prompt, limited dismiss, orange gradient
+- **Recommended**: Soft prompt, skip version option, primary gradient
+- **Optional**: No dialog shown
 
 ## Future Enhancements
 

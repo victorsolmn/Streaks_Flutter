@@ -160,3 +160,136 @@ Welcome Screen → Unified Auth Screen → Send OTP → Verify Code
 - Successfully tested with victorsolmn@gmail.com
 - Verified email delivery with branded templates
 - Tested on iOS simulator (iPhone 16 Pro)
+
+## Android Health Connect Deep Integration (September 2025)
+
+### Problem Solved
+Android Health Connect permissions were not navigating to the correct settings page on Samsung devices and other Android 14+ devices. The generic error message was confusing users.
+
+### Technical Implementation
+1. **Native Android Methods** (`MainActivity.kt`)
+   - `openHealthConnectSettings()`: Version-aware navigation to Health Connect settings
+   - Android 14+: Uses `ACTION_MANAGE_HEALTH_PERMISSIONS` intent
+   - Android 13-: Uses `ACTION_HEALTH_CONNECT_SETTINGS` intent
+   - Samsung-specific handling for deep system integration
+
+2. **Device Detection**
+   - Implemented `getDeviceInfo()` method to detect Samsung devices
+   - Returns device manufacturer and Android SDK version
+   - Used for providing device-specific guidance
+
+3. **User Guidance Widget** (`AndroidHealthPermissionGuide`)
+   - Device-specific instructions for permission setup
+   - Samsung devices: Navigate through Settings → Apps
+   - Other devices: Direct Health Connect app access
+   - Visual step-by-step guidance
+
+4. **Files Modified**
+   - `/android/app/src/main/kotlin/com/streaker/streaker/MainActivity.kt`
+   - `/lib/services/unified_health_service.dart`
+   - `/lib/widgets/android_health_permission_guide.dart` (new)
+   - `/lib/services/health_onboarding_service.dart`
+
+### Key Insights
+- Samsung devices have Health Connect deeply integrated at system level (similar to iOS HealthKit)
+- Different Android versions require different intent actions
+- User guidance significantly improves permission grant success rate
+
+## Force Update Feature Implementation (September 2025)
+
+### Overview
+Implemented a comprehensive force update system to ensure users are on the latest app version, with support for maintenance mode and soft updates.
+
+### Architecture Components
+
+1. **Database Schema** (`app_config` table in Supabase)
+   - Platform-specific configurations (iOS/Android/All)
+   - Version requirements (min_version, recommended_version)
+   - Update severity levels (critical/required/recommended/optional)
+   - Maintenance mode support
+   - Feature lists for update dialogs
+
+2. **VersionManagerService**
+   - Semantic version comparison
+   - 12-hour local caching to reduce API calls
+   - Automatic App Store/Play Store navigation
+   - Platform-specific store URL handling
+   - Offline support with graceful fallback
+
+3. **ForceUpdateDialog UI**
+   - Gradient icons based on severity
+   - Version upgrade path display (current → required)
+   - "What's New" feature lists
+   - Dismissible/Non-dismissible based on severity
+   - Skip version option for recommended updates
+   - Maintenance mode screen
+
+4. **AppWrapper Integration**
+   - Wraps entire app for version checking
+   - Checks on app launch and foreground
+   - Blocks app usage during critical updates
+   - Loading state during initial check
+
+### Update Severity Levels
+- **Critical**: Mandatory update, app blocked, no dismiss
+- **Required**: Strong prompt, limited dismiss
+- **Recommended**: Soft prompt, can skip version
+- **Optional**: No dialog shown
+
+### Cache Strategy
+- 12-hour cache expiry for config
+- Force refresh on app foreground after expiry
+- SharedPreferences for persistence
+- Memory cache for performance
+
+### Files Created/Modified
+- `/supabase/migrations/20250925_app_config_table.sql`
+- `/lib/services/version_manager_service.dart`
+- `/lib/widgets/force_update_dialog.dart`
+- `/lib/widgets/app_wrapper.dart`
+- `/scripts/test_force_update.sql`
+- `/docs/force_update_guide.md`
+- `/lib/main.dart` (integrated AppWrapper)
+
+### Testing
+- SQL scripts provided for testing different scenarios
+- Support for maintenance mode testing
+- Version comparison unit tests included
+- Successfully tested on iOS simulator
+
+## Codebase Analysis (September 2025)
+
+### Identified Issues
+1. **Duplicate Providers**: Both local and Supabase versions exist
+   - Impact: ~200KB redundant code
+   - Files: auth, user, nutrition providers
+
+2. **Multiple Screen Versions**
+   - Active: `home_screen_clean.dart`, `progress_screen_new.dart`
+   - Unused: `home_screen.dart`, `progress_screen.dart`
+   - Note: Using "new" versions, not originals
+
+3. **Redundant Health Services**
+   - Active: `unified_health_service.dart`
+   - Unused: `health_service.dart`, `flutter_health_service.dart`, `native_health_connect_service.dart`
+
+4. **Non-Flutter Directories**
+   - `/node_modules` (7.4MB) - Not needed
+   - `/website` (876KB) - Separate project
+
+5. **Documentation Overflow**
+   - 44 markdown files in root directory
+   - Multiple SQL test files
+
+### Build Impact Analysis
+- **Good News**: Flutter's tree-shaking excludes unused code
+- **iOS Build Size**: 33.9MB (reasonable for feature set)
+- **Main Impact**: Repository size and developer experience
+- **No significant runtime impact**
+
+### Recommendations
+- Clean up for code hygiene, not build size
+- Move documentation to `/docs`
+- Remove `/node_modules` and `/website`
+- Delete truly unused screen versions
+- Consolidate test SQL files

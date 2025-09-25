@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:app_settings/app_settings.dart';
@@ -230,6 +231,27 @@ class UnifiedHealthService {
     }
   }
   
+  // Get Android device information
+  Future<Map<String, dynamic>> getAndroidDeviceInfo() async {
+    if (!Platform.isAndroid) {
+      return {};
+    }
+
+    try {
+      const platform = MethodChannel('com.streaker/health_connect');
+      // Just get device info without actually opening settings
+      final result = await platform.invokeMethod('getDeviceInfo');
+      return Map<String, dynamic>.from(result ?? {});
+    } catch (e) {
+      _log('Error getting Android device info: $e');
+      return {
+        'isSamsung': false,
+        'androidVersion': 33,
+        'manufacturer': 'unknown',
+      };
+    }
+  }
+
   // Open health settings directly
   Future<void> openHealthSettings() async {
     try {
@@ -437,12 +459,32 @@ class UnifiedHealthService {
           );
         } else {
           _log('Health Connect authorization failed or was denied');
-          return HealthConnectionResult(
-            success: false,
-            error: HealthConnectionError.permissionsDenied,
-            errorMessage: 'Health Connect permissions were denied. Please grant permissions manually in Settings > Apps > Streaker > Permissions.',
-            debugInfo: _debugLogs.join('\n'),
-          );
+
+          // On Android, when permissions are denied, automatically open Health Connect settings
+          _log('Opening Health Connect settings for manual permission grant...');
+
+          // Call native Android method to open Health Connect settings
+          try {
+            const platform = MethodChannel('com.streaker/health_connect');
+            final result = await platform.invokeMethod('openHealthConnectSettings');
+            _log('Health Connect settings navigation result: $result');
+
+            return HealthConnectionResult(
+              success: false,
+              error: HealthConnectionError.permissionsDenied,
+              errorMessage: 'Please grant all health permissions in the settings page that just opened.',
+              debugInfo: _debugLogs.join('\n'),
+            );
+          } catch (e) {
+            _log('Error opening Health Connect settings: $e');
+
+            return HealthConnectionResult(
+              success: false,
+              error: HealthConnectionError.permissionsDenied,
+              errorMessage: 'Health Connect permissions were denied. Please grant permissions manually in Settings > Apps > Streaker > Permissions.',
+              debugInfo: _debugLogs.join('\n'),
+            );
+          }
         }
       }
       
