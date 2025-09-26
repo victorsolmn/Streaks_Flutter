@@ -102,6 +102,7 @@ class EnhancedSupabaseService {
     String? activityLevel,
     String? fitnessGoal,
     int? dailyCaloriesTarget,
+    int? dailyActiveCaloriesTarget,
   }) async {
     final updates = <String, dynamic>{};
     if (name != null) updates['name'] = name;
@@ -111,6 +112,7 @@ class EnhancedSupabaseService {
     if (activityLevel != null) updates['activity_level'] = activityLevel;
     if (fitnessGoal != null) updates['fitness_goal'] = fitnessGoal;
     if (dailyCaloriesTarget != null) updates['daily_calories_target'] = dailyCaloriesTarget;
+    if (dailyActiveCaloriesTarget != null) updates['daily_active_calories_target'] = dailyActiveCaloriesTarget;
 
     try {
       await _supabase

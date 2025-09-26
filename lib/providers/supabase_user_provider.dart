@@ -95,7 +95,8 @@ class SupabaseUserProvider with ChangeNotifier {
           hasCompletedOnboarding: profileData['has_completed_onboarding'] ?? false,
           hasSeenFitnessGoalSummary: profileData['has_seen_fitness_goal_summary'] ?? false,
           dailyCaloriesTarget: profileData['daily_calories_target'],
-          dailyStepsTarget: profileData['daily_steps_target'], 
+          dailyActiveCaloriesTarget: profileData['daily_active_calories_target'],
+          dailyStepsTarget: profileData['daily_steps_target'],
           dailySleepTarget: profileData['daily_sleep_target']?.toDouble(),
           dailyWaterTarget: profileData['daily_water_target']?.toDouble(),
         );
@@ -170,6 +171,7 @@ class SupabaseUserProvider with ChangeNotifier {
       if (profile.workoutConsistency != null) coreProfileUpdates['workout_consistency'] = profile.workoutConsistency;
       // Add daily targets to core updates now that schema is fixed
       if (profile.dailyCaloriesTarget != null) coreProfileUpdates['daily_calories_target'] = profile.dailyCaloriesTarget;
+      if (profile.dailyActiveCaloriesTarget != null) coreProfileUpdates['daily_active_calories_target'] = profile.dailyActiveCaloriesTarget;
       if (profile.dailyStepsTarget != null) coreProfileUpdates['daily_steps_target'] = profile.dailyStepsTarget;
       if (profile.dailySleepTarget != null) coreProfileUpdates['daily_sleep_target'] = profile.dailySleepTarget;
       if (profile.dailyWaterTarget != null) coreProfileUpdates['daily_water_target'] = profile.dailyWaterTarget;

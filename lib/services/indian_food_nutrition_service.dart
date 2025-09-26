@@ -7,12 +7,21 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 class IndianFoodNutritionService {
   // Google Gemini API - FREE tier (60 queries/minute)
   // IMPORTANT: Get your FREE key from https://makersuite.google.com/app/apikey
-  static const String _geminiApiKey = 'AIzaSyBXSUv6Ff9unTCkCTvxsE0UaXWX24TVxCI';
+  static const String _geminiApiKey = 'AIzaSyCKfZexkUygDlTNguMzEwtA0UX-6iJgh70';
   
   // Indian Food Composition Database (IFCT 2017) - DEPRECATED
   // We now use Gemini AI to calculate nutrition directly for better accuracy
   // Keeping this for reference/fallback only
   static final Map<String, Map<String, dynamic>> _indianFoodDatabase = {
+    // Common Mixed Meals (realistic values) - PRIORITIZED FIRST
+    'mixed meal': {'calories': 350, 'protein': 15.0, 'carbs': 45.0, 'fat': 12.0, 'fiber': 5.0},
+    'thali': {'calories': 400, 'protein': 18.0, 'carbs': 55.0, 'fat': 14.0, 'fiber': 6.0},
+    'combo meal': {'calories': 380, 'protein': 16.0, 'carbs': 50.0, 'fat': 13.0, 'fiber': 5.5},
+    'full meal': {'calories': 420, 'protein': 20.0, 'carbs': 60.0, 'fat': 15.0, 'fiber': 7.0},
+    'lunch plate': {'calories': 380, 'protein': 16.0, 'carbs': 50.0, 'fat': 13.0, 'fiber': 5.5},
+    'dinner plate': {'calories': 380, 'protein': 16.0, 'carbs': 50.0, 'fat': 13.0, 'fiber': 5.5},
+    'breakfast plate': {'calories': 250, 'protein': 10.0, 'carbs': 35.0, 'fat': 8.0, 'fiber': 3.0},
+
     // Vegetables and Salads
     'mixed vegetables': {'calories': 50, 'protein': 2.5, 'carbs': 10.0, 'fat': 0.5, 'fiber': 3.0},
     'salad': {'calories': 50, 'protein': 2.5, 'carbs': 10.0, 'fat': 0.5, 'fiber': 3.0},
@@ -83,20 +92,39 @@ class IndianFoodNutritionService {
   GenerativeModel? _model;
   
   IndianFoodNutritionService() {
-    // Initialize Gemini with the API key
+    // Initialize Gemini with the API key - try multiple model versions
     if (_geminiApiKey.isNotEmpty && _geminiApiKey.startsWith('AIza')) {
-      try {
-        _model = GenerativeModel(
-          model: 'gemini-1.5-flash-latest', // Use latest stable version
-          apiKey: _geminiApiKey,
-        );
-        debugPrint('✅ Gemini AI initialized successfully for Indian food recognition');
-      } catch (e) {
-        debugPrint('⚠️ Gemini initialization error: $e');
-      }
+      _initializeGeminiModel();
     } else {
       debugPrint('⚠️ Invalid Gemini API key');
     }
+  }
+
+  // Try multiple Gemini model versions to find one that works
+  void _initializeGeminiModel() {
+    final modelVersions = [
+      'gemini-1.5-flash',     // Most common free tier model
+      'gemini-1.5-pro',       // Pro version if available
+      'gemini-1.0-pro',       // Older stable version
+      'gemini-pro',           // Generic pro version
+    ];
+
+    for (final modelVersion in modelVersions) {
+      try {
+        debugPrint('🔄 Trying Gemini model: $modelVersion');
+        _model = GenerativeModel(
+          model: modelVersion,
+          apiKey: _geminiApiKey,
+        );
+        debugPrint('✅ Gemini AI initialized with model: $modelVersion');
+        return; // Success - exit
+      } catch (e) {
+        debugPrint('❌ Failed to initialize $modelVersion: $e');
+      }
+    }
+
+    debugPrint('⚠️ All Gemini models failed to initialize');
+    _model = null;
   }
   
   // New method to analyze food with description instead of individual items
@@ -215,8 +243,8 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
     } catch (e) {
       debugPrint('Error with Gemini calculation: $e');
       debugPrint('Falling back to local database analysis');
-      // Use local database as fallback - create description from available data
-      final fallbackDescription = 'Mixed meal';
+      // Use local database as fallback - use the actual meal description
+      final fallbackDescription = description ?? 'Mixed meal';
       return _analyzeWithLocalDatabase(fallbackDescription);
     }
   }
@@ -339,8 +367,8 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
     } catch (e) {
       debugPrint('Error with Gemini calculation: $e');
       debugPrint('Falling back to local database analysis');
-      // Use local database as fallback - create description from available data
-      final fallbackDescription = 'Mixed meal';
+      // Use local database as fallback - combine food name and quantity
+      final fallbackDescription = '$quantity $foodName';
       return _analyzeWithLocalDatabase(fallbackDescription);
     }
   }
@@ -848,10 +876,25 @@ Analyze the image now:
         'half': 0.5, 'quarter': 0.25, 'single': 1, 'double': 2,
       };
 
-      // Search for known foods in the description
-      for (final foodName in _indianFoodDatabase.keys) {
+      // Search for known foods in the description - prioritize exact and longer matches
+      // First, try to find exact or best matches
+      final sortedFoodNames = _indianFoodDatabase.keys.toList()
+        ..sort((a, b) => b.length.compareTo(a.length)); // Sort by length, longest first
+
+      for (final foodName in sortedFoodNames) {
+        // Skip 'mixed vegetables' if we're looking for 'mixed meal'
+        if (foodName == 'mixed vegetables' &&
+            (lowerDesc.contains('mixed meal') ||
+             lowerDesc.contains('meal') ||
+             !lowerDesc.contains('vegetable'))) {
+          continue;
+        }
+
         if (lowerDesc.contains(foodName)) {
-          foods.add(foodName);
+          // Avoid duplicate additions
+          if (!foods.contains(foodName)) {
+            foods.add(foodName);
+          }
 
           // Try to extract quantity for this food
           for (final pattern in quantityPatterns) {
@@ -936,43 +979,124 @@ Analyze the image now:
     }
   }
 
-  // Provide estimated nutrition when all else fails
+  // Provide estimated nutrition when all else fails - Enhanced smart estimation
   Map<String, dynamic> _getEstimatedNutrition(String description) {
-    debugPrint('📊 Providing estimated nutrition');
+    debugPrint('📊 Providing smart estimated nutrition for: $description');
 
-    // Estimate based on typical meal sizes
     final lowerDesc = description.toLowerCase();
-    int estimatedCalories = 300; // Default medium meal
+    int baseCalories = 350; // Default medium meal
+    String foodCategory = 'Mixed meal';
 
-    // Adjust based on meal size indicators
-    if (lowerDesc.contains('large') || lowerDesc.contains('big') ||
-        lowerDesc.contains('heavy') || lowerDesc.contains('full')) {
-      estimatedCalories = 500;
-    } else if (lowerDesc.contains('small') || lowerDesc.contains('light') ||
-               lowerDesc.contains('snack') || lowerDesc.contains('mini')) {
-      estimatedCalories = 150;
+    // Smart categorization based on meal type
+    if (_isMealType(lowerDesc, ['breakfast'])) {
+      baseCalories = 250;
+      foodCategory = 'Breakfast';
+    } else if (_isMealType(lowerDesc, ['lunch', 'dinner'])) {
+      baseCalories = 450;
+      foodCategory = 'Main meal';
+    } else if (_isMealType(lowerDesc, ['snack', 'tea time', 'evening'])) {
+      baseCalories = 150;
+      foodCategory = 'Snack';
+    } else if (_isMealType(lowerDesc, ['dessert', 'sweet'])) {
+      baseCalories = 200;
+      foodCategory = 'Dessert';
     }
 
-    // Typical macro distribution
-    final protein = (estimatedCalories * 0.20 / 4).round(); // 20% from protein
-    final carbs = (estimatedCalories * 0.50 / 4).round();   // 50% from carbs
-    final fat = (estimatedCalories * 0.30 / 9).round();     // 30% from fat
-    final fiber = (estimatedCalories * 0.02).round();       // Rough estimate
+    // Adjust for cooking method
+    if (_containsCookingMethod(lowerDesc, ['fried', 'deep fried', 'pakora'])) {
+      baseCalories = (baseCalories * 1.4).round(); // Fried foods +40%
+    } else if (_containsCookingMethod(lowerDesc, ['grilled', 'tandoori', 'roasted'])) {
+      baseCalories = (baseCalories * 0.95).round(); // Grilled foods -5%
+    } else if (_containsCookingMethod(lowerDesc, ['steamed', 'boiled'])) {
+      baseCalories = (baseCalories * 0.85).round(); // Steamed foods -15%
+    }
+
+    // Adjust for portion size indicators
+    if (lowerDesc.contains('large') || lowerDesc.contains('big') ||
+        lowerDesc.contains('heavy') || lowerDesc.contains('full') ||
+        lowerDesc.contains('plate') || lowerDesc.contains('thali')) {
+      baseCalories = (baseCalories * 1.5).round();
+    } else if (lowerDesc.contains('small') || lowerDesc.contains('light') ||
+               lowerDesc.contains('mini') || lowerDesc.contains('half')) {
+      baseCalories = (baseCalories * 0.6).round();
+    }
+
+    // Smart macro distribution based on food type
+    double proteinRatio = 0.20;
+    double carbsRatio = 0.50;
+    double fatRatio = 0.30;
+
+    // Adjust macros based on food indicators
+    if (_containsIngredient(lowerDesc, ['paneer', 'chicken', 'egg', 'dal', 'meat', 'fish'])) {
+      proteinRatio = 0.30; // High protein
+      carbsRatio = 0.40;
+      fatRatio = 0.30;
+    } else if (_containsIngredient(lowerDesc, ['rice', 'bread', 'roti', 'naan', 'dosa', 'idli'])) {
+      proteinRatio = 0.15; // High carbs
+      carbsRatio = 0.65;
+      fatRatio = 0.20;
+    } else if (_containsIngredient(lowerDesc, ['nuts', 'ghee', 'butter', 'oil', 'cream'])) {
+      proteinRatio = 0.15; // High fat
+      carbsRatio = 0.35;
+      fatRatio = 0.50;
+    }
+
+    // Calculate macros based on calories and ratios
+    final protein = (baseCalories * proteinRatio / 4).round();
+    final carbs = (baseCalories * carbsRatio / 4).round();
+    final fat = (baseCalories * fatRatio / 9).round();
+    final fiber = _estimateFiber(lowerDesc, baseCalories);
+
+    debugPrint('Smart estimation result: $baseCalories calories ($foodCategory)');
 
     return {
       'success': true,
-      'foods': ['Mixed meal'],
+      'foods': [foodCategory],
       'nutrition': {
-        'calories': estimatedCalories,
+        'calories': baseCalories,
         'protein': protein,
         'carbs': carbs,
         'fat': fat,
         'fiber': fiber,
       },
-      'confidence': 0.5,
-      'source': 'Estimated',
-      'message': 'Nutrition values are estimated. For accurate tracking, please use manual entry.',
+      'confidence': 0.6,
+      'source': 'Smart Estimation',
+      'message': 'Values estimated based on description. For accuracy, use manual entry.',
     };
+  }
+
+  // Helper: Check if description contains meal type
+  bool _isMealType(String desc, List<String> mealTypes) {
+    for (final meal in mealTypes) {
+      if (desc.contains(meal)) return true;
+    }
+    return false;
+  }
+
+  // Helper: Check cooking method
+  bool _containsCookingMethod(String desc, List<String> methods) {
+    for (final method in methods) {
+      if (desc.contains(method)) return true;
+    }
+    return false;
+  }
+
+  // Helper: Check ingredients
+  bool _containsIngredient(String desc, List<String> ingredients) {
+    for (final ingredient in ingredients) {
+      if (desc.contains(ingredient)) return true;
+    }
+    return false;
+  }
+
+  // Helper: Estimate fiber content
+  int _estimateFiber(String desc, int calories) {
+    if (_containsIngredient(desc, ['vegetable', 'salad', 'fruit', 'whole wheat'])) {
+      return (calories * 0.04).round(); // Higher fiber
+    } else if (_containsIngredient(desc, ['dal', 'beans', 'lentil'])) {
+      return (calories * 0.03).round(); // Medium fiber
+    }
+    return (calories * 0.02).round(); // Default fiber
   }
 
   // Get default nutrition when all methods fail

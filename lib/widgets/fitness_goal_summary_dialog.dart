@@ -59,10 +59,10 @@ class FitnessGoalSummaryDialog extends StatelessWidget {
     return bmr * activityMultiplier;
   }
 
-  // Calculate target calories based on goal
+  // Calculate target calories based on goal (total calories)
   int calculateTargetCalories(UserProfile profile) {
     double tdee = calculateTDEE(profile);
-    
+
     switch (profile.goal) {
       case FitnessGoal.weightLoss:
         // 500 calorie deficit for ~0.5kg/week loss
@@ -74,6 +74,30 @@ class FitnessGoalSummaryDialog extends StatelessWidget {
       case FitnessGoal.endurance:
         return tdee.round();
     }
+  }
+
+  // Calculate active calories (separate from BMR)
+  int calculateActiveCalories(UserProfile profile) {
+    // Calculate BMR
+    double bmr = (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + 5;
+    double tdee = calculateTDEE(profile);
+
+    // Active calories = TDEE - BMR
+    var activeCalories = (tdee - bmr).round();
+
+    // Apply goal adjustments to active calories
+    switch (profile.goal) {
+      case FitnessGoal.weightLoss:
+        activeCalories -= 200; // Reduce active target
+        break;
+      case FitnessGoal.muscleGain:
+        activeCalories += 150; // Increase active target
+        break;
+      default:
+        break;
+    }
+
+    return activeCalories.clamp(500, 4000);
   }
 
   // Calculate recommended steps
@@ -114,6 +138,7 @@ class FitnessGoalSummaryDialog extends StatelessWidget {
     final bmi = calculateBMI(profile.weight, profile.height);
     final bmiCategory = getBMICategory(bmi);
     final targetCalories = calculateTargetCalories(profile);
+    final activeCalories = calculateActiveCalories(profile);
     final maintenanceCalories = calculateTDEE(profile).round();
     final targetSteps = calculateTargetSteps(profile);
     final weightChange = calculateWeightChange(profile);
@@ -276,14 +301,14 @@ class FitnessGoalSummaryDialog extends StatelessWidget {
                       [
                         _PlanItem(
                           icon: Icons.local_fire_department,
-                          title: 'Maintenance',
-                          value: '${(maintenanceCalories / 1000).toStringAsFixed(1)}k',
-                          subtitle: 'kcal/day',
+                          title: 'Active Cal',
+                          value: '${(activeCalories / 1000).toStringAsFixed(1)}k',
+                          subtitle: 'burn/day',
                           color: Colors.orange,
                         ),
                         _PlanItem(
                           icon: Icons.restaurant,
-                          title: 'Target Intake',
+                          title: 'Total Intake',
                           value: '${(targetCalories / 1000).toStringAsFixed(1)}k',
                           subtitle: _getShortCalorieSubtitle(profile.goal, maintenanceCalories, targetCalories),
                           color: AppTheme.primaryAccent,
@@ -360,9 +385,10 @@ class FitnessGoalSummaryDialog extends StatelessWidget {
                           // Save the calculated targets to the user profile
                           await userProvider.updateProfile(
                             dailyCaloriesTarget: targetCalories,
+                            dailyActiveCaloriesTarget: activeCalories,
                             dailyStepsTarget: targetSteps,
                             dailySleepTarget: profile.goal == FitnessGoal.muscleGain ? 8.0 : 7.5,
-                            dailyWaterTarget: 2.5, // 2.5 liters default
+                            dailyWaterTarget: 3.0, // 3 liters default
                             bmiValue: bmi,
                             bmiCategoryValue: bmiCategory,
                             hasSeenFitnessGoalSummary: true,

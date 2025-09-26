@@ -428,12 +428,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    if (profile.dailyCaloriesTarget != null)
-                      _buildTargetChip(
-                        icon: Icons.local_fire_department,
-                        label: '${profile.dailyCaloriesTarget} kcal',
-                        color: Colors.orange,
-                      ),
+                    Consumer<HealthProvider>(
+                      builder: (context, healthProvider, child) {
+                        final actualBurnedCalories = healthProvider.todayCaloriesBurned > 0
+                            ? healthProvider.todayCaloriesBurned.toInt()
+                            : 0;
+                        return _buildTargetChip(
+                          icon: Icons.local_fire_department,
+                          label: '$actualBurnedCalories kcal burned',
+                          color: Colors.orange,
+                        );
+                      },
+                    ),
                     if (profile.dailyStepsTarget != null)
                       _buildTargetChip(
                         icon: Icons.directions_walk,

@@ -764,116 +764,206 @@ class _NutritionScreenState extends State<NutritionScreen>
 
     showDialog(
       context: context,
-      builder: (context) => AnimatedContainer(
-        duration: Duration(milliseconds: 300),
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: AlertDialog(
-          backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
-          scrollable: true,
-          insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          title: Text(
-            'Add Food Manually',
-            style: TextStyle(
-              color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
-            ),
+      barrierDismissible: false, // Prevent accidental dismissal when keyboard appears
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85, // Give more room for keyboard
           ),
-          content: Container(
-            width: double.maxFinite,
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.7,
-            ),
-            child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: nameController,
-                      decoration: const InputDecoration(labelText: 'Food Name'),
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                      autofocus: true,
+          decoration: BoxDecoration(
+            color: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            resizeToAvoidBottomInset: true, // Let Scaffold handle keyboard
+            body: Column(
+              children: [
+                // Title
+                Container(
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
+                        width: 1,
+                      ),
                     ),
-                    SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: caloriesController,
-                      decoration: const InputDecoration(labelText: 'Calories'),
-                      keyboardType: TextInputType.number,
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                    ),
-                    SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: proteinController,
-                      decoration: const InputDecoration(labelText: 'Protein (g)'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                    ),
-                    SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: carbsController,
-                      decoration: const InputDecoration(labelText: 'Carbs (g)'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                    ),
-                    SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: fatController,
-                      decoration: const InputDecoration(labelText: 'Fat (g)'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                    ),
-                    SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: fiberController,
-                      decoration: const InputDecoration(labelText: 'Fiber (g) - Optional'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Add Food Manually',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                        padding: EdgeInsets.zero,
+                        constraints: BoxConstraints(),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                // Form content
+                Expanded(
+                  child: Form(
+                    key: formKey,
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextFormField(
+                            controller: nameController,
+                            decoration: InputDecoration(
+                              labelText: 'Food Name',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                            textInputAction: TextInputAction.next,
+                          ),
+                          SizedBox(height: 16),
+
+                          TextFormField(
+                            controller: caloriesController,
+                            decoration: InputDecoration(
+                              labelText: 'Calories',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                            textInputAction: TextInputAction.next,
+                          ),
+                          SizedBox(height: 16),
+
+                          TextFormField(
+                            controller: proteinController,
+                            decoration: InputDecoration(
+                              labelText: 'Protein (g)',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                            textInputAction: TextInputAction.next,
+                          ),
+                          SizedBox(height: 16),
+
+                          TextFormField(
+                            controller: carbsController,
+                            decoration: InputDecoration(
+                              labelText: 'Carbs (g)',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                            textInputAction: TextInputAction.next,
+                          ),
+                          SizedBox(height: 16),
+
+                          TextFormField(
+                            controller: fatController,
+                            decoration: InputDecoration(
+                              labelText: 'Fat (g)',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                            textInputAction: TextInputAction.next,
+                          ),
+                          SizedBox(height: 16),
+
+                          TextFormField(
+                            controller: fiberController,
+                            decoration: InputDecoration(
+                              labelText: 'Fiber (g) - Optional',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            textInputAction: TextInputAction.done,
+                          ),
+                          SizedBox(height: 20), // Extra space at bottom for keyboard
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Actions
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text('Cancel'),
+                      ),
+                      SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () async {
+                          if (formKey.currentState?.validate() ?? false) {
+                            final entry = NutritionEntry(
+                              id: 'manual_${DateTime.now().millisecondsSinceEpoch}',
+                              foodName: nameController.text,
+                              calories: int.parse(caloriesController.text),
+                              protein: double.parse(proteinController.text),
+                              carbs: double.parse(carbsController.text),
+                              fat: double.parse(fatController.text),
+                              fiber: fiberController.text.isNotEmpty ? double.parse(fiberController.text) : 0.0,
+                              timestamp: DateTime.now(),
+                            );
+
+                            final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
+                            await nutritionProvider.addNutritionEntry(entry);
+
+                            Navigator.of(context).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Added ${entry.foodName} to your nutrition log'),
+                                backgroundColor: AppTheme.successGreen,
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text('Add Food'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState?.validate() ?? false) {
-                  final entry = NutritionEntry(
-                    id: 'manual_${DateTime.now().millisecondsSinceEpoch}',
-                    foodName: nameController.text,
-                    calories: int.parse(caloriesController.text),
-                    protein: double.parse(proteinController.text),
-                    carbs: double.parse(carbsController.text),
-                    fat: double.parse(fatController.text),
-                    fiber: fiberController.text.isNotEmpty ? double.parse(fiberController.text) : 0.0,
-                    timestamp: DateTime.now(),
-                  );
-
-                  final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
-                  await nutritionProvider.addNutritionEntry(entry);
-
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Added ${entry.foodName} to your nutrition log'),
-                      backgroundColor: AppTheme.successGreen,
-                    ),
-                  );
-                }
-              },
-              child: Text('Add'),
-            ),
-          ],
         ),
       ),
     );

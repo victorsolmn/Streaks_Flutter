@@ -21,7 +21,8 @@ class ProfileModel {
   final String? experienceLevel;
   final double? targetWeight; // 20-500 kg
   final String? workoutConsistency;
-  final int? dailyCaloriesTarget; // 500-10000
+  final int? dailyCaloriesTarget; // 500-10000 (total calories = BMR + active)
+  final int? dailyActiveCaloriesTarget; // 500-4000 (active calories only)
   final int? dailyStepsTarget; // 0-100000
   final double? dailySleepTarget; // 0-24 hours
   final double? dailyWaterTarget; // 0-20 liters
@@ -48,6 +49,7 @@ class ProfileModel {
     this.targetWeight,
     this.workoutConsistency,
     this.dailyCaloriesTarget,
+    this.dailyActiveCaloriesTarget,
     this.dailyStepsTarget,
     this.dailySleepTarget,
     this.dailyWaterTarget,
@@ -87,6 +89,7 @@ class ProfileModel {
           : null,
       workoutConsistency: json['workout_consistency'] as String?,
       dailyCaloriesTarget: json['daily_calories_target'] as int?,
+      dailyActiveCaloriesTarget: json['daily_active_calories_target'] as int?,
       dailyStepsTarget: json['daily_steps_target'] as int?,
       dailySleepTarget: json['daily_sleep_target'] != null
           ? (json['daily_sleep_target'] as num).toDouble()
@@ -121,6 +124,7 @@ class ProfileModel {
       if (targetWeight != null) 'target_weight': targetWeight,
       if (workoutConsistency != null) 'workout_consistency': workoutConsistency,
       if (dailyCaloriesTarget != null) 'daily_calories_target': dailyCaloriesTarget,
+      if (dailyActiveCaloriesTarget != null) 'daily_active_calories_target': dailyActiveCaloriesTarget,
       if (dailyStepsTarget != null) 'daily_steps_target': dailyStepsTarget,
       if (dailySleepTarget != null) 'daily_sleep_target': dailySleepTarget,
       if (dailyWaterTarget != null) 'daily_water_target': dailyWaterTarget,
@@ -151,6 +155,7 @@ class ProfileModel {
     double? targetWeight,
     String? workoutConsistency,
     int? dailyCaloriesTarget,
+    int? dailyActiveCaloriesTarget,
     int? dailyStepsTarget,
     double? dailySleepTarget,
     double? dailyWaterTarget,
@@ -177,6 +182,7 @@ class ProfileModel {
       targetWeight: targetWeight ?? this.targetWeight,
       workoutConsistency: workoutConsistency ?? this.workoutConsistency,
       dailyCaloriesTarget: dailyCaloriesTarget ?? this.dailyCaloriesTarget,
+      dailyActiveCaloriesTarget: dailyActiveCaloriesTarget ?? this.dailyActiveCaloriesTarget,
       dailyStepsTarget: dailyStepsTarget ?? this.dailyStepsTarget,
       dailySleepTarget: dailySleepTarget ?? this.dailySleepTarget,
       dailyWaterTarget: dailyWaterTarget ?? this.dailyWaterTarget,
@@ -225,5 +231,78 @@ class ProfileModel {
            workoutConsistency != null &&
            dailyCaloriesTarget != null &&
            dailyStepsTarget != null;
+  }
+
+  /// Check if profile has required data for BMR calculation
+  /// BMR calculation requires: age, gender, height, weight
+  bool hasBMRCalculationData() {
+    return age != null &&
+           age! > 0 &&
+           age! <= 120 &&
+           gender != null &&
+           gender!.isNotEmpty &&
+           height != null &&
+           height! > 0 &&
+           height! <= 300 &&
+           weight != null &&
+           weight! > 0 &&
+           weight! <= 500;
+  }
+
+  /// Get validated gender for BMR calculation
+  /// Returns null if gender is invalid or missing
+  String? getValidatedGender() {
+    if (gender == null || gender!.trim().isEmpty) {
+      return null;
+    }
+
+    final normalizedGender = gender!.toLowerCase().trim();
+
+    // Check for valid gender values
+    if (normalizedGender.contains('male') && !normalizedGender.contains('female')) {
+      return 'male';
+    } else if (normalizedGender.contains('female')) {
+      return 'female';
+    } else if (normalizedGender == 'other' || normalizedGender.contains('other')) {
+      return 'other'; // Treat as female for BMR calculation (conservative approach)
+    }
+
+    return null; // Invalid gender
+  }
+
+  /// Get BMR calculation readiness status
+  Map<String, dynamic> getBMRCalculationStatus() {
+    final hasData = hasBMRCalculationData();
+    final validGender = getValidatedGender();
+
+    return {
+      'isReady': hasData,
+      'hasAge': age != null && age! > 0 && age! <= 120,
+      'hasGender': validGender != null,
+      'hasHeight': height != null && height! > 0 && height! <= 300,
+      'hasWeight': weight != null && weight! > 0 && weight! <= 500,
+      'validatedGender': validGender,
+      'missingFields': _getMissingBMRFields(),
+    };
+  }
+
+  /// Get list of missing fields for BMR calculation
+  List<String> _getMissingBMRFields() {
+    final missing = <String>[];
+
+    if (age == null || age! <= 0 || age! > 120) {
+      missing.add('age');
+    }
+    if (getValidatedGender() == null) {
+      missing.add('gender');
+    }
+    if (height == null || height! <= 0 || height! > 300) {
+      missing.add('height');
+    }
+    if (weight == null || weight! <= 0 || weight! > 500) {
+      missing.add('weight');
+    }
+
+    return missing;
   }
 }

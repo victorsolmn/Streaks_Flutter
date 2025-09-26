@@ -263,7 +263,8 @@ class OnboardingService {
       await _client
           .from('profiles')
           .update({
-            'daily_calories_target': targets['calories'],
+            'daily_calories_target': targets['totalCalories'],
+            'daily_active_calories_target': targets['activeCalories'],
             'daily_steps_target': targets['steps'],
             'daily_sleep_target': targets['sleep'],
             'daily_water_target': targets['water'],
@@ -323,7 +324,25 @@ class OnboardingService {
       // Calculate daily targets
       final bmr = _calculateBMR(age, height, weight);
       final tdee = (bmr * SupabaseEnums.getActivityMultiplier(activityLevel)).round();
-      final calorieTarget = tdee + SupabaseEnums.getCalorieAdjustment(fitnessGoal);
+
+      // Calculate active calories (TDEE - BMR)
+      var activeCaloriesBase = (tdee - bmr).round();
+
+      // Apply goal adjustments
+      switch (fitnessGoal) {
+        case 'Lose Weight':
+          activeCaloriesBase -= 200; // Reduce active calorie target
+          break;
+        case 'Gain Muscle':
+          activeCaloriesBase += 150; // Increase active calorie target
+          break;
+      }
+
+      final activeCaloriesTarget = activeCaloriesBase.clamp(500, 4000);
+      final totalCaloriesTarget = (bmr + activeCaloriesTarget).round().clamp(
+        SupabaseEnums.dailyCaloriesMin,
+        SupabaseEnums.dailyCaloriesMax,
+      );
 
       final profileData = {
         'name': name,
@@ -337,10 +356,8 @@ class OnboardingService {
         'workout_consistency': workoutConsistency,
         'bmi_value': bmi,
         'bmi_category_value': bmiCategory,
-        'daily_calories_target': calorieTarget.clamp(
-          SupabaseEnums.dailyCaloriesMin,
-          SupabaseEnums.dailyCaloriesMax,
-        ),
+        'daily_calories_target': totalCaloriesTarget,
+        'daily_active_calories_target': activeCaloriesTarget,
         'daily_steps_target': _getStepsTarget(activityLevel),
         'daily_sleep_target': 8.0,
         'daily_water_target': 3.0,
@@ -449,10 +466,26 @@ class OnboardingService {
     );
 
     final tdee = (bmr * SupabaseEnums.getActivityMultiplier(profile.activityLevel!)).round();
-    final calorieTarget = tdee + SupabaseEnums.getCalorieAdjustment(profile.fitnessGoal!);
+
+    // Calculate active calories (TDEE - BMR)
+    var activeCaloriesBase = (tdee - bmr).round();
+
+    // Apply goal adjustments
+    switch (profile.fitnessGoal!) {
+      case 'Lose Weight':
+        activeCaloriesBase -= 200; // Reduce active calorie target
+        break;
+      case 'Gain Muscle':
+        activeCaloriesBase += 150; // Increase active calorie target
+        break;
+    }
+
+    final activeCaloriesTarget = activeCaloriesBase.clamp(500, 4000);
+    final totalCaloriesTarget = (bmr + activeCaloriesTarget).round().clamp(SupabaseEnums.dailyCaloriesMin, SupabaseEnums.dailyCaloriesMax);
 
     return {
-      'calories': calorieTarget.clamp(SupabaseEnums.dailyCaloriesMin, SupabaseEnums.dailyCaloriesMax),
+      'totalCalories': totalCaloriesTarget,
+      'activeCalories': activeCaloriesTarget,
       'steps': _getStepsTarget(profile.activityLevel!),
       'sleep': 8, // 8 hours default
       'water': 3, // 3 liters default

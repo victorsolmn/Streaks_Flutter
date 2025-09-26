@@ -1,21 +1,38 @@
-# Streaks Flutter - Technical Architecture
+# Streaker App - Architecture Documentation
 
 ## System Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Client Layer (Flutter)                 │
+│                         Flutter App                         │
 ├─────────────────────────────────────────────────────────────┤
-│  Presentation Layer  │  Business Logic  │   Data Layer      │
-│  - Screens/Widgets   │  - Providers      │  - Repositories   │
-│  - UI Components     │  - Services       │  - Models         │
-│  - Navigation        │  - State Mgmt     │  - API Clients    │
+│                      Presentation Layer                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Screens    │  │   Widgets    │  │   Dialogs    │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
 ├─────────────────────────────────────────────────────────────┤
-│                     Platform Integration                     │
-│  iOS: HealthKit      │  Android: Health Connect             │
+│                      State Management                        │
+│  ┌──────────────────────────────────────────────────┐      │
+│  │             Provider Pattern (ChangeNotifier)     │      │
+│  │  - SupabaseUserProvider  - HealthProvider        │      │
+│  │  - NutritionProvider     - StreakProvider        │      │
+│  │  - SupabaseAuthProvider  - UserProvider          │      │
+│  └──────────────────────────────────────────────────┘      │
 ├─────────────────────────────────────────────────────────────┤
-│                      Backend Services                        │
-│  Supabase (Auth/DB)  │  Firebase (Analytics)  │  Gemini AI │
+│                        Service Layer                         │
+│  ┌──────────────────────────────────────────────────┐      │
+│  │  - UnifiedHealthService   - RealtimeSyncService  │      │
+│  │  - SupabaseService        - CalorieTracking      │      │
+│  │  - NutritionAIService     - VersionManager       │      │
+│  │  - PermissionFlowManager  - NotificationService  │      │
+│  └──────────────────────────────────────────────────┘      │
+├─────────────────────────────────────────────────────────────┤
+│                     Data Sources                             │
+│  ┌────────────┐  ┌────────────┐  ┌──────────────┐         │
+│  │  Supabase  │  │Health APIs │  │Local Storage │         │
+│  │  Database  │  │ HealthKit  │  │SharedPrefs   │         │
+│  │            │  │Health Con. │  │              │         │
+│  └────────────┘  └────────────┘  └──────────────┘         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -23,362 +40,318 @@
 
 ```
 lib/
-├── main.dart                 # App entry point
-├── models/                   # Data models
+├── main.dart                    # App entry point
+├── screens/                     # UI screens
+│   ├── auth/                    # Authentication screens
+│   │   ├── unified_auth_screen.dart
+│   │   ├── otp_verification_screen.dart
+│   │   └── welcome_screen.dart
+│   ├── main/                    # Main app screens
+│   │   ├── home_screen_clean.dart     # Primary home screen
+│   │   ├── progress_screen_new.dart   # Progress tracking
+│   │   ├── profile_screen.dart        # User profile
+│   │   └── main_screen.dart          # Navigation container
+│   └── legal/                   # Legal screens
+│       ├── privacy_policy_screen.dart
+│       └── terms_conditions_screen.dart
+├── providers/                   # State management
+│   ├── supabase_user_provider.dart   # User profile state
+│   ├── health_provider.dart          # Health metrics state
+│   ├── nutrition_provider.dart       # Nutrition tracking
+│   ├── streak_provider.dart          # Streak management
+│   └── supabase_auth_provider.dart   # Authentication
+├── services/                    # Business logic
+│   ├── unified_health_service.dart   # Health data aggregation
+│   ├── realtime_sync_service.dart    # Background sync
+│   ├── supabase_service.dart         # Database operations
+│   ├── enhanced_supabase_service.dart # Enhanced DB ops
+│   └── version_manager_service.dart  # App versioning
+├── models/                      # Data models
 │   ├── user_model.dart
-│   ├── nutrition_model.dart
-│   ├── health_data_model.dart
-│   ├── profile_model.dart
-│   └── supabase_enums.dart
-├── providers/                # State management
-│   ├── supabase_auth_provider.dart
-│   ├── health_provider.dart
-│   ├── nutrition_provider.dart
-│   ├── user_provider.dart
-│   └── streak_provider.dart
-├── screens/                  # UI screens
-│   ├── auth/                # Authentication screens
-│   ├── main/                # Main app screens
-│   └── onboarding/          # Onboarding flow
-├── services/                 # Business logic
-│   ├── supabase_service.dart
-│   ├── health_service.dart
-│   ├── notification_service.dart
-│   ├── toast_service.dart
-│   ├── popup_service.dart
-│   └── onboarding_service.dart
-├── utils/                    # Utilities
-│   ├── app_theme.dart
-│   ├── constants.dart
-│   └── validators.dart
-└── widgets/                  # Reusable components
-    ├── custom_button.dart
-    ├── loading_indicator.dart
-    └── sync_status_indicator.dart
+│   ├── streak_model.dart
+│   └── health_metrics_model.dart
+├── widgets/                     # Reusable components
+│   ├── force_update_dialog.dart
+│   ├── app_wrapper.dart
+│   └── android_health_permission_guide.dart
+└── utils/                       # Utilities
+    └── constants.dart
 ```
 
 ## Core Components
 
-### 1. State Management Architecture
+### 1. Provider Architecture
 
-#### Provider Pattern Implementation
-```dart
-class AppProviders {
-  static List<Provider> get providers => [
-    ChangeNotifierProvider<SupabaseAuthProvider>(),
-    ChangeNotifierProvider<HealthProvider>(),
-    ChangeNotifierProvider<NutritionProvider>(),
-    ChangeNotifierProvider<UserProvider>(),
-    ChangeNotifierProvider<StreakProvider>(),
-  ];
-}
-```
+**SupabaseUserProvider**
+- Manages user profile data from Supabase
+- Handles profile updates and synchronization
+- Provides targets (calories, steps, sleep)
+- Force reload capability for fresh data
 
-#### Provider Responsibilities
-- **SupabaseAuthProvider**: Handles authentication, session management, OTP verification
-- **HealthProvider**: Manages health data sync with HealthKit/Health Connect
-- **NutritionProvider**: Tracks meals, calories, macros
-- **UserProvider**: User profile, preferences, onboarding status
-- **StreakProvider**: Streak calculation, goal tracking
+**HealthProvider**
+- Interfaces with device health APIs
+- Aggregates data from multiple sources
+- Handles permission management
+- 5-minute sync interval to Supabase
 
-### 2. Navigation Architecture
+**NutritionProvider**
+- Tracks food consumption
+- Calculates daily totals
+- Manages nutrition entries
+- Syncs with `nutrition_entries` table
 
-#### Navigation Flow
-```
-SplashScreen
-    ├── AuthCheck
-    │   ├── SignInScreen → OTPVerificationScreen
-    │   └── SignUpScreen → OTPVerificationScreen
-    └── Authenticated
-        ├── OnboardingScreen (if new user)
-        └── MainScreen (5 bottom tabs)
-            ├── HomeScreen
-            ├── ProgressScreen
-            ├── NutritionScreen
-            ├── ChatScreen
-            └── ProfileScreen
-```
+**StreakProvider**
+- Tracks daily goal completion
+- Manages current and longest streaks
+- Handles grace period logic
+- Real-time updates via Supabase
 
-### 3. Data Layer Architecture
+### 2. Service Layer
 
-#### Repository Pattern
-```dart
-abstract class BaseRepository<T> {
-  Future<T?> getById(String id);
-  Future<List<T>> getAll();
-  Future<void> create(T item);
-  Future<void> update(T item);
-  Future<void> delete(String id);
-}
-```
+**UnifiedHealthService**
+- Platform-agnostic health data interface
+- Prioritizes data sources (Samsung > Google > Apple)
+- Handles permission requests
+- Error recovery and fallback logic
 
-#### API Client Structure
-```dart
-class SupabaseClient {
-  // Singleton pattern
-  static final instance = Supabase.instance.client;
-  
-  // Auth operations
-  Future<AuthResponse> signInWithOTP(String email);
-  Future<AuthResponse> verifyOTP(String email, String token);
-  
-  // Database operations
-  PostgrestQueryBuilder from(String table);
-  RealtimeChannel channel(String name);
-}
-```
+**RealtimeSyncService**
+- Background data synchronization
+- Manages sync queues
+- Handles offline scenarios
+- Batch updates for efficiency
 
-### 4. Health Integration Architecture
+**SupabaseService/EnhancedSupabaseService**
+- Database CRUD operations
+- Real-time subscriptions
+- Error handling and retries
+- Optimistic updates
 
-#### Platform-Specific Implementation
-```dart
-class HealthService {
-  // Platform detection
-  final bool isIOS = Platform.isIOS;
-  final bool isAndroid = Platform.isAndroid;
-  
-  // Permission handling
-  Future<bool> requestPermissions();
-  
-  // Data sync
-  Future<void> syncHealthData() {
-    if (isIOS) return _syncWithHealthKit();
-    if (isAndroid) return _syncWithHealthConnect();
-  }
-}
-```
+### 3. Data Flow Patterns
 
 #### Health Data Flow
-1. Request permissions from user
-2. Fetch data from health platform
-3. Process and normalize data
-4. Sync to Supabase backend
-5. Update local state via Provider
-
-### 5. Authentication Architecture
-
-#### OTP Flow Implementation
 ```
-User enters email
-    ↓
-Send OTP via Supabase
-    ↓
-User enters 6-digit code
-    ↓
-Verify OTP
-    ↓
-Create/Update user profile
-    ↓
-Navigate to app/onboarding
+Device Sensors
+    → UnifiedHealthService
+    → HealthProvider
+    → RealtimeSyncService
+    → Supabase (health_metrics)
+    → UI Updates
 ```
 
-#### Session Management
-- Token stored in secure storage
-- Auto-refresh on app launch
-- Session validation on API calls
-- Logout clears all local data
+#### Nutrition Data Flow
+```
+User Input
+    → NutritionProvider
+    → SupabaseService
+    → Supabase (nutrition_entries)
+    → UI Updates
+```
+
+#### Profile Settings Flow
+```
+Supabase (profiles)
+    → SupabaseUserProvider
+    → UI Components
+    → User Updates
+    → Supabase (profiles)
+```
 
 ## Database Schema
 
 ### Core Tables
 
-#### user_profiles
-```sql
-CREATE TABLE user_profiles (
-  id UUID PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  display_name TEXT,
-  age INTEGER,
-  weight DECIMAL,
-  height DECIMAL,
-  activity_level TEXT,
-  fitness_goal TEXT,
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP
-);
+**profiles**
+- `user_id` (uuid, primary key)
+- `daily_active_calories_target` (integer)
+- `daily_steps_target` (integer)
+- `daily_sleep_target` (float)
+- `daily_water_target` (integer)
+- Profile settings and preferences
+
+**health_metrics**
+- `user_id` (uuid)
+- `date` (date)
+- `steps` (integer)
+- `total_calories` (integer)
+- `heart_rate` (integer)
+- `sleep_hours` (float)
+- Composite key: (user_id, date)
+
+**nutrition_entries**
+- `id` (uuid, primary key)
+- `user_id` (uuid)
+- `food_name` (text)
+- `calories` (integer)
+- `protein`, `carbs`, `fat` (float)
+- `created_at` (timestamp)
+
+**streaks**
+- `user_id` (uuid, primary key)
+- `current_streak` (integer)
+- `longest_streak` (integer)
+- `last_completed_date` (date)
+- `grace_days_used` (integer)
+
+## Authentication Flow
+
+### OTP-Based Authentication
+```
+1. User enters email → unified_auth_screen
+2. System sends OTP → Supabase Email Service
+3. User enters code → otp_verification_screen
+4. Verification → JWT token generation
+5. Session established → Navigate to main app
 ```
 
-#### health_data
-```sql
-CREATE TABLE health_data (
-  id UUID PRIMARY KEY,
-  user_id UUID REFERENCES user_profiles(id),
-  date DATE,
-  steps INTEGER,
-  calories_burned DECIMAL,
-  active_minutes INTEGER,
-  distance DECIMAL,
-  heart_rate_avg INTEGER,
-  synced_at TIMESTAMP
-);
-```
+### Session Management
+- JWT tokens with auto-refresh
+- Secure storage using flutter_secure_storage
+- Automatic re-authentication on expiry
+- Offline capability with cached credentials
 
-#### nutrition_entries
-```sql
-CREATE TABLE nutrition_entries (
-  id UUID PRIMARY KEY,
-  user_id UUID REFERENCES user_profiles(id),
-  meal_type TEXT,
-  food_name TEXT,
-  calories DECIMAL,
-  protein DECIMAL,
-  carbs DECIMAL,
-  fat DECIMAL,
-  logged_at TIMESTAMP
-);
-```
+## State Management Strategy
+
+### Provider Pattern Implementation
+- ChangeNotifier for reactive updates
+- Consumer widgets for UI rebuilds
+- Selective listening to prevent unnecessary rebuilds
+- Memory-efficient disposal lifecycle
+
+### State Update Flow
+1. Service fetches/processes data
+2. Provider updates internal state
+3. `notifyListeners()` triggers
+4. Consumer widgets rebuild
+5. UI reflects new state
 
 ## Performance Optimizations
 
-### 1. Widget Lifecycle Management
-- Always check `mounted` before async operations
-- Proper disposal of controllers and listeners
-- Timer management to prevent memory leaks
+### Data Caching
+- 12-hour cache for app config
+- Local storage for offline access
+- Memory cache for frequent reads
+- Incremental sync for large datasets
 
-### 2. Data Caching Strategy
-- Local caching with SharedPreferences
-- Offline-first approach for critical data
-- Sync queue for failed operations
+### UI Optimizations
+- Lazy loading for historical data
+- Debounced search inputs
+- Image caching and compression
+- Tree-shaking removes unused code
 
-### 3. Image Optimization
-- Lazy loading for images
-- Compression before upload
-- CDN integration for assets
+### Network Optimizations
+- Batch API requests
+- Delta sync for changes only
+- Retry logic with exponential backoff
+- Connection state monitoring
 
-## Security Implementation
+## Security Measures
 
-### 1. Data Protection
-- Flutter Secure Storage for sensitive data
-- Environment variables for API keys
-- Certificate pinning for API calls
+### Data Protection
+- End-to-end encryption for sensitive data
+- Row-level security in Supabase
+- Secure credential storage
+- No plaintext passwords
 
-### 2. Authentication Security
-- OTP expiration (60 seconds)
-- Rate limiting on auth endpoints
-- Session timeout after inactivity
+### API Security
+- Rate limiting protection
+- Request validation
+- CORS configuration
+- API key rotation support
 
-### 3. Health Data Privacy
-- Explicit permission requests
-- Minimal data collection
-- User control over data sharing
+## Platform-Specific Implementations
 
-## Error Handling Strategy
+### Android
+- Health Connect integration
+- Samsung Health priority
+- Native permission handling via MainActivity.kt
+- Background service for sync
 
-### 1. Global Error Handling
-```dart
-class ErrorHandler {
-  static void handleError(dynamic error) {
-    if (error is NetworkException) {
-      PopupService.showNetworkError();
-    } else if (error is AuthException) {
-      NavigationService.navigateToLogin();
-    } else {
-      ToastService.showError('An error occurred');
-    }
-  }
-}
-```
-
-### 2. Retry Mechanisms
-- Exponential backoff for network requests
-- Offline queue for failed syncs
-- User-initiated retry options
+### iOS
+- HealthKit integration
+- Entitlements configuration
+- Background fetch capability
+- Native Swift bridging
 
 ## Testing Strategy
 
-### 1. Unit Tests
+### Unit Tests
 - Provider logic testing
+- Service method validation
 - Model serialization tests
-- Utility function tests
+- Utility function coverage
 
-### 2. Widget Tests
-- Screen navigation tests
-- Form validation tests
-- Component interaction tests
+### Integration Tests
+- API endpoint testing
+- Database operation verification
+- Health API integration
+- Authentication flow testing
 
-### 3. Integration Tests
-- Auth flow testing
-- Health sync testing
-- End-to-end user journeys
+### UI Tests
+- Screen navigation flows
+- Form validation
+- Permission request handling
+- Error state displays
 
-## Build & Deployment
+## Deployment Pipeline
 
-### iOS Configuration
-- Bundle ID: com.streaker.streaker
-- Minimum iOS: 13.0
-- HealthKit capabilities enabled
+### Build Process
+1. Version increment
+2. Environment configuration
+3. Platform-specific builds
+4. Code signing
+5. Store uploads
 
-### Android Configuration
-- Package: com.streaker.streaker
-- Min SDK: 26 (Android 8.0)
-- Target SDK: 36
-- Health Connect integration
-
-### CI/CD Pipeline (Planned)
-```yaml
-pipeline:
-  - lint: flutter analyze
-  - test: flutter test
-  - build_ios: flutter build ios
-  - build_android: flutter build apk
-  - deploy: fastlane deploy
-```
+### Release Checklist
+- Database migrations
+- API compatibility
+- Force update configuration
+- Privacy policy updates
+- Store listing updates
 
 ## Monitoring & Analytics
 
-### 1. Firebase Analytics Events
-- User registration
-- Feature usage
-- Error tracking
-- Performance metrics
+### Error Tracking
+- Crash reporting via Firebase Crashlytics
+- Error boundary implementation
+- Logged error states
+- User feedback integration
 
-### 2. Crash Reporting
-- Firebase Crashlytics (when enabled)
-- Error boundaries
-- Stack trace collection
-
-### 3. Performance Monitoring
-- App startup time
-- Screen load times
+### Performance Monitoring
 - API response times
+- Screen load metrics
 - Memory usage tracking
+- Battery impact analysis
 
-## Future Architecture Improvements
+## Future Architecture Considerations
 
-### 1. Scalability Enhancements
-- Implement GraphQL for efficient data fetching
-- Add Redis caching layer
-- Microservices architecture for backend
+### Scalability
+- Microservices migration path
+- CDN for static assets
+- Database sharding strategy
+- Load balancing preparation
 
-### 2. Technical Debt Reduction
-- Migrate to Riverpod for better state management
-- Implement clean architecture principles
-- Add comprehensive error boundaries
+### Feature Expansion
+- Plugin architecture for features
+- Modular dependency injection
+- Feature flags system
+- A/B testing framework
 
-### 3. Feature Additions
-- Real-time collaboration features
-- WebSocket for live updates
-- Background task scheduling
-- ML model integration for predictions
+## Development Best Practices
 
-## Privacy Policy Implementation (v1.0.4)
+### Code Organization
+- Single responsibility principle
+- Clear separation of concerns
+- Consistent naming conventions
+- Comprehensive documentation
 
-### Legal Compliance Architecture
-```
-lib/screens/legal/
-├── privacy_policy_screen.dart   # In-app privacy policy display
-├── terms_conditions_screen.dart  # Terms of service display
-└── Integration:
-    ├── Signup flow with TapGestureRecognizer
-    ├── Checkbox for consent tracking
-    └── External hosting on GitHub Pages
-```
+### Version Control
+- Feature branch workflow
+- Semantic versioning
+- Commit message standards
+- Code review requirements
 
-### Camera Permissions Architecture
-- AndroidManifest.xml configuration
-- Privacy policy URL requirement for Google Play
-- Hosted at: https://victorsolmn.github.io/streaker-privacy/
-
----
-Last Updated: December 2024
-Version: 1.0.4
+### Documentation
+- Inline code comments
+- API documentation
+- Architecture decisions records
+- User guides and FAQs

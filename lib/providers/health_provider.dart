@@ -34,7 +34,8 @@ class HealthProvider with ChangeNotifier {
   
   // Today's data - Initialize with -1 to indicate no data loaded yet
   double _todaySteps = -1;
-  double _todayCaloriesBurned = -1;
+  double _todayCaloriesBurned = -1;  // Active calories only (exercise + steps)
+  double _todayTotalCalories = -1;   // Total daily energy (BMR + Active)
   double _todayHeartRate = -1;
   double _todaySleep = -1;
   double _todayDistance = -1;
@@ -63,6 +64,7 @@ class HealthProvider with ChangeNotifier {
   // Return 0 instead of -1 for display purposes
   double get todaySteps => _todaySteps > 0 ? _todaySteps : 0;
   double get todayCaloriesBurned => _todayCaloriesBurned > 0 ? _todayCaloriesBurned : 0;
+  double get todayTotalCalories => _todayTotalCalories > 0 ? _todayTotalCalories : 0;
   double get todayHeartRate => _todayHeartRate > 0 ? _todayHeartRate : 0;
   double get todaySleep => _todaySleep > 0 ? _todaySleep : 0;
   double get todayDistance => _todayDistance > 0 ? _todayDistance : 0;
@@ -152,15 +154,9 @@ class HealthProvider with ChangeNotifier {
 
       updateMetricsFromHealth(data);
 
-      // Sync calories using the new tracking service
-      await _calorieService.syncCalories();
-
-      // Get today's total from the new system
-      final dailyTotal = await _calorieService.getTodayTotal();
-      if (dailyTotal != null) {
-        _todayCaloriesBurned = dailyTotal.totalCalories;
-        debugPrint('HealthProvider: Updated calories from tracking service: ${_todayCaloriesBurned}');
-      }
+      debugPrint('HealthProvider: Accurate calorie calculation complete');
+      debugPrint('  - Active calories: $_todayCaloriesBurned kcal (steps + exercise)');
+      debugPrint('  - Total daily energy: $_todayTotalCalories kcal (BMR + active)');
 
       _lastSyncTime = DateTime.now();
     } catch (e) {
@@ -194,9 +190,18 @@ class HealthProvider with ChangeNotifier {
     
     // Only update if we have valid data, otherwise keep existing values
     if (hasValidData) {
-      // Update today's data with Samsung Health prioritization
+      // Update today's data with accurate calorie calculation
       _todaySteps = (data['steps'] != null && data['steps'] > 0) ? data['steps'].toDouble() : _todaySteps;
-      _todayCaloriesBurned = (data['calories'] != null && data['calories'] > 0) ? data['calories'].toDouble() : _todayCaloriesBurned;
+
+      // Use the accurate active calories (steps + exercise) - NEW field from Android
+      _todayCaloriesBurned = (data['activeCalories'] != null && data['activeCalories'] > 0)
+        ? data['activeCalories'].toDouble()
+        : ((data['calories'] != null && data['calories'] > 0) ? data['calories'].toDouble() : _todayCaloriesBurned);
+
+      // Use the accurate total calories (BMR + active) from our calculation
+      _todayTotalCalories = (data['totalCalories'] != null && data['totalCalories'] > 0)
+        ? data['totalCalories'].toDouble()
+        : _todayTotalCalories;
       _todayHeartRate = (data['heartRate'] != null && data['heartRate'] > 0) ? data['heartRate'].toDouble() : _todayHeartRate;
       _todaySleep = (data['sleep'] != null && data['sleep'] > 0) ? data['sleep'].toDouble() : _todaySleep;
       _todayDistance = (data['distance'] != null && data['distance'] > 0) ? data['distance'].toDouble() : _todayDistance;
@@ -217,10 +222,21 @@ class HealthProvider with ChangeNotifier {
         };
       }
       
-      debugPrint('Samsung Health Metrics Updated:');
+      // Log the accurate calorie breakdown if available
+      final exerciseCalories = data['exerciseCalories'] as int? ?? 0;
+      final stepCalories = data['stepCalories'] as int? ?? 0;
+      final bmrCalories = data['bmrCalories'] as int? ?? 0;
+
+      debugPrint('Metrics Updated:');
       debugPrint('  Steps: $_todaySteps (from $dataSource)');
       debugPrint('  Heart Rate: $_todayHeartRate bpm');
-      debugPrint('  Calories: $_todayCaloriesBurned kcal');
+      debugPrint('  === ACCURATE CALORIE BREAKDOWN ===');
+      debugPrint('  Step Calories: $stepCalories kcal');
+      debugPrint('  Exercise Calories: $exerciseCalories kcal');
+      debugPrint('  Active Total: $_todayCaloriesBurned kcal');
+      debugPrint('  BMR So Far: $bmrCalories kcal');
+      debugPrint('  TOTAL DAILY: $_todayTotalCalories kcal');
+      debugPrint('  ===================================');
       debugPrint('  Sleep: $_todaySleep hours');
       debugPrint('  Distance: $_todayDistance km');
       debugPrint('  Water: $_todayWater ml');

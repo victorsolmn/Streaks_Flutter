@@ -33,6 +33,7 @@ class UserProfile {
   
   // Fitness targets
   final int? dailyCaloriesTarget;
+  final int? dailyActiveCaloriesTarget;
   final int? dailyStepsTarget;
   final double? dailySleepTarget;
   final double? dailyWaterTarget;
@@ -53,6 +54,7 @@ class UserProfile {
     required this.updatedAt,
     this.hasSeenFitnessGoalSummary = false,
     this.dailyCaloriesTarget,
+    this.dailyActiveCaloriesTarget,
     this.dailyStepsTarget,
     this.dailySleepTarget,
     this.dailyWaterTarget,
@@ -75,6 +77,7 @@ class UserProfile {
       'updatedAt': updatedAt.toIso8601String(),
       'hasSeenFitnessGoalSummary': hasSeenFitnessGoalSummary,
       'dailyCaloriesTarget': dailyCaloriesTarget,
+      'dailyActiveCaloriesTarget': dailyActiveCaloriesTarget,
       'dailyStepsTarget': dailyStepsTarget,
       'dailySleepTarget': dailySleepTarget,
       'dailyWaterTarget': dailyWaterTarget,
@@ -98,6 +101,7 @@ class UserProfile {
       updatedAt: DateTime.parse(json['updatedAt']),
       hasSeenFitnessGoalSummary: json['hasSeenFitnessGoalSummary'] ?? false,
       dailyCaloriesTarget: json['dailyCaloriesTarget'],
+      dailyActiveCaloriesTarget: json['dailyActiveCaloriesTarget'],
       dailyStepsTarget: json['dailyStepsTarget'],
       dailySleepTarget: json['dailySleepTarget']?.toDouble(),
       dailyWaterTarget: json['dailyWaterTarget']?.toDouble(),
@@ -117,6 +121,7 @@ class UserProfile {
     ActivityLevel? activityLevel,
     bool? hasSeenFitnessGoalSummary,
     int? dailyCaloriesTarget,
+    int? dailyActiveCaloriesTarget,
     int? dailyStepsTarget,
     double? dailySleepTarget,
     double? dailyWaterTarget,
@@ -137,6 +142,7 @@ class UserProfile {
       updatedAt: DateTime.now(),
       hasSeenFitnessGoalSummary: hasSeenFitnessGoalSummary ?? this.hasSeenFitnessGoalSummary,
       dailyCaloriesTarget: dailyCaloriesTarget ?? this.dailyCaloriesTarget,
+      dailyActiveCaloriesTarget: dailyActiveCaloriesTarget ?? this.dailyActiveCaloriesTarget,
       dailyStepsTarget: dailyStepsTarget ?? this.dailyStepsTarget,
       dailySleepTarget: dailySleepTarget ?? this.dailySleepTarget,
       dailyWaterTarget: dailyWaterTarget ?? this.dailyWaterTarget,
@@ -344,6 +350,7 @@ class UserProvider with ChangeNotifier {
     ActivityLevel? activityLevel,
     bool? hasSeenFitnessGoalSummary,
     int? dailyCaloriesTarget,
+    int? dailyActiveCaloriesTarget,
     int? dailyStepsTarget,
     double? dailySleepTarget,
     double? dailyWaterTarget,
@@ -367,6 +374,7 @@ class UserProvider with ChangeNotifier {
         activityLevel: activityLevel,
         hasSeenFitnessGoalSummary: hasSeenFitnessGoalSummary,
         dailyCaloriesTarget: dailyCaloriesTarget,
+        dailyActiveCaloriesTarget: dailyActiveCaloriesTarget,
         dailyStepsTarget: dailyStepsTarget,
         dailySleepTarget: dailySleepTarget,
         dailyWaterTarget: dailyWaterTarget,

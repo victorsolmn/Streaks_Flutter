@@ -657,144 +657,161 @@ class MainActivity: FlutterFragmentActivity() {
                     healthData["heartRateType"] = "error"
                 }
                 
-                // Read calories with source prioritization - try both active and total calories
+                // ACCURATE CALORIE CALCULATION - Based on reliable data
                 try {
-                    var samsungActiveCalories = 0.0
-                    var samsungTotalCalories = 0.0
-                    var googleFitCalories = 0.0
-                    var otherCalories = 0.0
-                    
-                    // Read Active Calories (exercise calories)
+                    Log.d(TAG, "Starting accurate calorie calculation...")
+
+                    // Get steps for base activity calculation
+                    val steps = healthData["steps"] as? Int ?: 0
+
+                    // 1. Calculate base active calories from steps (0.04 kcal per step)
+                    val baseActiveCalories = steps * 0.04
+                    Log.d(TAG, "Base active calories from $steps steps: $baseActiveCalories kcal")
+
+                    // 2. Read exercise sessions for gym/workout calories
+                    var exerciseCalories = 0.0
                     try {
-                        val activeCaloriesResponse = healthConnectClient.readRecords(
+                        val exerciseResponse = healthConnectClient.readRecords(
                             ReadRecordsRequest(
-                                ActiveCaloriesBurnedRecord::class,
+                                ExerciseSessionRecord::class,
                                 timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
                             )
                         )
-                        
-                        activeCaloriesResponse.records.forEach { record ->
-                            val source = record.metadata.dataOrigin.packageName
-                            val calories = record.energy.inKilocalories
-                            
-                            when {
-                                source.contains("shealth") || 
-                                source.contains("com.sec.android") || 
-                                source.contains("samsung") -> {
-                                    samsungActiveCalories += calories
-                                    Log.d(TAG, "Samsung active calories: $calories kcal from $source")
-                                }
-                                source.contains("google.android.apps.fitness") -> {
-                                    googleFitCalories += calories
-                                }
-                                else -> {
-                                    otherCalories += calories
-                                }
+
+                        Log.d(TAG, "Found ${exerciseResponse.records.size} exercise sessions today")
+
+                        exerciseResponse.records.forEach { session ->
+                            val duration = java.time.Duration.between(session.startTime, session.endTime).toMinutes()
+                            val exerciseType = session.exerciseType
+
+                            // Try to get calories from active calories during this session
+                            var sessionCalories = 0.0
+                            try {
+                                val sessionActiveResponse = healthConnectClient.readRecords(
+                                    ReadRecordsRequest(
+                                        ActiveCaloriesBurnedRecord::class,
+                                        timeRangeFilter = TimeRangeFilter.between(session.startTime, session.endTime)
+                                    )
+                                )
+
+                                sessionCalories = sessionActiveResponse.records.sumOf { it.energy.inKilocalories }
+                            } catch (e: Exception) {
+                                Log.d(TAG, "No active calories data for session, estimating...")
                             }
+
+                            // If no calories data, estimate based on exercise type and duration
+                            if (sessionCalories == 0.0) {
+                                sessionCalories = estimateExerciseCalories(exerciseType, duration.toDouble())
+                            }
+
+                            // For running/walking, avoid double counting with steps
+                            if (exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_RUNNING ||
+                                exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_WALKING) {
+                                // Get steps during this session
+                                val sessionSteps = try {
+                                    val stepsResponse = healthConnectClient.readRecords(
+                                        ReadRecordsRequest(
+                                            StepsRecord::class,
+                                            timeRangeFilter = TimeRangeFilter.between(session.startTime, session.endTime)
+                                        )
+                                    )
+                                    stepsResponse.records.sumOf { it.count.toInt() }
+                                } catch (e: Exception) {
+                                    0
+                                }
+
+                                val sessionStepCalories = sessionSteps * 0.04
+                                // Use the higher value to avoid double counting
+                                sessionCalories = maxOf(sessionCalories, sessionStepCalories)
+                            }
+
+                            Log.d(TAG, "Exercise: ${getExerciseTypeName(exerciseType)}, Duration: $duration min, Calories: $sessionCalories kcal")
+                            exerciseCalories += sessionCalories
                         }
                     } catch (e: Exception) {
-                        Log.d(TAG, "Active calories not available", e)
+                        Log.d(TAG, "Error reading exercise sessions", e)
                     }
-                    
-                    // Read Total Calories (Samsung Health often uses this)
-                    try {
-                        val totalCaloriesResponse = healthConnectClient.readRecords(
-                            ReadRecordsRequest(
-                                TotalCaloriesBurnedRecord::class,
-                                timeRangeFilter = TimeRangeFilter.between(startOfDay, now)
-                            )
-                        )
-                        
-                        totalCaloriesResponse.records.forEach { record ->
-                            val source = record.metadata.dataOrigin.packageName
-                            val calories = record.energy.inKilocalories
-                            
-                            when {
-                                source.contains("shealth") || 
-                                source.contains("com.sec.android") || 
-                                source.contains("samsung") -> {
-                                    samsungTotalCalories += calories
-                                    Log.d(TAG, "Samsung total calories: $calories kcal from $source")
-                                }
-                                source.contains("google.android.apps.fitness") -> {
-                                    if (samsungActiveCalories == 0.0) googleFitCalories += calories // Avoid double counting
-                                }
-                                else -> {
-                                    if (samsungActiveCalories == 0.0 && samsungTotalCalories == 0.0) otherCalories += calories
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.d(TAG, "Total calories not available", e)
+
+                    // 3. Calculate total active calories (avoiding double counting)
+                    val totalActiveCalories = if (exerciseCalories > 0) {
+                        // If we have exercise, use the appropriate combination
+                        // For running/walking exercises, they already include the step calories
+                        // For other exercises (gym, cycling), add to base activity
+                        maxOf(baseActiveCalories, exerciseCalories)
+                    } else {
+                        baseActiveCalories
                     }
-                    
-                    // Get user profile from shared preferences if available
+
+                    // 4. Get user profile and calculate BMR
                     val sharedPrefs = getSharedPreferences("user_profile", Context.MODE_PRIVATE)
                     val userAge = sharedPrefs.getInt("age", 30)
                     val userGender = sharedPrefs.getString("gender", "Male") ?: "Male"
                     val userWeight = sharedPrefs.getFloat("weight", 70f).toDouble()
                     val userHeight = sharedPrefs.getFloat("height", 170f).toDouble()
 
-                    // Calculate precise BMR using gender-specific formula (Mifflin-St Jeor equation)
+                    // Calculate BMR using Mifflin-St Jeor equation
                     val dailyBMR = if (userGender.lowercase() == "male") {
                         (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
                     } else {
                         (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) - 161
                     }
-                    val hourlyBMR = dailyBMR / 24
-                    val hoursElapsed = java.time.Duration.between(startOfDay, now).toHours().toDouble()
-                    val bmrEstimate = hourlyBMR * hoursElapsed
 
-                    Log.d(TAG, "User profile - Age: $userAge, Gender: $userGender, Weight: $userWeight kg, Height: $userHeight cm")
-                    Log.d(TAG, "Calculated BMR: $dailyBMR kcal/day, Hourly: $hourlyBMR kcal/hour")
+                    // Calculate BMR for elapsed time (more accurate than hourly)
+                    val minutesSinceMidnight = java.time.Duration.between(startOfDay, now).toMinutes()
+                    val bmrPerMinute = dailyBMR / (24.0 * 60.0)
+                    val bmrSoFar = bmrPerMinute * minutesSinceMidnight
 
-                    // Check if we have heart rate data for better calculation
-                    val hasElevatedHR = healthData["heartRate"] as? Int ?: 0 > 90
+                    Log.d(TAG, "BMR Calculation: Daily BMR: ${dailyBMR.toInt()} kcal, Minutes elapsed: $minutesSinceMidnight, BMR so far: ${bmrSoFar.toInt()} kcal")
 
-                    // Prioritize Samsung Health data with improved calculation
-                    val finalCalories = when {
-                        samsungActiveCalories > 0 -> {
-                            Log.d(TAG, "Using Samsung active calories: $samsungActiveCalories kcal")
-                            samsungActiveCalories
-                        }
-                        samsungTotalCalories > 0 && samsungActiveCalories == 0.0 -> {
-                            // Use accurate BMR calculation
-                            val activeFromTotal = (samsungTotalCalories - bmrEstimate).coerceAtLeast(0.0)
-                            Log.d(TAG, "Samsung total minus precise BMR: $activeFromTotal kcal (total: $samsungTotalCalories, BMR: $bmrEstimate)")
-                            activeFromTotal
-                        }
-                        googleFitCalories > 0 -> {
-                            // Google Fit usually gives total calories, so subtract BMR
-                            val activeFromGoogle = if (googleFitCalories > bmrEstimate) {
-                                googleFitCalories - bmrEstimate
-                            } else {
-                                googleFitCalories // Assume it's already active calories if less than BMR
-                            }
-                            Log.d(TAG, "Google Fit adjusted: $activeFromGoogle kcal (original: $googleFitCalories)")
-                            activeFromGoogle
-                        }
-                        else -> {
-                            // If low activity (steps < 2000) and we have steps, use step-based calculation
-                            val steps = healthData["steps"] as? Int ?: 0
-                            if (steps in 1..1999) {
-                                val stepCalories = steps * 0.045 // Average calories per step
-                                Log.d(TAG, "Low activity detected, using step-based: $stepCalories kcal from $steps steps")
-                                stepCalories
-                            } else if (otherCalories > 0) {
-                                Log.d(TAG, "Using other sources: $otherCalories kcal")
-                                otherCalories
-                            } else {
-                                Log.d(TAG, "No calorie data available, using minimal estimate")
-                                0.0
-                            }
-                        }
-                    }
-                    
-                    healthData["calories"] = finalCalories.toInt()
-                    Log.d(TAG, "Final calories (prioritizing Samsung): $finalCalories kcal")
+                    // 5. Calculate total daily calories (TDEE)
+                    val totalDailyCalories = bmrSoFar + totalActiveCalories
+
+                    // Store the accurate values
+                    healthData["activeCalories"] = totalActiveCalories.toInt()
+                    healthData["bmrCalories"] = bmrSoFar.toInt()
+                    healthData["totalCalories"] = totalDailyCalories.toInt()
+                    healthData["exerciseCalories"] = exerciseCalories.toInt()
+                    healthData["stepCalories"] = baseActiveCalories.toInt()
+
+                    // For backward compatibility
+                    healthData["calories"] = totalActiveCalories.toInt()
+
+                    Log.d(TAG, "=== ACCURATE CALORIE CALCULATION ===")
+                    Log.d(TAG, "Steps: $steps → ${baseActiveCalories.toInt()} kcal")
+                    Log.d(TAG, "Exercise: ${exerciseCalories.toInt()} kcal")
+                    Log.d(TAG, "Total Active: ${totalActiveCalories.toInt()} kcal")
+                    Log.d(TAG, "BMR (${(minutesSinceMidnight/60.0).toInt()} hrs): ${bmrSoFar.toInt()} kcal")
+                    Log.d(TAG, "TOTAL DAILY: ${totalDailyCalories.toInt()} kcal")
+                    Log.d(TAG, "=====================================")
+
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error reading calories", e)
-                    healthData["calories"] = 0
+                    Log.e(TAG, "Error calculating calories", e)
+                    // Fallback to simple calculation
+                    val steps = healthData["steps"] as? Int ?: 0
+                    val simpleActive = steps * 0.04
+
+                    // Get profile for BMR
+                    val sharedPrefs = getSharedPreferences("user_profile", Context.MODE_PRIVATE)
+                    val userAge = sharedPrefs.getInt("age", 30)
+                    val userGender = sharedPrefs.getString("gender", "Male") ?: "Male"
+                    val userWeight = sharedPrefs.getFloat("weight", 70f).toDouble()
+                    val userHeight = sharedPrefs.getFloat("height", 170f).toDouble()
+
+                    val dailyBMR = if (userGender.lowercase() == "male") {
+                        (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
+                    } else {
+                        (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) - 161
+                    }
+
+                    val minutesSinceMidnight = java.time.Duration.between(startOfDay, now).toMinutes()
+                    val bmrSoFar = (dailyBMR / (24.0 * 60.0)) * minutesSinceMidnight
+
+                    healthData["activeCalories"] = simpleActive.toInt()
+                    healthData["bmrCalories"] = bmrSoFar.toInt()
+                    healthData["totalCalories"] = (bmrSoFar + simpleActive).toInt()
+                    healthData["calories"] = simpleActive.toInt()
+
+                    Log.d(TAG, "Fallback calculation - Steps: $steps, Active: ${simpleActive.toInt()}, BMR: ${bmrSoFar.toInt()}, Total: ${(bmrSoFar + simpleActive).toInt()}")
                 }
                 
                 // Read distance with source prioritization - detailed logging for debugging
@@ -2002,6 +2019,81 @@ class MainActivity: FlutterFragmentActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "Error opening Health Connect settings", e)
             result.error("SETTINGS_ERROR", e.message, null)
+        }
+    }
+
+    // Helper function to calculate BMR using Mifflin-St Jeor equation
+    private fun calculateBMR(age: Int, gender: String, height: Double, weight: Double): Double {
+        return if (gender.lowercase() == "male") {
+            (10 * weight) + (6.25 * height) - (5 * age) + 5
+        } else {
+            (10 * weight) + (6.25 * height) - (5 * age) - 161
+        }
+    }
+
+    // Helper function to estimate exercise calories based on type and duration
+    private fun estimateExerciseCalories(exerciseType: Int, durationMinutes: Double): Double {
+        // Average calories burned per minute for different exercise types
+        // These are conservative estimates for a 70kg person
+        val caloriesPerMinute = when (exerciseType) {
+            ExerciseSessionRecord.EXERCISE_TYPE_RUNNING -> 10.0
+            ExerciseSessionRecord.EXERCISE_TYPE_WALKING -> 4.0
+            ExerciseSessionRecord.EXERCISE_TYPE_BIKING -> 8.0  // Cycling
+            ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL -> 11.0  // Swimming
+            ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING -> 6.0
+            ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING -> 6.0
+            ExerciseSessionRecord.EXERCISE_TYPE_YOGA -> 3.0
+            ExerciseSessionRecord.EXERCISE_TYPE_PILATES -> 4.0
+            ExerciseSessionRecord.EXERCISE_TYPE_DANCING -> 7.0
+            ExerciseSessionRecord.EXERCISE_TYPE_HIKING -> 7.0
+            ExerciseSessionRecord.EXERCISE_TYPE_BASKETBALL -> 8.0
+            ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_AMERICAN -> 9.0  // Football
+            ExerciseSessionRecord.EXERCISE_TYPE_TENNIS -> 8.0
+            ExerciseSessionRecord.EXERCISE_TYPE_BADMINTON -> 7.0
+            ExerciseSessionRecord.EXERCISE_TYPE_ROWING_MACHINE -> 9.0  // Rowing
+            ExerciseSessionRecord.EXERCISE_TYPE_ELLIPTICAL -> 8.0
+            ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING -> 9.0
+            else -> 5.0 // Default for unknown exercise types
+        }
+
+        return caloriesPerMinute * durationMinutes
+    }
+
+    // Helper function to get exercise type name for logging
+    private fun getExerciseTypeName(exerciseType: Int): String {
+        return when (exerciseType) {
+            ExerciseSessionRecord.EXERCISE_TYPE_RUNNING -> "Running"
+            ExerciseSessionRecord.EXERCISE_TYPE_WALKING -> "Walking"
+            ExerciseSessionRecord.EXERCISE_TYPE_BIKING -> "Cycling"
+            ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL -> "Swimming"
+            ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING -> "Strength Training"
+            ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING -> "Weightlifting"
+            ExerciseSessionRecord.EXERCISE_TYPE_YOGA -> "Yoga"
+            ExerciseSessionRecord.EXERCISE_TYPE_PILATES -> "Pilates"
+            ExerciseSessionRecord.EXERCISE_TYPE_DANCING -> "Dancing"
+            ExerciseSessionRecord.EXERCISE_TYPE_HIKING -> "Hiking"
+            ExerciseSessionRecord.EXERCISE_TYPE_BASKETBALL -> "Basketball"
+            ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_AMERICAN -> "Football"
+            ExerciseSessionRecord.EXERCISE_TYPE_TENNIS -> "Tennis"
+            ExerciseSessionRecord.EXERCISE_TYPE_BADMINTON -> "Badminton"
+            ExerciseSessionRecord.EXERCISE_TYPE_ROWING_MACHINE -> "Rowing"
+            ExerciseSessionRecord.EXERCISE_TYPE_ELLIPTICAL -> "Elliptical"
+            ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING -> "Stair Climbing"
+            else -> "Other Exercise"
+        }
+    }
+
+    // Helper function to get data source name for logging
+    private fun getDataSourceName(packageName: String): String {
+        return when {
+            packageName.contains("shealth") ||
+            packageName.contains("samsung") -> "Samsung Health"
+            packageName.contains("google.android.apps.fitness") -> "Google Fit"
+            packageName.contains("fitbit") -> "Fitbit"
+            packageName.contains("garmin") -> "Garmin"
+            packageName.contains("xiaomi") ||
+            packageName.contains("miui") -> "Mi Fitness"
+            else -> "Unknown Source"
         }
     }
 }

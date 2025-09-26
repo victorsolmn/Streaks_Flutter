@@ -31,6 +31,7 @@ class UserProfile {
   
   // Fitness targets
   final int? dailyCaloriesTarget;
+  final int? dailyActiveCaloriesTarget;
   final int? dailyStepsTarget;
   final double? dailySleepTarget;
   final double? dailyWaterTarget;
@@ -53,6 +54,7 @@ class UserProfile {
     this.hasCompletedOnboarding = false,
     this.hasSeenFitnessGoalSummary = false,
     this.dailyCaloriesTarget,
+    this.dailyActiveCaloriesTarget,
     this.dailyStepsTarget,
     this.dailySleepTarget,
     this.dailyWaterTarget,
@@ -104,6 +106,7 @@ class UserProfile {
       hasCompletedOnboarding: json['hasCompletedOnboarding'] ?? json['has_completed_onboarding'] ?? false,
       hasSeenFitnessGoalSummary: json['hasSeenFitnessGoalSummary'] ?? json['has_seen_fitness_goal_summary'] ?? false,
       dailyCaloriesTarget: json['dailyCaloriesTarget'] ?? json['daily_calories_target'],
+      dailyActiveCaloriesTarget: json['dailyActiveCaloriesTarget'] ?? json['daily_active_calories_target'],
       dailyStepsTarget: json['dailyStepsTarget'] ?? json['daily_steps_target'],
       dailySleepTarget: json['dailySleepTarget']?.toDouble() ?? json['daily_sleep_target']?.toDouble(),
       dailyWaterTarget: json['dailyWaterTarget']?.toDouble() ?? json['daily_water_target']?.toDouble(),
@@ -137,6 +140,8 @@ class UserProfile {
       'has_seen_fitness_goal_summary': hasSeenFitnessGoalSummary,
       'dailyCaloriesTarget': dailyCaloriesTarget,
       'daily_calories_target': dailyCaloriesTarget,
+      'dailyActiveCaloriesTarget': dailyActiveCaloriesTarget,
+      'daily_active_calories_target': dailyActiveCaloriesTarget,
       'dailyStepsTarget': dailyStepsTarget,
       'daily_steps_target': dailyStepsTarget,
       'dailySleepTarget': dailySleepTarget,
@@ -166,6 +171,7 @@ class UserProfile {
     bool? hasCompletedOnboarding,
     bool? hasSeenFitnessGoalSummary,
     int? dailyCaloriesTarget,
+    int? dailyActiveCaloriesTarget,
     int? dailyStepsTarget,
     double? dailySleepTarget,
     double? dailyWaterTarget,
@@ -188,6 +194,7 @@ class UserProfile {
       hasCompletedOnboarding: hasCompletedOnboarding ?? this.hasCompletedOnboarding,
       hasSeenFitnessGoalSummary: hasSeenFitnessGoalSummary ?? this.hasSeenFitnessGoalSummary,
       dailyCaloriesTarget: dailyCaloriesTarget ?? this.dailyCaloriesTarget,
+      dailyActiveCaloriesTarget: dailyActiveCaloriesTarget ?? this.dailyActiveCaloriesTarget,
       dailyStepsTarget: dailyStepsTarget ?? this.dailyStepsTarget,
       dailySleepTarget: dailySleepTarget ?? this.dailySleepTarget,
       dailyWaterTarget: dailyWaterTarget ?? this.dailyWaterTarget,

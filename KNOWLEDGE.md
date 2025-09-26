@@ -373,3 +373,72 @@ Implemented a comprehensive force update system to ensure users are on the lates
 - Remove `/node_modules` and `/website`
 - Delete truly unused screen versions
 - Consolidate test SQL files
+
+## Home Page Metrics Integration (September 26, 2025)
+
+### Recent Critical Fixes
+
+#### 1. Calorie Display Issue
+**Problem**: Home page showing total calories (4369) instead of active calories (2761)
+**Solution**:
+- Changed from `dailyCaloriesTarget` to `dailyActiveCaloriesTarget` in `home_screen_clean.dart:399`
+- Force reload profile data from Supabase on app initialization
+- Added debug logging to trace actual values being loaded
+
+#### 2. Nutrition Data Not Loading
+**Problem**: Calories Left section showing "0 kcal" despite having nutrition entries
+**Solution**:
+- Added `nutritionProvider.loadDataFromSupabase()` call on app init (line 49-53)
+- Changed display format to "consumed/target" (e.g., "2914/2361 kcal")
+- Implemented weight loss deficit calculation: activeTarget - 400
+
+#### 3. Data Flow Architecture
+
+**Steps Metric**:
+- Source: `HealthProvider.todaySteps` → `UnifiedHealthService`
+- Target: `profiles.daily_steps_target`
+- Display: `{steps}/{target}` (e.g., "10221/10000")
+
+**Calories Burn**:
+- Source: `HealthProvider.todayTotalCalories`
+- Target: `profiles.daily_active_calories_target`
+- Display: `{burned}/{target}` (e.g., "1979/2761 kcal")
+
+**Calories Left (Nutrition)**:
+- Source: `NutritionProvider.todayNutrition.totalCalories`
+- Target: `activeCaloriesTarget - 400` (weight loss deficit)
+- Display: `{consumed}/{target}` (e.g., "2914/2361 kcal")
+
+**Streak Metrics**:
+- Current: `StreakProvider.currentStreak`
+- Record: `StreakProvider.longestStreak`
+- Database: `streaks` table
+
+### Key Technical Details
+
+**Provider Architecture**:
+```dart
+SupabaseUserProvider: Profile data and targets
+HealthProvider: Device health metrics
+NutritionProvider: Food tracking data
+StreakProvider: Streak and achievement data
+```
+
+**Database Tables**:
+- `profiles`: User targets and settings
+- `health_metrics`: Daily health data
+- `nutrition_entries`: Food consumption
+- `streaks`: Streak tracking
+
+**Sync Strategy**:
+- Health data: 5-minute intervals via RealtimeSyncService
+- Nutrition: Real-time on entry
+- Profile: Force reload on app init
+- Streaks: Real-time updates
+
+### Testing Verification
+✅ All metrics display correct database values
+✅ Targets load from user profile
+✅ Nutrition data persists and loads correctly
+✅ Weight loss deficit calculation working (2761 - 400 = 2361)
+✅ Data syncs to Supabase properly

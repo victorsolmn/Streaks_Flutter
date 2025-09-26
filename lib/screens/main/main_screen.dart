@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/app_theme.dart';
 import '../../providers/nutrition_provider.dart';
 import '../../providers/health_provider.dart';
 import '../../providers/supabase_auth_provider.dart';
 import '../../services/toast_service.dart';
 import '../../services/popup_service.dart';
+import '../../services/health_onboarding_service.dart';
 import '../../widgets/sync_status_indicator.dart';
+import '../../widgets/health_permission_dialog.dart';
 import 'home_screen_clean.dart';
 import 'progress_screen_new.dart';
 import 'nutrition_screen.dart';
@@ -29,6 +32,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   bool _isSyncing = false;
   DateTime? _lastSyncTime;
   GlobalKey? _profileKey;
+
+  // Centralized health permission management
+  static bool _hasShownHealthDialog = false;
+  static bool _isShowingHealthDialog = false;
+  HealthOnboardingService? _healthOnboardingService;
 
   @override
   void initState() {
@@ -164,7 +172,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       } else {
         debugPrint('MainScreen: Health source not connected, skipping auto-sync');
       }
-      
+
+      // Check mounted after all health operations
+      if (!mounted) return;
+
+      // CENTRALIZED HEALTH PERMISSION CHECK: Only show if not auto-connected
+      if (!healthProvider.isHealthSourceConnected) {
+        await _checkAndShowHealthPermissionDialog();
+      }
+
       if (mounted) {
         setState(() {
           _isDataLoaded = true;
@@ -253,6 +269,154 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         setState(() {
           _isSyncing = false;
         });
+      }
+    }
+  }
+
+  /// CENTRALIZED HEALTH PERMISSION DIALOG - Single source of truth
+  Future<void> _checkAndShowHealthPermissionDialog() async {
+    // MUTEX LOCK: Prevent multiple dialogs from being shown simultaneously
+    if (_isShowingHealthDialog || _hasShownHealthDialog) {
+      debugPrint('MainScreen: Health dialog already shown/showing, skipping');
+      return;
+    }
+
+    _isShowingHealthDialog = true;
+    debugPrint('MainScreen: Checking if health permission dialog should be shown...');
+
+    try {
+      // Initialize health onboarding service if not already done
+      if (_healthOnboardingService == null) {
+        final prefs = await SharedPreferences.getInstance();
+        final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+        _healthOnboardingService = HealthOnboardingService(
+          prefs: prefs,
+          healthProvider: healthProvider,
+        );
+      }
+
+      // Check if we should show the health permission dialog
+      final shouldShow = await _healthOnboardingService!.shouldShowHealthPrompt();
+      if (!shouldShow || !mounted) {
+        debugPrint('MainScreen: Should not show health dialog or widget unmounted');
+        return;
+      }
+
+      // Wait for UI to be fully rendered (reduced from 800ms to 500ms for better UX)
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+
+      // CRITICAL: Check real-time health connection status before showing dialog
+      final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+
+      // Final permission check with auto-connect attempt
+      debugPrint('MainScreen: Final health permission check before showing dialog...');
+      final isConnected = await healthProvider.healthService.checkAndAutoConnect();
+
+      if (isConnected || healthProvider.isHealthSourceConnected) {
+        debugPrint('MainScreen: Health auto-connected during final check, skipping dialog');
+        return;
+      }
+
+      // Mark that we're showing the dialog to prevent duplicates
+      _hasShownHealthDialog = true;
+
+      // Check if it's a re-engagement
+      final isReengagement = await SharedPreferences.getInstance()
+          .then((prefs) => prefs.getBool('health_prompt_shown') ?? false);
+
+      debugPrint('MainScreen: 🔥 Showing health permission dialog (re-engagement: $isReengagement)');
+
+      // Show the health permission dialog
+      if (mounted && context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => HealthPermissionDialog(
+            isReengagement: isReengagement,
+            onConnect: () async {
+              Navigator.of(context).pop();
+              await _handleHealthPermissionRequest();
+            },
+            onDismiss: () async {
+              Navigator.of(context).pop();
+              await _healthOnboardingService!.markHealthPromptDismissed();
+
+              // Show a subtle reminder
+              if (mounted && context.mounted) {
+                ToastService().showInfo('You can connect health data anytime from Settings');
+              }
+            },
+          ),
+        );
+
+        // Mark that we've shown the prompt
+        await _healthOnboardingService!.markHealthPromptShown();
+      }
+
+    } catch (e) {
+      debugPrint('MainScreen: Error in health permission check: $e');
+    } finally {
+      _isShowingHealthDialog = false;
+    }
+  }
+
+  /// Handle health permission request
+  Future<void> _handleHealthPermissionRequest() async {
+    if (_healthOnboardingService == null) return;
+
+    try {
+      debugPrint('MainScreen: Handling health permission request...');
+      final result = await _healthOnboardingService!.requestHealthPermissions(context);
+
+      if (result.success) {
+        // Show success message
+        if (mounted && context.mounted) {
+          ToastService().showSuccess(result.message);
+        }
+
+        // Refresh health data immediately
+        final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+        await healthProvider.syncWithHealth();
+
+        // Force UI update
+        if (mounted) {
+          setState(() {
+            _isDataLoaded = true; // Ensure UI reflects connected state
+          });
+        }
+
+        debugPrint('MainScreen: ✅ Health permission granted and data synced');
+      } else {
+        // Show error message
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(result.message),
+                  if (result.actionRequired != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      result.actionRequired!,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ],
+              ),
+              backgroundColor: AppTheme.errorRed,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+        debugPrint('MainScreen: ❌ Health permission request failed: ${result.message}');
+      }
+    } catch (e) {
+      debugPrint('MainScreen: Error handling health permission request: $e');
+      if (mounted && context.mounted) {
+        ToastService().showError('Failed to connect health data. Please try again.');
       }
     }
   }
