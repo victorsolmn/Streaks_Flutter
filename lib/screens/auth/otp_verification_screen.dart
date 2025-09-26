@@ -154,7 +154,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     final success = await authProvider.sendOTP(
       widget.email,
       isSignUp: widget.isSignUp,
-      showLoading: false,  // Prevent duplicate loading indicator
     );
     
     if (success) {

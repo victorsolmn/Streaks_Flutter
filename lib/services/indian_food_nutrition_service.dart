@@ -215,8 +215,9 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
     } catch (e) {
       debugPrint('Error with Gemini calculation: $e');
       debugPrint('Falling back to local database analysis');
-      // Use local database as fallback
-      return _analyzeWithLocalDatabase(description);
+      // Use local database as fallback - create description from available data
+      final fallbackDescription = 'Mixed meal';
+      return _analyzeWithLocalDatabase(fallbackDescription);
     }
   }
 
@@ -338,8 +339,9 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
     } catch (e) {
       debugPrint('Error with Gemini calculation: $e');
       debugPrint('Falling back to local database analysis');
-      // Use local database as fallback
-      return _analyzeWithLocalDatabase(description);
+      // Use local database as fallback - create description from available data
+      final fallbackDescription = 'Mixed meal';
+      return _analyzeWithLocalDatabase(fallbackDescription);
     }
   }
 
