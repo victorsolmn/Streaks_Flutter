@@ -150,10 +150,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     final authProvider = Provider.of<SupabaseAuthProvider>(context, listen: false);
     
     ToastService().showLoading('Sending new code...');
-    
+
     final success = await authProvider.sendOTP(
       widget.email,
       isSignUp: widget.isSignUp,
+      showLoading: false,  // Prevent duplicate loading indicator
     );
     
     if (success) {

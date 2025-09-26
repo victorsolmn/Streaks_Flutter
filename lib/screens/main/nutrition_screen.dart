@@ -932,21 +932,36 @@ class _NutritionScreenState extends State<NutritionScreen>
           _buildHistoryTab(),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isScanning ? null : _scanFood,
-        backgroundColor: _isScanning 
-            ? AppTheme.borderColor 
-            : AppTheme.primaryAccent,
-        child: _isScanning
-            ? SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Theme.of(context).textTheme.bodyMedium?.color,
-                ),
-              )
-            : Icon(Icons.camera_alt),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Manual Entry FAB - More visible and accessible
+          FloatingActionButton.small(
+            heroTag: 'manual_entry',
+            onPressed: _showManualEntryDialog,
+            backgroundColor: AppTheme.successGreen,
+            child: Icon(Icons.edit, size: 20),
+          ),
+          SizedBox(height: 12),
+          // Main Camera FAB
+          FloatingActionButton(
+            heroTag: 'camera_scan',
+            onPressed: _isScanning ? null : _scanFood,
+            backgroundColor: _isScanning
+                ? AppTheme.borderColor
+                : AppTheme.primaryAccent,
+            child: _isScanning
+                ? SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
+                  )
+                : Icon(Icons.camera_alt),
+          ),
+        ],
       ),
     );
   }

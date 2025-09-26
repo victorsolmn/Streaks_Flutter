@@ -11,7 +11,6 @@ import '../../widgets/streak_display_widget.dart';
 import '../../widgets/sync_status_indicator.dart';
 import '../../providers/streak_provider.dart';
 import '../../services/health_onboarding_service.dart';
-import '../../services/permission_flow_manager.dart';
 import 'dart:math' as math;
 import '../../services/toast_service.dart';
 
@@ -28,7 +27,6 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
   late Animation<double> _fadeAnimation;
   HealthOnboardingService? _healthOnboardingService;
   bool _hasCheckedHealthPermission = false;
-  bool _isPermissionFlowInProgress = false;
 
   @override
   void initState() {
@@ -95,8 +93,8 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
   }
 
   Future<void> _checkAndShowHealthPermissionDialog() async {
-    // Avoid showing multiple times in same session or if flow is in progress
-    if (_hasCheckedHealthPermission || _isPermissionFlowInProgress) return;
+    // Avoid showing multiple times in same session
+    if (_hasCheckedHealthPermission) return;
     _hasCheckedHealthPermission = true;
 
     // Initialize health onboarding service if not already done
@@ -109,13 +107,6 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
       );
     }
 
-    // Don't show if permission flow is already active
-    final permissionManager = PermissionFlowManager();
-    if (permissionManager.isPermissionFlowActive) {
-      debugPrint('Health permission flow already active, skipping dialog');
-      return;
-    }
-
     // Check if we should show the health permission dialog
     final shouldShow = await _healthOnboardingService!.shouldShowHealthPrompt();
     if (shouldShow && mounted) {
@@ -124,8 +115,29 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
 
       if (!mounted) return;
 
-      // Check if it's a re-engagement
+      // CRITICAL FIX: Wait for any background permission checks to complete
+      // This prevents showing the dialog when permissions were just granted
       final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+
+      // Add additional delay to ensure background auto-connect completes
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return;
+
+      // Re-check if health is now connected after the delay
+      // This catches cases where permissions were granted while we were waiting
+      if (healthProvider.isHealthSourceConnected) {
+        debugPrint('HomeScreen: Health connected during delay, skipping permission dialog');
+        return;
+      }
+
+      // Double-check with the service directly
+      final isConnected = await healthProvider.healthService.checkAndAutoConnect();
+      if (isConnected) {
+        debugPrint('HomeScreen: Health auto-connected successfully, skipping permission dialog');
+        return;
+      }
+
+      // Check if it's a re-engagement
       final isReengagement = await SharedPreferences.getInstance()
           .then((prefs) => prefs.getBool('health_prompt_shown') ?? false);
 
@@ -133,45 +145,14 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (dialogContext) => HealthPermissionDialog(
+        builder: (context) => HealthPermissionDialog(
           isReengagement: isReengagement,
           onConnect: () async {
-            // Don't pop immediately - let permission flow handle it
-            // Set flag to prevent re-showing
-            _isPermissionFlowInProgress = true;
-
-            // Handle permission request and close dialog based on result
-            final result = await _healthOnboardingService!.requestHealthPermissions(context);
-
-            // Close the dialog after permission flow completes
-            if (dialogContext.mounted && Navigator.canPop(dialogContext)) {
-              Navigator.of(dialogContext).pop();
-            }
-
-            if (result.success) {
-              // Show success message
-              if (mounted) {
-                ToastService().showSuccess(result.message);
-              }
-              // Refresh the UI to show real data
-              await _refreshHealthData();
-            } else if (!result.message.contains('Waiting')) {
-              // Only show error if not in waiting state
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(result.message),
-                    backgroundColor: AppTheme.errorRed,
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-              }
-            }
-
-            _isPermissionFlowInProgress = false;
+            Navigator.of(context).pop();
+            await _handleHealthPermissionRequest();
           },
           onDismiss: () async {
-            Navigator.of(dialogContext).pop();
+            Navigator.of(context).pop();
             await _healthOnboardingService!.markHealthPromptDismissed();
 
             // Show a subtle reminder
@@ -188,6 +169,43 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
     // Note: Auto-sync is already handled by MainScreen, no need to sync here
   }
 
+  Future<void> _handleHealthPermissionRequest() async {
+    final result = await _healthOnboardingService!.requestHealthPermissions(context);
+
+    if (result.success) {
+      // Show success message
+      if (mounted) {
+        ToastService().showSuccess(result.message);
+      }
+
+      // Refresh the UI to show real data
+      await _refreshHealthData();
+    } else {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(result.message),
+                if (result.actionRequired != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    result.actionRequired!,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ],
+            ),
+            backgroundColor: AppTheme.errorRed,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
 
   Future<void> _syncMetricsToStreak() async {
     final streakProvider = Provider.of<StreakProvider>(context, listen: false);

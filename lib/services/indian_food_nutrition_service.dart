@@ -7,7 +7,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 class IndianFoodNutritionService {
   // Google Gemini API - FREE tier (60 queries/minute)
   // IMPORTANT: Get your FREE key from https://makersuite.google.com/app/apikey
-  static const String _geminiApiKey = 'AIzaSyAzN4cdDbDRr5TuK9hHSyVqvGlcBbyHgrA';
+  static const String _geminiApiKey = 'AIzaSyBXSUv6Ff9unTCkCTvxsE0UaXWX24TVxCI';
   
   // Indian Food Composition Database (IFCT 2017) - DEPRECATED
   // We now use Gemini AI to calculate nutrition directly for better accuracy
@@ -87,7 +87,7 @@ class IndianFoodNutritionService {
     if (_geminiApiKey.isNotEmpty && _geminiApiKey.startsWith('AIza')) {
       try {
         _model = GenerativeModel(
-          model: 'gemini-1.5-flash', // Fast and FREE model
+          model: 'gemini-1.5-flash-latest', // Use latest stable version
           apiKey: _geminiApiKey,
         );
         debugPrint('✅ Gemini AI initialized successfully for Indian food recognition');
@@ -113,8 +113,11 @@ class IndianFoodNutritionService {
 
       // Check if model is initialized
       if (_model == null) {
-        debugPrint('⚠️ Gemini not initialized, using fallback');
-        return _getDefaultNutrition();
+        debugPrint('⚠️ Gemini not initialized, using smart fallback');
+        // Try to analyze using local database with description parsing
+        // For generic image analysis, use default description
+        final description = 'Mixed meal from image';
+        return _analyzeWithLocalDatabase(description);
       }
 
       // Send image and description to Gemini for nutrition calculation
@@ -206,11 +209,14 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
         };
       } catch (parseError) {
         debugPrint('Error parsing Gemini response: $parseError');
-        return _getDefaultNutrition();
+        // Fallback to local database analysis
+        return _analyzeWithLocalDatabase(description);
       }
     } catch (e) {
       debugPrint('Error with Gemini calculation: $e');
-      return _getDefaultNutrition();
+      debugPrint('Falling back to local database analysis');
+      // Use local database as fallback
+      return _analyzeWithLocalDatabase(description);
     }
   }
 
@@ -229,8 +235,11 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
 
       // Check if model is initialized
       if (_model == null) {
-        debugPrint('⚠️ Gemini not initialized, using fallback');
-        return _getDefaultNutrition();
+        debugPrint('⚠️ Gemini not initialized, using smart fallback');
+        // Try to analyze using local database with description parsing
+        // For generic image analysis, use default description
+        final description = 'Mixed meal from image';
+        return _analyzeWithLocalDatabase(description);
       }
 
       // Step 1: Send image and food details to Gemini for direct nutrition calculation
@@ -244,10 +253,10 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
       return nutritionResult;
     } catch (e) {
       debugPrint('❌ Error in analyzeIndianFoodWithDetails: $e');
-      return {
-        'success': false,
-        'error': e.toString(),
-      };
+      debugPrint('Using local database fallback');
+      // Combine foodName and quantity for fallback
+      final description = '$quantity $foodName';
+      return _analyzeWithLocalDatabase(description);
     }
   }
   
@@ -328,7 +337,9 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
       }
     } catch (e) {
       debugPrint('Error with Gemini calculation: $e');
-      return _getDefaultNutrition();
+      debugPrint('Falling back to local database analysis');
+      // Use local database as fallback
+      return _analyzeWithLocalDatabase(description);
     }
   }
 
@@ -455,8 +466,11 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
 
       // Check if model is initialized
       if (_model == null) {
-        debugPrint('⚠️ Gemini not initialized, using fallback');
-        return _getDefaultNutrition();
+        debugPrint('⚠️ Gemini not initialized, using smart fallback');
+        // Try to analyze using local database with description parsing
+        // For generic image analysis, use default description
+        final description = 'Mixed meal from image';
+        return _analyzeWithLocalDatabase(description);
       }
 
       // Let Gemini analyze the image and calculate nutrition directly
@@ -471,7 +485,9 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
       return nutritionResult;
     } catch (e) {
       debugPrint('Error analyzing Indian food: $e');
-      return _getDefaultNutrition();
+      debugPrint('Using local database fallback');
+      // Fallback to estimated nutrition for generic food
+      return _analyzeWithLocalDatabase('Mixed meal');
     }
   }
   
@@ -805,6 +821,158 @@ Analyze the image now:
     return _getDefaultNutrition();
   }
   
+  // Smart fallback: Analyze meal using local database
+  Future<Map<String, dynamic>> _analyzeWithLocalDatabase(String description) async {
+    try {
+      debugPrint('🔍 Analyzing with local database: $description');
+
+      // Convert description to lowercase for matching
+      final lowerDesc = description.toLowerCase();
+
+      // Extract quantities and food items from description
+      final foods = <String>[];
+      final quantities = <String, int>{};
+
+      // Common quantity patterns
+      final quantityPatterns = [
+        RegExp(r'(\d+)\s*(?:piece|pcs|pc|nos|number)?\s*(?:of)?\s*(\w+)', caseSensitive: false),
+        RegExp(r'(\d+)\s*(\w+)', caseSensitive: false),
+        RegExp(r'(one|two|three|four|five|half|quarter)\s+(\w+)', caseSensitive: false),
+      ];
+
+      // Number word mapping
+      final numberWords = {
+        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+        'half': 0.5, 'quarter': 0.25, 'single': 1, 'double': 2,
+      };
+
+      // Search for known foods in the description
+      for (final foodName in _indianFoodDatabase.keys) {
+        if (lowerDesc.contains(foodName)) {
+          foods.add(foodName);
+
+          // Try to extract quantity for this food
+          for (final pattern in quantityPatterns) {
+            final matches = pattern.allMatches(lowerDesc);
+            for (final match in matches) {
+              final matchedFood = match.group(2)?.toLowerCase() ?? '';
+              if (foodName.contains(matchedFood) || matchedFood.contains(foodName.split(' ').first)) {
+                final quantityStr = match.group(1)?.toLowerCase() ?? '1';
+                final quantity = numberWords[quantityStr] ??
+                                 (double.tryParse(quantityStr) ?? 1.0);
+                quantities[foodName] = quantity.round();
+                break;
+              }
+            }
+          }
+
+          // Default quantity if not found
+          quantities[foodName] ??= 1;
+        }
+      }
+
+      // If no foods found, try partial matching
+      if (foods.isEmpty) {
+        final words = lowerDesc.split(RegExp(r'[\s,;.]+'));
+        for (final word in words) {
+          if (word.length > 3) {
+            for (final foodName in _indianFoodDatabase.keys) {
+              if (foodName.contains(word) || word.contains(foodName.split(' ').first)) {
+                foods.add(foodName);
+                quantities[foodName] = 1;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // If still no foods found, provide estimated nutrition
+      if (foods.isEmpty) {
+        debugPrint('No specific foods found, providing estimated nutrition');
+        return _getEstimatedNutrition(description);
+      }
+
+      // Calculate total nutrition
+      int totalCalories = 0;
+      double totalProtein = 0;
+      double totalCarbs = 0;
+      double totalFat = 0;
+      double totalFiber = 0;
+
+      for (final food in foods) {
+        final nutrition = _indianFoodDatabase[food]!;
+        final quantity = quantities[food] ?? 1;
+
+        totalCalories += (nutrition['calories'] as int) * quantity;
+        totalProtein += (nutrition['protein'] as double) * quantity;
+        totalCarbs += (nutrition['carbs'] as double) * quantity;
+        totalFat += (nutrition['fat'] as double) * quantity;
+        totalFiber += (nutrition['fiber'] as double) * quantity;
+      }
+
+      debugPrint('✅ Local database analysis complete:');
+      debugPrint('   Foods found: $foods');
+      debugPrint('   Total calories: $totalCalories');
+
+      return {
+        'success': true,
+        'foods': foods,
+        'nutrition': {
+          'calories': totalCalories,
+          'protein': totalProtein.round(),
+          'carbs': totalCarbs.round(),
+          'fat': totalFat.round(),
+          'fiber': totalFiber.round(),
+        },
+        'confidence': 0.7,
+        'source': 'Local Database',
+      };
+    } catch (e) {
+      debugPrint('Error in local database analysis: $e');
+      return _getEstimatedNutrition(description);
+    }
+  }
+
+  // Provide estimated nutrition when all else fails
+  Map<String, dynamic> _getEstimatedNutrition(String description) {
+    debugPrint('📊 Providing estimated nutrition');
+
+    // Estimate based on typical meal sizes
+    final lowerDesc = description.toLowerCase();
+    int estimatedCalories = 300; // Default medium meal
+
+    // Adjust based on meal size indicators
+    if (lowerDesc.contains('large') || lowerDesc.contains('big') ||
+        lowerDesc.contains('heavy') || lowerDesc.contains('full')) {
+      estimatedCalories = 500;
+    } else if (lowerDesc.contains('small') || lowerDesc.contains('light') ||
+               lowerDesc.contains('snack') || lowerDesc.contains('mini')) {
+      estimatedCalories = 150;
+    }
+
+    // Typical macro distribution
+    final protein = (estimatedCalories * 0.20 / 4).round(); // 20% from protein
+    final carbs = (estimatedCalories * 0.50 / 4).round();   // 50% from carbs
+    final fat = (estimatedCalories * 0.30 / 9).round();     // 30% from fat
+    final fiber = (estimatedCalories * 0.02).round();       // Rough estimate
+
+    return {
+      'success': true,
+      'foods': ['Mixed meal'],
+      'nutrition': {
+        'calories': estimatedCalories,
+        'protein': protein,
+        'carbs': carbs,
+        'fat': fat,
+        'fiber': fiber,
+      },
+      'confidence': 0.5,
+      'source': 'Estimated',
+      'message': 'Nutrition values are estimated. For accurate tracking, please use manual entry.',
+    };
+  }
+
   // Get default nutrition when all methods fail
   Map<String, dynamic> _getDefaultNutrition() {
     return {
