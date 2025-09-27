@@ -33,6 +33,15 @@ Streaker is a comprehensive fitness and health tracking Flutter application buil
 - **Visual Progress**: Charts and animations
 - **Milestone Notifications**: Achievement alerts
 - **Recovery Mechanisms**: Streak protection features
+- **Calendar View**: Visual streak history display
+- **Milestone Rings**: Progress visualization
+
+### 5. Profile Management (NEW - Sept 2025)
+- **Profile Photo Upload**: Supabase storage integration
+- **Edit Profile**: Complete profile editing with validation
+- **Pull-to-Refresh**: Dynamic data updates
+- **Input Validation**: Comprehensive field validation
+- **Photo Management**: Automatic cleanup of old photos
 
 ## Frontend Architecture
 

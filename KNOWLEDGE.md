@@ -47,6 +47,40 @@ Streaker (formerly Streaks Flutter) is a comprehensive health and fitness tracki
 - Modified `/lib/services/supabase_service.dart:189-238`
 - Updated `/lib/providers/nutrition_provider.dart:355-364`
 
+## Recent Updates (September 27, 2025)
+
+### 1. Profile Feature Enhancement
+**Features Added:**
+- **Profile Photo Upload:** Integrated Supabase storage for profile photos
+- **Edit Profile Screen:** Complete profile editing with validation
+- **Pull-to-Refresh:** Added RefreshIndicator for dynamic data updates
+- **Input Validation:** Age (13-120), Height (50-300cm), Weight (20-500kg)
+- **Fixed Weight Display:** Removed hardcoded 70kg default, shows actual data
+
+**Files Added:**
+- `/lib/screens/main/edit_profile_screen.dart` - Profile editing interface
+- `/lib/widgets/nutrition_entry_card_enhanced.dart` - Enhanced nutrition cards
+- `/lib/widgets/streak_calendar_widget.dart` - Visual streak calendar
+- `/lib/widgets/milestone_progress_ring.dart` - Milestone progress visualization
+
+**Database Changes:**
+- Added `photo_url` column to profiles table
+- Created `profile-photos` storage bucket in Supabase
+
+### 2. Nutrition Display Enhancement
+**Problem:** Dual display of AI-generated names and user descriptions
+**Solution:**
+- Show only user-entered descriptions when available
+- Simplified card layout to display user text, nutrition facts, and time
+- Fixed persistence issues when navigating between screens
+
+### 3. Supabase Storage Integration
+**Features:**
+- Profile photo upload with automatic compression
+- Old photo cleanup on update
+- Public storage bucket for easy access
+- Binary upload with proper MIME types
+
 ### 3. Health Data Sync Issues
 **Problem:** Steps showing 0 in Supabase after app restart
 

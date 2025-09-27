@@ -17,12 +17,14 @@ class UserProfile {
   final String name;
   final String email;
   final int? age;
+  final String? gender;
   final double? height;
   final double? weight;
   final double? targetWeight;
   final String? fitnessGoal;
   final String? activityLevel;
   final String? experienceLevel;
+  final String? photoUrl;
   final String? workoutConsistency;
   final String? deviceName;
   final bool deviceConnected;
@@ -42,12 +44,14 @@ class UserProfile {
     required this.name,
     required this.email,
     this.age,
+    this.gender,
     this.height,
     this.weight,
     this.targetWeight,
     this.fitnessGoal,
     this.activityLevel,
     this.experienceLevel,
+    this.photoUrl,
     this.workoutConsistency,
     this.deviceName,
     this.deviceConnected = false,
@@ -159,12 +163,14 @@ class UserProfile {
     String? name,
     String? email,
     int? age,
+    String? gender,
     double? height,
     double? weight,
     double? targetWeight,
     String? fitnessGoal,
     String? activityLevel,
     String? experienceLevel,
+    String? photoUrl,
     String? workoutConsistency,
     String? deviceName,
     bool? deviceConnected,
@@ -182,12 +188,14 @@ class UserProfile {
       name: name ?? this.name,
       email: email ?? this.email,
       age: age ?? this.age,
+      gender: gender ?? this.gender,
       height: height ?? this.height,
       weight: weight ?? this.weight,
       targetWeight: targetWeight ?? this.targetWeight,
       fitnessGoal: fitnessGoal ?? this.fitnessGoal,
       activityLevel: activityLevel ?? this.activityLevel,
       experienceLevel: experienceLevel ?? this.experienceLevel,
+      photoUrl: photoUrl ?? this.photoUrl,
       workoutConsistency: workoutConsistency ?? this.workoutConsistency,
       deviceName: deviceName ?? this.deviceName,
       deviceConnected: deviceConnected ?? this.deviceConnected,

@@ -5,10 +5,13 @@ import '../../providers/user_provider.dart';
 import '../../providers/nutrition_provider.dart';
 import '../../providers/health_provider.dart';
 import '../../providers/achievement_provider.dart';
-import '../../models/health_metric_model.dart';
+import '../../providers/streak_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/circular_progress_widget.dart';
+import '../../widgets/streak_display_widget.dart';
 import '../../widgets/achievements/achievement_grid.dart';
+import '../../widgets/streak_calendar_widget.dart';
+import '../../widgets/milestone_progress_ring.dart';
 import '../../services/achievement_checker.dart';
 // import 'dart:math' as math; // Not needed anymore - no random data
 
@@ -71,13 +74,13 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
       ),
       body: FadeTransition(
         opacity: _fadeAnimation,
-        child: Consumer3<UserProvider, NutritionProvider, HealthProvider>(
-          builder: (context, userProvider, nutritionProvider, healthProvider, child) {
+        child: Consumer4<UserProvider, NutritionProvider, HealthProvider, StreakProvider>(
+          builder: (context, userProvider, nutritionProvider, healthProvider, streakProvider, child) {
             return TabBarView(
               controller: _tabController,
               children: [
-                _buildProgressTab(userProvider, nutritionProvider, healthProvider),
-                _buildAchievementsTab(userProvider, nutritionProvider),
+                _buildProgressTab(userProvider, nutritionProvider, healthProvider, streakProvider),
+                _buildAchievementsTab(userProvider, nutritionProvider, healthProvider, streakProvider),
               ],
             );
           },
@@ -86,13 +89,21 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
     );
   }
 
-  Widget _buildProgressTab(UserProvider userProvider, NutritionProvider nutritionProvider, HealthProvider healthProvider) {
+  Widget _buildProgressTab(UserProvider userProvider, NutritionProvider nutritionProvider, HealthProvider healthProvider, StreakProvider streakProvider) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Add StreakDisplayWidget at the top for grace period visibility
+          const StreakDisplayWidget(isCompact: false),
+          const SizedBox(height: 20),
+
+          // Grace Period Warning Banner (if applicable)
+          if (streakProvider.isInGracePeriod)
+            _buildGracePeriodWarning(streakProvider),
+
           Text(
             'Today\'s Summary',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -101,17 +112,24 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
             ),
           ),
           const SizedBox(height: 20),
-          _buildSummarySection(userProvider, nutritionProvider, healthProvider),
+          _buildSummarySection(userProvider, nutritionProvider, healthProvider, streakProvider),
           const SizedBox(height: 32),
-          _buildWeeklyProgressChart(nutritionProvider, healthProvider),
+          _buildWeeklyProgressChart(nutritionProvider, healthProvider, streakProvider),
           const SizedBox(height: 32),
-          _buildGoalProgressSection(nutritionProvider, userProvider),
+
+          // Centered Milestone Progress Ring - Main Feature
+          Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: const MilestoneProgressRing(size: 160, strokeWidth: 16),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildAchievementsTab(UserProvider userProvider, NutritionProvider nutritionProvider) {
+  Widget _buildAchievementsTab(UserProvider userProvider, NutritionProvider nutritionProvider, HealthProvider healthProvider, StreakProvider streakProvider) {
     // Check achievements when tab is viewed
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AchievementChecker.checkAllAchievements(context);
@@ -129,11 +147,17 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStreakStatsSection(userProvider),
+            _buildStreakStatsSection(streakProvider),
             const SizedBox(height: 32),
-            _buildWeeklyPerformance(userProvider, nutritionProvider),
+            _buildWeeklyPerformance(streakProvider, nutritionProvider, healthProvider),
             const SizedBox(height: 32),
-            _buildMotivationalMessage(userProvider),
+            _buildMotivationalMessage(streakProvider),
+            const SizedBox(height: 32),
+            // Streak Calendar Widget
+            const StreakCalendarWidget(),
+            const SizedBox(height: 32),
+            // Monthly Statistics Section (New)
+            _buildMonthlyStats(streakProvider),
             const SizedBox(height: 32),
             // Replace old achievement badges with new AchievementGrid
             const AchievementGrid(),
@@ -144,13 +168,14 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
   }
 
 
-  Widget _buildSummarySection(UserProvider userProvider, NutritionProvider nutritionProvider, HealthProvider healthProvider) {
+  Widget _buildSummarySection(UserProvider userProvider, NutritionProvider nutritionProvider, HealthProvider healthProvider, StreakProvider streakProvider) {
     final todayNutrition = nutritionProvider.todayNutrition;
     final caloriesConsumed = todayNutrition.totalCalories;
-    
+
     // Get actual calories burned from health provider
     final caloriesBurned = healthProvider.todayCaloriesBurned.toInt();
-    final activeStreak = userProvider.streakData?.currentStreak ?? 0;
+    // Use StreakProvider for streak data
+    final activeStreak = streakProvider.currentStreak;
 
     return Row(
       children: [
@@ -223,7 +248,7 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
     );
   }
 
-  Widget _buildWeeklyProgressChart(NutritionProvider nutritionProvider, HealthProvider healthProvider) {
+  Widget _buildWeeklyProgressChart(NutritionProvider nutritionProvider, HealthProvider healthProvider, StreakProvider streakProvider) {
     // Calculate max value from both datasets to set dynamic Y-axis scale
     final burnedData = _generateWeeklyData(true);
     final consumedData = _generateWeeklyData(false);
@@ -422,13 +447,23 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
       double value = 0.0;
 
       if (isCaloriesBurned) {
-        // Get calories burned data from health provider
-        // For now, use today's data for the current day, and estimate for past days
+        // Get calories burned data from health provider and recent metrics
         if (i == 6) { // Today
           value = healthProvider.todayCaloriesBurned.toDouble();
         } else {
-          // Use a default value for past days (you can enhance this later with historical data)
-          value = 1800 + (i * 50); // Gradually increasing trend
+          // Try to get actual data from recent metrics
+          final streakProvider = Provider.of<StreakProvider>(context, listen: false);
+          final metricsForDate = streakProvider.recentMetrics.where((m) =>
+            m.date.year == date.year &&
+            m.date.month == date.month &&
+            m.date.day == date.day
+          ).toList();
+
+          if (metricsForDate.isNotEmpty) {
+            value = metricsForDate.first.caloriesBurned.toDouble();
+          } else {
+            value = 0; // Show 0 instead of fake data
+          }
         }
       } else {
         // Get calories consumed data from nutrition provider
@@ -443,10 +478,8 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
           value += entry.calories.toDouble();
         }
 
-        // If no data for that day, use a default value
-        if (value == 0 && i < 6) {
-          value = 1900 + (i * 30); // Default pattern
-        }
+        // No fake data - show 0 if no entries
+        // This provides accurate representation of actual consumption
       }
 
       spots.add(FlSpot(i.toDouble(), value));
@@ -456,129 +489,12 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
   }
 
 
-  Widget _buildGoalProgressSection(NutritionProvider nutritionProvider, UserProvider userProvider) {
-    final todayNutrition = nutritionProvider.todayNutrition;
-    final caloriesProgress = todayNutrition.totalCalories / nutritionProvider.calorieGoal;
-    final proteinProgress = todayNutrition.totalProtein / nutritionProvider.proteinGoal;
-    
-    // Start with zero workouts - will track actual workouts
-    final workoutsCompleted = 0;
-    final workoutsGoal = 7;
-    final workoutProgress = workoutsCompleted / workoutsGoal;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Goal Progress',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
-        ),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              _buildProgressItem(
-                'Caloric Intake',
-                todayNutrition.totalCalories,
-                nutritionProvider.calorieGoal,
-                'kcal',
-                caloriesProgress,
-                AppTheme.primaryAccent,
-              ),
-              const SizedBox(height: 20),
-              _buildProgressItem(
-                'Protein',
-                todayNutrition.totalProtein.toInt(),
-                nutritionProvider.proteinGoal.toInt(),
-                'g',
-                proteinProgress,
-                Colors.green,
-              ),
-              const SizedBox(height: 20),
-              _buildProgressItem(
-                'Workouts',
-                workoutsCompleted,
-                workoutsGoal,
-                '',
-                workoutProgress,
-                Colors.purple,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProgressItem(
-    String label,
-    int current,
-    int goal,
-    String unit,
-    double progress,
-    Color color,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            Text(
-              '$current / $goal $unit',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 8,
-          decoration: BoxDecoration(
-            color: AppTheme.borderColor,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: progress.clamp(0.0, 1.0),
-            child: Container(
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStreakStatsSection(UserProvider userProvider) {
-    final streakData = userProvider.streakData;
-    final currentStreak = streakData?.currentStreak ?? 0;
-    final bestStreak = streakData?.longestStreak ?? 0;
-    final goalsCompleted = 0; // Start from zero
+  Widget _buildStreakStatsSection(StreakProvider streakProvider) {
+    final currentStreak = streakProvider.currentStreak;
+    final bestStreak = streakProvider.longestStreak;
+    final stats = streakProvider.getStreakStats();
+    final goalsCompleted = stats['goalsCompleted'] as int;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -655,11 +571,14 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
     );
   }
 
-  Widget _buildWeeklyPerformance(UserProvider userProvider, NutritionProvider nutritionProvider) {
-    final totalStreakDays = userProvider.streakData?.currentStreak ?? 0;
-    final caloriesBurnedThisWeek = 0; // Start from zero
-    final hoursWorkedOut = 0; // Start from zero
-    final performancePercentage = 0; // Start from zero
+  Widget _buildWeeklyPerformance(StreakProvider streakProvider, NutritionProvider nutritionProvider, HealthProvider healthProvider) {
+    final totalStreakDays = streakProvider.currentStreak;
+    // Calculate weekly calories burned from recent metrics
+    final caloriesBurnedThisWeek = _calculateWeeklyCaloriesBurned(healthProvider);
+    // Calculate weekly workout hours from health data
+    final hoursWorkedOut = _calculateWeeklyWorkoutHours(healthProvider);
+    // Calculate actual performance percentage
+    final performancePercentage = _calculateWeeklyPerformance(streakProvider);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -737,9 +656,10 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
     );
   }
 
-  Widget _buildMotivationalMessage(UserProvider userProvider) {
-    final currentStreak = userProvider.streakData?.currentStreak ?? 0;
-    final daysToNextMilestone = 7 - (currentStreak % 7);
+  Widget _buildMotivationalMessage(StreakProvider streakProvider) {
+    final currentStreak = streakProvider.currentStreak;
+    final daysToNextMilestone = _calculateDaysToNextMilestone(currentStreak);
+    final message = streakProvider.getGracePeriodMessage();
     
     return Container(
       padding: const EdgeInsets.all(20),
@@ -765,15 +685,376 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: Text(
-              'You\'re on a $currentStreak-day streak! Just $daysToNextMilestone more days to unlock Build the Habit!',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                height: 1.4,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.isNotEmpty ? message :
+                  'You\'re on a $currentStreak-day streak! Just $daysToNextMilestone more days to the next milestone!',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    height: 1.4,
+                  ),
+                ),
+                if (streakProvider.isInGracePeriod) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '⚠️ Grace Period: ${streakProvider.remainingGraceDays} excuse days remaining',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.errorRed,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // Real data calculation methods
+  int _calculateWeeklyCaloriesBurned(HealthProvider healthProvider) {
+    final streakProvider = Provider.of<StreakProvider>(context, listen: false);
+    final now = DateTime.now();
+    int totalCalories = 0;
+
+    // Calculate calories burned for the past 7 days from recent metrics
+    for (int i = 0; i < 7; i++) {
+      final date = now.subtract(Duration(days: i));
+      final metricsForDate = streakProvider.recentMetrics.where((m) =>
+        m.date.year == date.year &&
+        m.date.month == date.month &&
+        m.date.day == date.day
+      ).toList();
+
+      if (metricsForDate.isNotEmpty) {
+        totalCalories += metricsForDate.first.caloriesBurned;
+      }
+    }
+
+    // If no historical data, include today's value
+    if (totalCalories == 0) {
+      totalCalories = healthProvider.todayCaloriesBurned.toInt();
+    }
+
+    return totalCalories;
+  }
+
+  double _calculateWeeklyWorkoutHours(HealthProvider healthProvider) {
+    final streakProvider = Provider.of<StreakProvider>(context, listen: false);
+    final now = DateTime.now();
+    int totalWorkouts = 0;
+
+    // Calculate workouts for the past 7 days from recent metrics
+    for (int i = 0; i < 7; i++) {
+      final date = now.subtract(Duration(days: i));
+      final metricsForDate = streakProvider.recentMetrics.where((m) =>
+        m.date.year == date.year &&
+        m.date.month == date.month &&
+        m.date.day == date.day
+      ).toList();
+
+      if (metricsForDate.isNotEmpty) {
+        totalWorkouts += metricsForDate.first.workouts;
+      }
+    }
+
+    // If no historical data, include today's value
+    if (totalWorkouts == 0) {
+      totalWorkouts = healthProvider.todayWorkouts;
+    }
+
+    // Estimate 45 minutes per workout on average
+    return totalWorkouts * 0.75;
+  }
+
+  int _calculateWeeklyPerformance(StreakProvider streakProvider) {
+    // Calculate based on how many days goals were achieved this week
+    final recentMetrics = streakProvider.recentMetrics;
+    if (recentMetrics.isEmpty) return 0;
+
+    int daysAchieved = 0;
+    final now = DateTime.now();
+    for (final metric in recentMetrics) {
+      if (now.difference(metric.date).inDays < 7 && metric.allGoalsAchieved) {
+        daysAchieved++;
+      }
+    }
+    return ((daysAchieved / 7.0) * 100).round();
+  }
+
+  int _calculateDaysToNextMilestone(int currentStreak) {
+    if (currentStreak < 7) return 7 - currentStreak;
+    if (currentStreak < 30) return 30 - currentStreak;
+    if (currentStreak < 100) return 100 - currentStreak;
+    return (((currentStreak ~/ 100) + 1) * 100) - currentStreak;
+  }
+
+  Widget _buildGracePeriodWarning(StreakProvider streakProvider) {
+    final remainingDays = streakProvider.remainingGraceDays;
+    final isHighRisk = remainingDays <= 1;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isHighRisk
+            ? AppTheme.errorRed.withOpacity(0.1)
+            : Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isHighRisk
+              ? AppTheme.errorRed.withOpacity(0.3)
+              : Colors.orange.withOpacity(0.3),
+          width: 2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isHighRisk ? Icons.warning_rounded : Icons.info_outline_rounded,
+            color: isHighRisk ? AppTheme.errorRed : Colors.orange,
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isHighRisk ? 'Streak at Risk!' : 'Grace Period Active',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: isHighRisk ? AppTheme.errorRed : Colors.orange,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  streakProvider.getGracePeriodMessage(),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Visual indicator of grace days
+          Row(
+            children: List.generate(2, (index) {
+              final isUsed = index < streakProvider.graceDaysUsed;
+              return Container(
+                margin: const EdgeInsets.only(left: 4),
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isUsed
+                      ? AppTheme.errorRed
+                      : (isHighRisk && index == 1)
+                          ? Colors.orange
+                          : AppTheme.successGreen.withOpacity(0.5),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthlyStats(StreakProvider streakProvider) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: streakProvider.getMonthlyStats(),
+      builder: (context, snapshot) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Monthly Statistics',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 24,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: _buildMonthlyStatsContent(snapshot),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildMonthlyStatsContent(AsyncSnapshot<Map<String, dynamic>> snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return Column(
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            'Loading monthly statistics...',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (snapshot.hasError) {
+      return Column(
+        children: [
+          Icon(
+            Icons.error_outline,
+            color: AppTheme.errorRed,
+            size: 48,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Unable to load monthly stats',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: AppTheme.errorRed,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Please check your connection and try again',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppTheme.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => setState(() {}), // Trigger rebuild to retry
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryAccent,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+      return Column(
+        children: [
+          Icon(
+            Icons.calendar_month,
+            color: AppTheme.textSecondary,
+            size: 48,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No monthly data yet',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Complete your daily goals to see monthly statistics',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppTheme.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      );
+    }
+
+    final stats = snapshot.data!;
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildMonthlyStatItem(
+              'Days\nCompleted',
+              '${stats['daysCompleted'] ?? 0}',
+              Icons.calendar_month,
+              AppTheme.primaryAccent,
+            ),
+            _buildMonthlyStatItem(
+              'Perfect\nDays',
+              '${stats['perfectDays'] ?? 0}',
+              Icons.star,
+              Colors.amber,
+            ),
+            _buildMonthlyStatItem(
+              'Avg\nSleep',
+              '${(stats['avgSleep'] ?? 0).toStringAsFixed(1)}h',
+              Icons.bedtime,
+              Colors.indigo,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        if (stats['totalSteps'] != null && stats['totalSteps'] > 0) ...[
+          Text(
+            'Total Steps This Month',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${(stats['totalSteps'] as int).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryAccent,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildMonthlyStatItem(String label, String value, IconData icon, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: AppTheme.textSecondary,
+            height: 1.2,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 

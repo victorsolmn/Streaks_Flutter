@@ -8,6 +8,7 @@ import '../../services/toast_service.dart';
 import '../../services/popup_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/nutrition_card.dart';
+import '../../widgets/nutrition_entry_card_enhanced.dart';
 
 class NutritionScreen extends StatefulWidget {
   const NutritionScreen({Key? key}) : super(key: key);
@@ -47,7 +48,10 @@ class _NutritionScreenState extends State<NutritionScreen>
       // Request camera permission
       final cameraStatus = await Permission.camera.request();
       if (!cameraStatus.isGranted) {
-        _showErrorDialog('Camera permission is required to scan food');
+        _showErrorDialog(
+          'Camera Permission Required',
+          'Please enable camera access in your device settings to scan food items.'
+        );
         return;
       }
 
@@ -724,20 +728,32 @@ class _NutritionScreenState extends State<NutritionScreen>
   }
 
 
-  void _showErrorDialog(String message) {
+  void _showErrorDialog(String titleOrMessage, [String? message]) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final String actualTitle = message != null ? titleOrMessage : 'Error';
+    final String actualMessage = message ?? titleOrMessage;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: isDarkMode ? AppTheme.darkCardBackground : AppTheme.cardBackgroundLight,
-        title: Text(
-          'Error',
-          style: TextStyle(
-            color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
-          ),
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: AppTheme.errorRed, size: 24),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                actualTitle,
+                style: TextStyle(
+                  color: isDarkMode ? AppTheme.textPrimaryDark : AppTheme.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
         content: Text(
-          message,
+          actualMessage,
           style: TextStyle(
             color: isDarkMode ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
           ),
@@ -1063,8 +1079,8 @@ class _NutritionScreenState extends State<NutritionScreen>
         
         return RefreshIndicator(
           onRefresh: () async {
-            // Refresh data
-            await Future.delayed(const Duration(seconds: 1));
+            // Reload nutrition data from Supabase
+            await nutritionProvider.loadDataFromSupabase();
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -1110,7 +1126,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                   _buildEmptyState()
                 else
                   ...todayNutrition.entries.map(
-                    (entry) => NutritionEntryCard(
+                    (entry) => NutritionEntryCardEnhanced(
                       entry: entry,
                       onDelete: () async {
                         final confirm = await _showDeleteConfirmation();
@@ -1137,8 +1153,8 @@ class _NutritionScreenState extends State<NutritionScreen>
         
         return RefreshIndicator(
           onRefresh: () async {
-            // Refresh data
-            await Future.delayed(const Duration(seconds: 1));
+            // Reload nutrition data from Supabase
+            await nutritionProvider.loadDataFromSupabase();
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),

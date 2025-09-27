@@ -4,6 +4,7 @@ import '../config/supabase_config.dart';
 import '../models/user_model.dart';
 import '../models/nutrition_model.dart';
 import 'dart:convert';
+import 'dart:io';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -453,6 +454,106 @@ class SupabaseService {
       }
       print('=' * 60 + '\n');
       throw Exception('Failed to update profile: $e');
+    }
+  }
+
+  // Storage Methods for Profile Photos
+  Future<String?> uploadProfilePhoto({
+    required String userId,
+    required String filePath,
+  }) async {
+    try {
+      final file = File(filePath);
+      final fileExtension = filePath.split('.').last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+      final storagePath = '$userId/$fileName';
+
+      // Upload file to Supabase storage
+      // Try to upload, if file exists it will throw error so we use upsert
+      await _supabase.storage
+          .from('profile-photos')
+          .uploadBinary(
+            storagePath,
+            await file.readAsBytes(),
+            fileOptions: FileOptions(
+              upsert: true,
+              contentType: 'image/${fileExtension}',
+            ),
+          );
+
+      // Get the public URL for the uploaded file
+      final publicUrl = _supabase.storage
+          .from('profile-photos')
+          .getPublicUrl(storagePath);
+
+      return publicUrl;
+    } catch (e) {
+      print('Error uploading profile photo: $e');
+      throw Exception('Failed to upload profile photo: $e');
+    }
+  }
+
+  Future<void> deleteProfilePhoto(String? photoUrl) async {
+    if (photoUrl == null || photoUrl.isEmpty) return;
+
+    try {
+      // Extract the storage path from the URL
+      final uri = Uri.parse(photoUrl);
+      final pathSegments = uri.pathSegments;
+
+      // Find the index of 'profile-photos' in the path
+      final bucketIndex = pathSegments.indexOf('profile-photos');
+      if (bucketIndex == -1 || bucketIndex >= pathSegments.length - 1) {
+        print('Invalid photo URL format');
+        return;
+      }
+
+      // Get the path after 'profile-photos'
+      final storagePath = pathSegments.sublist(bucketIndex + 1).join('/');
+
+      // Delete the file from storage
+      await _supabase.storage
+          .from('profile-photos')
+          .remove([storagePath]);
+    } catch (e) {
+      // Don't throw error for deletion failures, just log it
+      print('Failed to delete old profile photo: $e');
+    }
+  }
+
+  Future<void> updateProfilePhoto({
+    required String userId,
+    required String filePath,
+  }) async {
+    try {
+      // Get current profile to find old photo URL
+      final currentProfile = await getUserProfile(userId);
+      final oldPhotoUrl = currentProfile?['photo_url'] as String?;
+
+      // Upload new photo
+      final newPhotoUrl = await uploadProfilePhoto(
+        userId: userId,
+        filePath: filePath,
+      );
+
+      if (newPhotoUrl == null) {
+        throw Exception('Failed to get photo URL after upload');
+      }
+
+      // Update profile with new photo URL
+      await updateUserProfile(
+        userId: userId,
+        updates: {
+          'photo_url': newPhotoUrl,
+        },
+      );
+
+      // Delete old photo after successful update
+      if (oldPhotoUrl != null && oldPhotoUrl != newPhotoUrl) {
+        await deleteProfilePhoto(oldPhotoUrl);
+      }
+    } catch (e) {
+      throw Exception('Failed to update profile photo: $e');
     }
   }
 

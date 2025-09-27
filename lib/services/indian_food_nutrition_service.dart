@@ -3,12 +3,23 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_generative_ai/google_generative_ai.dart';
+import '../config/api_config.dart';
 
 class IndianFoodNutritionService {
-  // Google Gemini API - FREE tier (60 queries/minute)
-  // IMPORTANT: Get your FREE key from https://makersuite.google.com/app/apikey
-  static const String _geminiApiKey = 'AIzaSyCKfZexkUygDlTNguMzEwtA0UX-6iJgh70';
-  
+  // Singleton instance
+  static IndianFoodNutritionService? _instance;
+  factory IndianFoodNutritionService() {
+    _instance ??= IndianFoodNutritionService._internal();
+    return _instance!;
+  }
+
+  IndianFoodNutritionService._internal() {
+    _initializeGeminiModel();
+  }
+
+  // Google Gemini API - Using secure config
+  static String get _geminiApiKey => ApiConfig.geminiApiKey;
+
   // Indian Food Composition Database (IFCT 2017) - DEPRECATED
   // We now use Gemini AI to calculate nutrition directly for better accuracy
   // Keeping this for reference/fallback only
@@ -90,18 +101,19 @@ class IndianFoodNutritionService {
   
   // Gemini Vision for Indian food recognition
   GenerativeModel? _model;
-  
-  IndianFoodNutritionService() {
-    // Initialize Gemini with the API key - try multiple model versions
-    if (_geminiApiKey.isNotEmpty && _geminiApiKey.startsWith('AIza')) {
-      _initializeGeminiModel();
-    } else {
-      debugPrint('⚠️ Invalid Gemini API key');
-    }
-  }
 
   // Try multiple Gemini model versions to find one that works
   void _initializeGeminiModel() {
+    // Check API key validity
+    if (!ApiConfig.enableGeminiVision || _geminiApiKey.isEmpty) {
+      debugPrint('⚠️ Gemini Vision is disabled or API key is missing');
+      return;
+    }
+
+    if (!_geminiApiKey.startsWith('AIza')) {
+      debugPrint('⚠️ Invalid Gemini API key format');
+      return;
+    }
     final modelVersions = [
       'gemini-1.5-flash',     // Most common free tier model
       'gemini-1.5-pro',       // Pro version if available

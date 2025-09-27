@@ -210,10 +210,10 @@ class NutritionProvider with ChangeNotifier {
       // Note: clearAllNutritionEntries method available if needed for future cleanup
       // await _supabaseService.clearAllNutritionEntries(userId);
 
-      // Load nutrition history from Supabase (last 30 days)
+      // Load nutrition history from Supabase (last 7 days initially for performance)
       final history = await _supabaseService.getNutritionHistory(
         userId: userId,
-        days: 30,
+        days: 7, // Start with 7 days for faster loading
       );
 
       _entries.clear();
@@ -359,11 +359,15 @@ class NutritionProvider with ChangeNotifier {
       );
 
       // Create a set of existing entry identifiers to prevent duplicates
+      // Using composite key: timestamp + food_name + calories for better duplicate detection
       final existingEntryKeys = <String>{};
       for (final existing in existingEntries) {
         final timestamp = DateTime.parse(existing['created_at'] ?? existing['date'] ?? '');
         final foodName = existing['food_name'] ?? '';
-        final key = '${timestamp.millisecondsSinceEpoch}_$foodName';
+        final calories = existing['calories'] ?? 0;
+        // Create composite key with timestamp (rounded to nearest minute), food name, and calories
+        final roundedTimestamp = (timestamp.millisecondsSinceEpoch ~/ 60000) * 60000;
+        final key = '${roundedTimestamp}_${foodName}_$calories';
         existingEntryKeys.add(key);
       }
 
@@ -382,8 +386,9 @@ class NutritionProvider with ChangeNotifier {
 
         // Only save entries that haven't been synced yet
         for (final entry in todayEntries) {
-          // Use a combination of timestamp and food name as unique identifier
-          final entryKey = '${entry.timestamp.millisecondsSinceEpoch}_${entry.foodName}';
+          // Use composite key: timestamp (rounded to minute) + food name + calories
+          final roundedTimestamp = (entry.timestamp.millisecondsSinceEpoch ~/ 60000) * 60000;
+          final entryKey = '${roundedTimestamp}_${entry.foodName}_${entry.calories}';
 
           // Check if entry already exists in database
           if (!existingEntryKeys.contains(entryKey) && !syncedEntryIds.contains(entryKey)) {
@@ -469,7 +474,7 @@ class NutritionProvider with ChangeNotifier {
         final entry = NutritionEntry(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           foodName: foodName,
-          quantity: mealDescription.length > 50 ? mealDescription.substring(0, 50) + '...' : mealDescription,
+          quantity: mealDescription.length > 200 ? mealDescription.substring(0, 197) + '...' : mealDescription,
           calories: nutrition['calories'] ?? 0,
           protein: (nutrition['protein'] ?? 0).toDouble(),
           carbs: (nutrition['carbs'] ?? 0).toDouble(),
@@ -688,6 +693,66 @@ class NutritionProvider with ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  // Load more nutrition history (for pagination)
+  Future<void> loadMoreHistory({int days = 30}) async {
+    final userId = _supabaseService.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      _setLoading(true);
+
+      // Load extended history from Supabase
+      final history = await _supabaseService.getNutritionHistory(
+        userId: userId,
+        days: days,
+      );
+
+      // Track existing entries to avoid duplicates
+      final existingKeys = <String>{};
+      for (final entry in _entries) {
+        final roundedTimestamp = (entry.timestamp.millisecondsSinceEpoch ~/ 60000) * 60000;
+        existingKeys.add('${roundedTimestamp}_${entry.foodName}_${entry.calories}');
+      }
+
+      // Add new entries that don't already exist
+      for (final entry in history) {
+        final timestamp = DateTime.parse(entry['created_at'] ?? entry['date'] ?? DateTime.now().toIso8601String());
+        final foodName = entry['food_name'] ?? 'Unknown';
+        final calories = entry['calories'] ?? 0;
+
+        // Create composite key
+        final roundedTimestamp = (timestamp.millisecondsSinceEpoch ~/ 60000) * 60000;
+        final entryKey = '${roundedTimestamp}_${foodName}_$calories';
+
+        // Skip if already exists
+        if (!existingKeys.contains(entryKey)) {
+          _entries.add(NutritionEntry(
+            id: entry['id'] ?? entryKey,
+            foodName: foodName,
+            calories: calories,
+            protein: (entry['protein'] ?? 0).toDouble(),
+            carbs: (entry['carbs'] ?? 0).toDouble(),
+            fat: (entry['fat'] ?? 0).toDouble(),
+            fiber: (entry['fiber'] ?? 0).toDouble(),
+            timestamp: timestamp,
+          ));
+        }
+      }
+
+      // Sort entries by timestamp
+      _entries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      debugPrint('Loaded ${_entries.length} total nutrition entries');
+      await _saveNutritionData();
+
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading more history: $e');
+      _setLoading(false);
+    }
   }
 
   Future<void> clearNutritionData() async {

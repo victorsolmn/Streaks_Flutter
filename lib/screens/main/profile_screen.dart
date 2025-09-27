@@ -24,7 +24,9 @@ import '../../widgets/weight_progress_card.dart';
 import '../../utils/app_theme.dart';
 import '../auth/welcome_screen.dart';
 import 'edit_goals_screen.dart';
+import 'edit_profile_screen.dart';
 import '../../services/health_log_capture_service.dart';
+import '../../services/supabase_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -60,19 +62,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _initializeWeightDataWithDefaults() {
-    // Initialize with placeholder data to prevent null errors
-    _weightProgress = WeightProgress(
-      startWeight: 70.0,
-      currentWeight: 70.0,
-      targetWeight: 70.0,
-      entries: [
-        WeightEntry(
-          id: 'placeholder',
-          weight: 70.0,
-          timestamp: DateTime.now(),
-        ),
-      ],
-    );
+    // Initialize with null to show loading state instead of fake data
+    _weightProgress = null;
   }
 
   void _initializeWeightData() {
@@ -87,8 +78,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     // Use actual profile data from onboarding
-    final startWeight = profile.weight ?? 70.0;
-    final currentWeight = profile.weight ?? 70.0; // For now, same as start weight
+    // Only initialize if we have actual weight data
+    if (profile.weight == null) {
+      print('ProfileScreen: No weight data in profile');
+      return;
+    }
+
+    final startWeight = profile.weight!;
+    final currentWeight = profile.weight!; // Will be updated from weight entries if available
     final targetWeight = profile.targetWeight ?? startWeight;
 
     print('ProfileScreen: Initializing weight data - Start: $startWeight, Current: $currentWeight, Target: $targetWeight');
@@ -98,15 +95,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       currentWeight: currentWeight,
       targetWeight: targetWeight,
       entries: [
-        // Add initial entry from profile (when user started)
+        // Single entry with current weight from profile
         WeightEntry(
-          id: 'initial',
-          weight: startWeight,
-          timestamp: DateTime.now().subtract(const Duration(days: 1)), // Started yesterday
-        ),
-        // Current weight entry
-        WeightEntry(
-          id: 'current',
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
           weight: currentWeight,
           timestamp: DateTime.now(),
         ),
@@ -121,19 +112,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildHeader(),
-              _buildProfileInfo(),
-              _buildWeightProgressSection(),
-              _buildFitnessGoalsSection(),
-              _buildSettingsSection(),
-            ],
+        child: RefreshIndicator(
+          onRefresh: _refreshProfile,
+          color: AppTheme.primaryAccent,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                _buildHeader(),
+                _buildProfileInfo(),
+                _buildWeightProgressSection(),
+                _buildFitnessGoalsSection(),
+                _buildSettingsSection(),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _refreshProfile() async {
+    try {
+      // Refresh profile data
+      final userProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
+      await userProvider.reloadUserProfile();
+
+      // Refresh health data
+      final healthProvider = Provider.of<HealthProvider>(context, listen: false);
+      if (healthProvider.isHealthSourceConnected) {
+        await healthProvider.syncWithHealth();
+      }
+
+      // Re-initialize weight data with refreshed profile
+      _initializeWeightData();
+
+      // Update UI
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Profile refreshed successfully!'),
+            backgroundColor: AppTheme.successGreen,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh profile: ${e.toString()}'),
+            backgroundColor: AppTheme.errorRed,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildHeader() {
@@ -154,7 +189,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           IconButton(
             onPressed: () {
-              // Edit profile action
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => EditProfileScreen(),
+                ),
+              ).then((_) {
+                // Refresh profile data after returning from edit screen
+                if (mounted) {
+                  _refreshProfile();
+                }
+              });
             },
             icon: Icon(
               Icons.edit,
@@ -189,14 +233,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: AppTheme.primaryAccent,
                       width: 3,
                     ),
-                    image: _profileImage != null
-                        ? DecorationImage(
-                            image: FileImage(_profileImage!),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
+                    image: _getProfileImage(),
                   ),
-                  child: _profileImage == null
+                  child: _getProfileImage() == null
                       ? Icon(
                           Icons.person,
                           size: 50,
@@ -860,7 +899,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _profileImage = File(image.path);
       });
+
+      // Upload to Supabase storage
+      try {
+        final userProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
+        final userId = SupabaseService().currentUser?.id;
+
+        if (userId != null) {
+          // Show loading indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Uploading profile photo...'),
+                ],
+              ),
+              backgroundColor: AppTheme.primaryAccent,
+              duration: Duration(seconds: 30),
+            ),
+          );
+
+          // Upload photo and update profile
+          await SupabaseService().updateProfilePhoto(
+            userId: userId,
+            filePath: image.path,
+          );
+
+          // Reload profile to get updated photo URL
+          await userProvider.loadUserProfile();
+
+          // Clear any existing snackbars
+          ScaffoldMessenger.of(context).clearSnackBars();
+
+          // Show success message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Profile photo updated successfully!'),
+                backgroundColor: AppTheme.successGreen,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        // Clear loading snackbar
+        ScaffoldMessenger.of(context).clearSnackBars();
+
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to upload photo: ${e.toString()}'),
+              backgroundColor: AppTheme.errorRed,
+            ),
+          );
+        }
+      }
     }
+  }
+
+  DecorationImage? _getProfileImage() {
+    final userProvider = Provider.of<SupabaseUserProvider>(context);
+    final photoUrl = userProvider.userProfile?.photoUrl;
+
+    // First priority: Supabase photo URL
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return DecorationImage(
+        image: NetworkImage(photoUrl),
+        fit: BoxFit.cover,
+      );
+    }
+
+    // Second priority: Local file (temporary during upload)
+    if (_profileImage != null) {
+      return DecorationImage(
+        image: FileImage(_profileImage!),
+        fit: BoxFit.cover,
+      );
+    }
+
+    return null;
   }
 
   void _showWeightChart() {
@@ -948,13 +1075,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               controller: weightController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                labelText: 'Weight (${_weightProgress!.unit})',
+                labelText: 'Weight (${_weightProgress?.unit ?? 'kg'})',
+                helperText: 'Range: 20-500 kg',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
               inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                FilteringTextInputFormatter.allow(RegExp(r'^\d{0,3}(\.\d{0,1})?$')),
               ],
             ),
             SizedBox(height: 16),
@@ -978,7 +1106,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             onPressed: () async {
               final weight = double.tryParse(weightController.text);
-              if (weight != null) {
+
+              // Validate weight range
+              if (weight == null || weight < 20 || weight > 500) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Please enter a valid weight between 20 and 500 kg'),
+                    backgroundColor: AppTheme.errorRed,
+                  ),
+                );
+                return;
+              }
+
+              if (weight != null && weight >= 20 && weight <= 500) {
                 final newEntry = WeightEntry(
                   id: DateTime.now().millisecondsSinceEpoch.toString(),
                   weight: weight,
@@ -1037,26 +1177,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             TextField(
               controller: calorieController,
-              decoration: const InputDecoration(labelText: 'Daily Calories'),
+              decoration: const InputDecoration(
+                labelText: 'Daily Calories',
+                helperText: 'Range: 500-10000',
+              ),
               keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
             ),
             SizedBox(height: 16),
             TextField(
               controller: proteinController,
-              decoration: const InputDecoration(labelText: 'Protein (g)'),
+              decoration: const InputDecoration(
+                labelText: 'Protein (g)',
+                helperText: 'Range: 0-999',
+              ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d{0,3}(\.\d{0,1})?$')),
+              ],
             ),
             SizedBox(height: 16),
             TextField(
               controller: carbController,
-              decoration: const InputDecoration(labelText: 'Carbs (g)'),
+              decoration: const InputDecoration(
+                labelText: 'Carbs (g)',
+                helperText: 'Range: 0-999',
+              ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d{0,3}(\.\d{0,1})?$')),
+              ],
             ),
             SizedBox(height: 16),
             TextField(
               controller: fatController,
-              decoration: const InputDecoration(labelText: 'Fat (g)'),
+              decoration: const InputDecoration(
+                labelText: 'Fat (g)',
+                helperText: 'Range: 0-999',
+              ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d{0,3}(\.\d{0,1})?$')),
+              ],
             ),
           ],
         ),
@@ -1067,13 +1231,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              // Validate inputs
+              final calories = int.tryParse(calorieController.text);
+              final protein = double.tryParse(proteinController.text);
+              final carbs = double.tryParse(carbController.text);
+              final fat = double.tryParse(fatController.text);
+
+              // Check calorie range
+              if (calories != null && (calories < 500 || calories > 10000)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Calories must be between 500 and 10000'),
+                    backgroundColor: AppTheme.errorRed,
+                  ),
+                );
+                return;
+              }
+
+              // Check macros range
+              if ((protein != null && (protein < 0 || protein > 999)) ||
+                  (carbs != null && (carbs < 0 || carbs > 999)) ||
+                  (fat != null && (fat < 0 || fat > 999))) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Macros must be between 0 and 999 grams'),
+                    backgroundColor: AppTheme.errorRed,
+                  ),
+                );
+                return;
+              }
+
               await nutritionProvider.updateGoals(
-                calorieGoal: int.tryParse(calorieController.text),
-                proteinGoal: double.tryParse(proteinController.text),
-                carbGoal: double.tryParse(carbController.text),
-                fatGoal: double.tryParse(fatController.text),
+                calorieGoal: calories,
+                proteinGoal: protein,
+                carbGoal: carbs,
+                fatGoal: fat,
               );
               Navigator.of(context).pop();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Nutrition goals updated successfully!'),
+                  backgroundColor: AppTheme.successGreen,
+                ),
+              );
             },
             child: Text('Save'),
           ),

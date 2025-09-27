@@ -303,7 +303,7 @@ class StreakDisplayWidget extends StatelessWidget {
               ),
               _buildStatItem(
                 'This Month',
-                '${_getMonthlyCount(totalDays)}',
+                '${stats['currentMonthDays'] ?? 0}',
                 Icons.date_range,
                 isActive,
                 isDarkMode,
@@ -395,11 +395,5 @@ class StreakDisplayWidget extends StatelessWidget {
         ),
       ],
     );
-  }
-  
-  int _getMonthlyCount(int totalDays) {
-    // This is a simplified calculation
-    // In production, you'd query actual monthly data
-    return totalDays > 30 ? 30 : totalDays;
   }
 }

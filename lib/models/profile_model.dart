@@ -17,6 +17,7 @@ class ProfileModel {
   final double? height; // 50-300 cm
   final double? weight; // 20-500 kg
   final String? activityLevel;
+  final String? photoUrl; // Profile photo URL from Supabase storage
   final String? fitnessGoal;
   final String? experienceLevel;
   final double? targetWeight; // 20-500 kg
@@ -44,6 +45,7 @@ class ProfileModel {
     this.height,
     this.weight,
     this.activityLevel,
+    this.photoUrl,
     this.fitnessGoal,
     this.experienceLevel,
     this.targetWeight,
@@ -82,6 +84,7 @@ class ProfileModel {
           ? (json['weight'] as num).toDouble()
           : null,
       activityLevel: json['activity_level'] as String?,
+      photoUrl: json['photo_url'] as String?,
       fitnessGoal: json['fitness_goal'] as String?,
       experienceLevel: json['experience_level'] as String?,
       targetWeight: json['target_weight'] != null
@@ -119,6 +122,7 @@ class ProfileModel {
       if (height != null) 'height': height,
       if (weight != null) 'weight': weight,
       if (activityLevel != null) 'activity_level': activityLevel,
+      if (photoUrl != null) 'photo_url': photoUrl,
       if (fitnessGoal != null) 'fitness_goal': fitnessGoal,
       if (experienceLevel != null) 'experience_level': experienceLevel,
       if (targetWeight != null) 'target_weight': targetWeight,
@@ -150,6 +154,7 @@ class ProfileModel {
     double? height,
     double? weight,
     String? activityLevel,
+    String? photoUrl,
     String? fitnessGoal,
     String? experienceLevel,
     double? targetWeight,
@@ -177,6 +182,7 @@ class ProfileModel {
       height: height ?? this.height,
       weight: weight ?? this.weight,
       activityLevel: activityLevel ?? this.activityLevel,
+      photoUrl: photoUrl ?? this.photoUrl,
       fitnessGoal: fitnessGoal ?? this.fitnessGoal,
       experienceLevel: experienceLevel ?? this.experienceLevel,
       targetWeight: targetWeight ?? this.targetWeight,

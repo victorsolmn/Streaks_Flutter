@@ -15,6 +15,7 @@ class StreakProvider extends ChangeNotifier {
   UserDailyMetrics? _todayMetrics;
   UserStreak? _userStreak;
   List<UserDailyMetrics> _recentMetrics = [];
+  int _currentMonthCompletedDays = 0;
   
   // Loading states
   bool _isLoading = false;
@@ -88,10 +89,11 @@ class StreakProvider extends ChangeNotifier {
     try {
       final userId = _supabaseService.currentUser?.id;
       if (userId == null) return;
-      
-      final today = DateTime.now();
+
+      // Use local timezone for date calculation
+      final today = DateTime.now().toLocal();
       final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-      
+
       final response = await _supabaseService.client
           .from('health_metrics')
           .select()
@@ -126,18 +128,21 @@ class StreakProvider extends ChangeNotifier {
     try {
       final userId = _supabaseService.currentUser?.id;
       if (userId == null) return;
-      
+
       final response = await _supabaseService.client
           .from('health_metrics')
           .select()
           .eq('user_id', userId)
           .order('date', ascending: false)
           .limit(30);
-      
+
       _recentMetrics = (response as List)
           .map((json) => UserDailyMetrics.fromJson(json))
           .toList();
-      
+
+      // Calculate current month's completed days
+      _calculateMonthlyStats();
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading recent metrics: $e');
@@ -424,6 +429,7 @@ class StreakProvider extends ChangeNotifier {
       'message': _userStreak?.streakMessage ?? 'Start your streak!',
       'todayProgress': todayProgress,
       'goalsCompleted': _getGoalsCompletedCount(),
+      'currentMonthDays': _currentMonthCompletedDays,
     };
   }
   
@@ -457,7 +463,72 @@ class StreakProvider extends ChangeNotifier {
     if (_todayMetrics!.nutritionAchieved) count++;
     return count;
   }
-  
+
+  // Calculate monthly statistics from recent metrics
+  void _calculateMonthlyStats() {
+    final now = DateTime.now().toLocal();
+    final currentMonth = now.month;
+    final currentYear = now.year;
+
+    _currentMonthCompletedDays = _recentMetrics.where((metric) {
+      return metric.date.month == currentMonth &&
+             metric.date.year == currentYear &&
+             metric.allGoalsAchieved;
+    }).length;
+  }
+
+  // Get detailed monthly statistics
+  Future<Map<String, dynamic>> getMonthlyStats({int? month, int? year}) async {
+    try {
+      final userId = _supabaseService.currentUser?.id;
+      if (userId == null) return {};
+
+      final now = DateTime.now().toLocal();
+      final targetMonth = month ?? now.month;
+      final targetYear = year ?? now.year;
+
+      // Query monthly stats using the database function
+      final response = await _supabaseService.client
+          .rpc('get_user_monthly_stats', params: {
+            'p_user_id': userId,
+            'p_month': targetMonth,
+            'p_year': targetYear,
+          });
+
+      if (response != null && (response as List).isNotEmpty) {
+        final stats = response[0];
+        return {
+          'month': stats['month'] ?? targetMonth,
+          'year': stats['year'] ?? targetYear,
+          'daysCompleted': stats['days_completed'] ?? 0,
+          'totalSteps': stats['total_steps'] ?? 0,
+          'avgCalories': stats['avg_calories'] ?? 0.0,
+          'avgSleep': stats['avg_sleep'] ?? 0.0,
+          'perfectDays': stats['perfect_days'] ?? 0,
+        };
+      }
+
+      return {
+        'month': targetMonth,
+        'year': targetYear,
+        'daysCompleted': 0,
+        'totalSteps': 0,
+        'avgCalories': 0.0,
+        'avgSleep': 0.0,
+        'perfectDays': 0,
+      };
+    } catch (e) {
+      debugPrint('Error getting monthly stats: $e');
+      // Fallback to local calculation
+      return {
+        'month': month ?? DateTime.now().month,
+        'year': year ?? DateTime.now().year,
+        'daysCompleted': _currentMonthCompletedDays,
+        'perfectDays': _currentMonthCompletedDays,
+      };
+    }
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
