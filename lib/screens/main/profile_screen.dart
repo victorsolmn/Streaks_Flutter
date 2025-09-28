@@ -19,12 +19,11 @@ import '../../services/flutter_health_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../health_debug_screen.dart';
 import '../database_test_screen.dart';
-import '../../models/weight_model.dart';
-import '../../widgets/weight_progress_card.dart';
 import '../../utils/app_theme.dart';
 import '../auth/welcome_screen.dart';
 import 'edit_goals_screen.dart';
 import 'edit_profile_screen.dart';
+import 'main_screen.dart';
 import '../../services/health_log_capture_service.dart';
 import '../../services/supabase_service.dart';
 
@@ -39,72 +38,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final ImagePicker _picker = ImagePicker();
   File? _profileImage;
   
-  // Weight data from Supabase profile
-  WeightProgress? _weightProgress;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with default values immediately
-    _initializeWeightDataWithDefaults();
-
-    // Then load actual data from Supabase
+    // Load actual data from Supabase
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       // Auto-reload profile data from Supabase
       final userProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
       await userProvider.reloadUserProfile();
 
-      if (!mounted) return;
-      _initializeWeightData();
-      if (mounted) setState(() {});
     });
   }
 
-  void _initializeWeightDataWithDefaults() {
-    // Initialize with null to show loading state instead of fake data
-    _weightProgress = null;
-  }
-
-  void _initializeWeightData() {
-    // Get weight data from Supabase user profile
-    if (!mounted) return;
-    final supabaseUserProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
-    final profile = supabaseUserProvider.userProfile;
-
-    if (profile == null) {
-      print('ProfileScreen: No profile data available for weight initialization');
-      return;
-    }
-
-    // Use actual profile data from onboarding
-    // Only initialize if we have actual weight data
-    if (profile.weight == null) {
-      print('ProfileScreen: No weight data in profile');
-      return;
-    }
-
-    final startWeight = profile.weight!;
-    final currentWeight = profile.weight!; // Will be updated from weight entries if available
-    final targetWeight = profile.targetWeight ?? startWeight;
-
-    print('ProfileScreen: Initializing weight data - Start: $startWeight, Current: $currentWeight, Target: $targetWeight');
-
-    _weightProgress = WeightProgress(
-      startWeight: startWeight,
-      currentWeight: currentWeight,
-      targetWeight: targetWeight,
-      entries: [
-        // Single entry with current weight from profile
-        WeightEntry(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          weight: currentWeight,
-          timestamp: DateTime.now(),
-        ),
-      ],
-      unit: 'kg',
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +68,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 _buildHeader(),
                 _buildProfileInfo(),
-                _buildWeightProgressSection(),
                 _buildFitnessGoalsSection(),
                 _buildSettingsSection(),
               ],
@@ -143,9 +89,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (healthProvider.isHealthSourceConnected) {
         await healthProvider.syncWithHealth();
       }
-
-      // Re-initialize weight data with refreshed profile
-      _initializeWeightData();
 
       // Update UI
       if (mounted) {
@@ -303,53 +246,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildWeightProgressSection() {
-    if (_weightProgress == null) {
-      return Container(
-        margin: const EdgeInsets.only(top: 16),
-        padding: const EdgeInsets.all(20),
-        color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkCardBackground : Colors.white,
-        child: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(top: 16),
-      padding: const EdgeInsets.all(20),
-      color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkCardBackground : Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          WeightProgressCard(
-            weightProgress: _weightProgress!,
-            onTap: () => _showWeightChart(),
-          ),
-          SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _weightProgress == null ? null : () => _showAddWeightDialog(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryAccent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: Icon(Icons.add),
-              label: Text(
-                'Log Weight',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildFitnessGoalsSection() {
     return Consumer<SupabaseUserProvider>(
@@ -500,60 +396,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ],
-              
-              // Weight Progress
-              if (profile.targetWeight != null && profile.weight != null && profile.targetWeight != profile.weight) ...[
+
+              // Weight Progress Navigation
+              if (profile.targetWeight != null && profile.weight != null) ...[
                 SizedBox(height: 20),
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryAccent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppTheme.primaryAccent.withOpacity(0.3),
+                InkWell(
+                  onTap: () {
+                    // Navigate to Progress tab
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MainScreen(initialIndex: 1), // Progress tab index
+                      ),
+                      (route) => false,
+                    );
+                  },
+                  child: Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryAccent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppTheme.primaryAccent.withOpacity(0.3),
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        profile.targetWeight! > profile.weight!
-                          ? Icons.trending_up
-                          : Icons.trending_down,
-                        color: AppTheme.primaryAccent,
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Target Weight',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              '${profile.targetWeight!.toStringAsFixed(1)} kg',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryAccent,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              '${(profile.targetWeight! - profile.weight!).abs().toStringAsFixed(1)} kg to go',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.show_chart,
+                          color: AppTheme.primaryAccent,
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Weight Progress',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Current: ${profile.weight!.toStringAsFixed(1)} kg',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.primaryAccent,
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'Goal: ${profile.targetWeight!.toStringAsFixed(1)} kg',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -990,176 +905,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return null;
   }
 
-  void _showWeightChart() {
-    if (_weightProgress == null) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.85,
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Weight Progress',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: WeightChartView(
-                  weightProgress: _weightProgress!,
-                  onDeleteEntry: (entry) {
-                    setState(() {
-                      _weightProgress = _weightProgress!.copyWith(
-                        entries: _weightProgress!.entries
-                            .where((e) => e.id != entry.id)
-                            .toList(),
-                      );
-                    });
-                    Navigator.pop(context);
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddWeightDialog() {
-    if (_weightProgress == null) return;
-
-    final weightController = TextEditingController();
-    final noteController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Log Weight'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: weightController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'Weight (${_weightProgress?.unit ?? 'kg'})',
-                helperText: 'Range: 20-500 kg',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d{0,3}(\.\d{0,1})?$')),
-              ],
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: noteController,
-              decoration: InputDecoration(
-                labelText: 'Note (optional)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final weight = double.tryParse(weightController.text);
-
-              // Validate weight range
-              if (weight == null || weight < 20 || weight > 500) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Please enter a valid weight between 20 and 500 kg'),
-                    backgroundColor: AppTheme.errorRed,
-                  ),
-                );
-                return;
-              }
-
-              if (weight != null && weight >= 20 && weight <= 500) {
-                final newEntry = WeightEntry(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  weight: weight,
-                  timestamp: DateTime.now(),
-                  note: noteController.text.isEmpty ? null : noteController.text,
-                );
-
-                setState(() {
-                  final entries = List<WeightEntry>.from(_weightProgress!.entries)
-                    ..add(newEntry);
-                  _weightProgress = _weightProgress!.copyWith(
-                    entries: entries,
-                    currentWeight: weight,
-                  );
-                });
-
-                // Update user profile with new current weight in Supabase
-                final supabaseUserProvider = Provider.of<SupabaseUserProvider>(context, listen: false);
-                if (supabaseUserProvider.userProfile != null) {
-                  final updatedProfile = supabaseUserProvider.userProfile!.copyWith(weight: weight);
-                  await supabaseUserProvider.updateProfile(updatedProfile);
-                }
-                
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Weight logged successfully!'),
-                    backgroundColor: Color(0xFF10B981),
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.secondaryLight,
-            ),
-            child: Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showNutritionGoalsDialog() {
     final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);

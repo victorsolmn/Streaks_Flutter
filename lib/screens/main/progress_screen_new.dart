@@ -6,13 +6,16 @@ import '../../providers/nutrition_provider.dart';
 import '../../providers/health_provider.dart';
 import '../../providers/achievement_provider.dart';
 import '../../providers/streak_provider.dart';
+import '../../providers/weight_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/circular_progress_widget.dart';
 import '../../widgets/streak_display_widget.dart';
 import '../../widgets/achievements/achievement_grid.dart';
 import '../../widgets/streak_calendar_widget.dart';
 import '../../widgets/milestone_progress_ring.dart';
+import '../../widgets/weight_progress_chart.dart';
 import '../../services/achievement_checker.dart';
+import 'weight_details_screen.dart';
 // import 'dart:math' as math; // Not needed anymore - no random data
 
 class ProgressScreenNew extends StatefulWidget {
@@ -112,17 +115,32 @@ class _ProgressScreenNewState extends State<ProgressScreenNew>
             ),
           ),
           const SizedBox(height: 20),
-          _buildSummarySection(userProvider, nutritionProvider, healthProvider, streakProvider),
-          const SizedBox(height: 32),
-          _buildWeeklyProgressChart(nutritionProvider, healthProvider, streakProvider),
-          const SizedBox(height: 32),
 
-          // Centered Milestone Progress Ring - Main Feature
+          // Centered Milestone Progress Ring - Main Feature (Moved to First)
           Center(
             child: Container(
               constraints: const BoxConstraints(maxWidth: 300),
               child: const MilestoneProgressRing(size: 160, strokeWidth: 16),
             ),
+          ),
+          const SizedBox(height: 32),
+
+          _buildSummarySection(userProvider, nutritionProvider, healthProvider, streakProvider),
+          const SizedBox(height: 32),
+          _buildWeeklyProgressChart(nutritionProvider, healthProvider, streakProvider),
+          const SizedBox(height: 32),
+
+          // Weight Progress Chart
+          WeightProgressChart(
+            isCompact: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const WeightDetailsScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),
