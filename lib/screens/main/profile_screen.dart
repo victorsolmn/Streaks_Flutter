@@ -26,6 +26,7 @@ import 'edit_profile_screen.dart';
 import 'main_screen.dart';
 import '../../services/health_log_capture_service.dart';
 import '../../services/supabase_service.dart';
+import '../../widgets/fitness_goals_card.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -69,6 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildHeader(),
                 _buildProfileInfo(),
                 _buildFitnessGoalsSection(),
+                _buildDailyTargetsSection(),
                 _buildSettingsSection(),
               ],
             ),
@@ -252,9 +254,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context, userProvider, child) {
         final profile = userProvider.userProfile;
         if (profile == null) return SizedBox.shrink();
-        
+
+        return FitnessGoalsCard(profile: profile);
+      },
+    );
+  }
+
+  Widget _buildDailyTargetsSection() {
+    return Consumer<SupabaseUserProvider>(
+      builder: (context, userProvider, child) {
+        final profile = userProvider.userProfile;
+        if (profile == null) return SizedBox.shrink();
+
         final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-        
+
         return Container(
           margin: const EdgeInsets.only(top: 16),
           padding: const EdgeInsets.all(20),
@@ -262,103 +275,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Fitness Goals',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => EditGoalsScreen(),
-                        ),
-                      );
-                    },
-                    icon: Icon(
-                      Icons.edit,
-                      color: AppTheme.primaryAccent,
-                      size: 20,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 16),
-              
-              // Current Goal
-              _buildGoalItem(
-                icon: Icons.flag,
-                title: 'Fitness Goal',
-                value: profile.fitnessGoal ?? 'Not set',
-                color: AppTheme.primaryAccent,
-              ),
-
-              // Activity Level
-              if (profile.activityLevel != null) ...[
-                SizedBox(height: 12),
-                _buildGoalItem(
-                  icon: Icons.fitness_center,
-                  title: 'Activity Level',
-                  value: profile.activityLevel!,
-                  color: Colors.blue,
-                ),
-              ],
-
-              // Experience Level
-              if (profile.experienceLevel != null) ...[
-                SizedBox(height: 12),
-                _buildGoalItem(
-                  icon: Icons.school,
-                  title: 'Experience Level',
-                  value: profile.experienceLevel!,
-                  color: Colors.green,
-                ),
-              ],
-
-              // Workout Consistency
-              if (profile.workoutConsistency != null) ...[
-                SizedBox(height: 12),
-                _buildGoalItem(
-                  icon: Icons.schedule,
-                  title: 'Workout Consistency',
-                  value: profile.workoutConsistency!,
-                  color: Colors.orange,
-                ),
-              ],
-              
-              // BMI (calculated from height and weight)
-              if (profile.height != null && profile.weight != null) ...[
-                SizedBox(height: 12),
-                _buildGoalItem(
-                  icon: Icons.monitor_weight,
-                  title: 'BMI',
-                  value: '${profile.bmi.toStringAsFixed(1)} (${profile.bmiCategory})',
-                  color: _getBMIColor(profile.bmi),
-                ),
-              ],
-              
               // Daily Targets
-              if (profile.dailyCaloriesTarget != null || 
+              if (profile.dailyCaloriesTarget != null ||
                   profile.dailyStepsTarget != null ||
                   profile.dailySleepTarget != null ||
                   profile.dailyWaterTarget != null) ...[
-                SizedBox(height: 20),
                 Text(
                   'Daily Targets',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                     color: Theme.of(context).textTheme.bodyLarge?.color,
                   ),
                 ),
-                SizedBox(height: 12),
-                
+                SizedBox(height: 16),
+
                 Wrap(
                   spacing: 12,
                   runSpacing: 12,

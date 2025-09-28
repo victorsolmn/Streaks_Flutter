@@ -47,6 +47,81 @@ Streaker (formerly Streaks Flutter) is a comprehensive health and fitness tracki
 - Modified `/lib/services/supabase_service.dart:189-238`
 - Updated `/lib/providers/nutrition_provider.dart:355-364`
 
+## Recent Updates (September 28, 2025)
+
+### Profile Screen UI Redesign: Compact Fitness Goals Card
+**Requirement:** Replace verbose fitness goals section with space-efficient card design
+
+**Implementation:**
+1. **Created New Component:**
+   - `/lib/widgets/fitness_goals_card.dart` - Compact card widget replacing verbose fitness goals section
+
+2. **Key Features:**
+   - **2x2 Grid Layout**: Goal, Activity Level, Experience Level, Workout Consistency
+   - **Integrated BMI Display**: Color-coded BMI with category badge
+   - **Space Efficiency**: Dramatically reduced vertical space consumption
+   - **Theme-Aware**: Proper dark/light mode support
+   - **Edit Navigation**: Direct access to EditGoalsScreen
+
+3. **Layout Structure:**
+   ```
+   Fitness Goals Card
+   ├── Header (Title + Edit Button)
+   ├── 2x2 Grid
+   │   ├── Goal & Activity (top row)
+   │   └── Experience & Consistency (bottom row)
+   └── BMI Section (when height/weight available)
+   ```
+
+4. **Design Improvements:**
+   - Color-coded goal items with themed backgrounds
+   - Consistent spacing and typography
+   - Professional icon usage with proper sizing
+   - Responsive text handling with ellipsis overflow
+
+**Technical Fix:**
+- Fixed import error: Changed from `../models/user_profile.dart` to `../models/user_model.dart`
+- Ensured compatibility with existing `SupabaseUserProvider` data structure
+
+### Weight Progress Migration
+**Requirement:** Move weight progress from Profile screen to Progress screen (2nd tab) with line graph visualization
+
+**Implementation:**
+1. **Created New Components:**
+   - `/lib/providers/weight_provider.dart` - State management for weight data with Supabase integration
+   - `/lib/widgets/weight_progress_chart.dart` - Interactive line graph widget using fl_chart
+   - `/lib/widgets/modern_weight_chart.dart` - Enhanced chart with click indicators and theme support
+   - `/lib/screens/main/weight_details_screen.dart` - Full weight management screen
+   - `/supabase/migrations/create_weight_entries.sql` - Database schema for weight tracking
+
+2. **Key Changes:**
+   - Removed weight progress section from Profile screen completely
+   - Added weight chart to Progress screen below weekly progress
+   - Implemented line graph with touch interactions and tooltips
+   - Added navigation from compact view to detailed view
+   - Graceful error handling for missing database table
+
+3. **Features:**
+   - Line graph visualization with actual and target weight lines
+   - Add/delete weight entries with notes
+   - Historical data tracking with timestamps
+   - Automatic sync with user profile weight
+   - Weekly trend calculations and projections
+   - Visual click indicators ("View →" badge and "+" button)
+
+4. **Widget Order in Progress Screen:**
+   - Milestone Progress Ring (moved to top)
+   - Summary Section
+   - Weekly Progress Chart
+   - Weight Progress Chart (new)
+
+### Monetization Strategy Documentation
+**Added comprehensive monetization planning:**
+- Created MONETIZATION_STRATEGY_REPORT.md - Market research and feature analysis
+- Created PREMIUM_IMPLEMENTATION_STRATEGY.md - UI/UX implementation details
+- Created PREMIUM_DEVELOPMENT_PLAN.md - Technical implementation roadmap
+- Planned freemium model with Plus ($4.99) and Pro ($9.99) tiers
+
 ## Recent Updates (September 27, 2025)
 
 ### 1. Profile Feature Enhancement
