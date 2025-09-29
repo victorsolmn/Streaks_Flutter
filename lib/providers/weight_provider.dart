@@ -95,7 +95,7 @@ class WeightProvider extends ChangeNotifier {
       final profileResponse = await _supabase
           .from('profiles')
           .select('weight, target_weight, weight_unit')
-          .eq('user_id', userId)
+          .eq('id', userId)
           .single();
 
       if (profileResponse != null) {
@@ -184,7 +184,7 @@ class WeightProvider extends ChangeNotifier {
               'weight': weight,
               'updated_at': DateTime.now().toIso8601String(),
             })
-            .eq('user_id', userId);
+            .eq('id', userId);
 
         notifyListeners();
         return true;
@@ -240,7 +240,7 @@ class WeightProvider extends ChangeNotifier {
                 'weight': latestWeight,
                 'updated_at': DateTime.now().toIso8601String(),
               })
-              .eq('user_id', userId);
+              .eq('id', userId);
         }
       }
 
@@ -276,7 +276,7 @@ class WeightProvider extends ChangeNotifier {
             'weight_unit': unit,
             'updated_at': DateTime.now().toIso8601String(),
           })
-          .eq('user_id', userId);
+          .eq('id', userId);
 
       if (_weightProgress != null) {
         _weightProgress = _weightProgress!.copyWith(unit: unit);
@@ -314,7 +314,7 @@ class WeightProvider extends ChangeNotifier {
             'target_weight': targetWeight,
             'updated_at': DateTime.now().toIso8601String(),
           })
-          .eq('user_id', userId);
+          .eq('id', userId);
 
       if (_weightProgress != null) {
         _weightProgress = _weightProgress!.copyWith(targetWeight: targetWeight);
