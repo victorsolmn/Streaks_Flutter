@@ -79,12 +79,57 @@ class _WeightProgressChartState extends State<WeightProgressChart> {
                 fontSize: 24,
               ),
             ),
-            if (widget.onTap != null)
-              IconButton(
-                icon: Icon(Icons.fullscreen, color: AppTheme.textSecondary),
-                onPressed: widget.onTap,
-                tooltip: 'View details',
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Add weight button
+                Container(
+                  height: 36,
+                  width: 36,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.primaryAccent,
+                        AppTheme.primaryAccent.withOpacity(0.8),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryAccent.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Tooltip(
+                      message: 'Add weight entry',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: widget.onTap,
+                        child: const Icon(
+                          Icons.add,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (widget.onTap != null) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: Icon(Icons.fullscreen, color: AppTheme.textSecondary),
+                    onPressed: widget.onTap,
+                    tooltip: 'View details',
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -523,38 +568,59 @@ class _WeightProgressChartState extends State<WeightProgressChart> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.borderColor.withOpacity(0.1),
+          width: 1,
+        ),
       ),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.show_chart,
-              size: 48,
-              color: AppTheme.textSecondary.withOpacity(0.5),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryAccent.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.show_chart,
+                size: 32,
+                color: AppTheme.primaryAccent,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
-              'No weight entries yet',
+              'Track Your Weight',
               style: TextStyle(
-                fontSize: 16,
-                color: AppTheme.textSecondary,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Add your first weight entry to see the chart',
+              'Add your first entry to start tracking',
               style: TextStyle(
                 fontSize: 14,
-                color: AppTheme.textSecondary.withOpacity(0.7),
+                color: AppTheme.textSecondary.withOpacity(0.8),
               ),
             ),
             if (widget.onTap != null) ...[
-              const SizedBox(height: 16),
-              TextButton.icon(
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
                 onPressed: widget.onTap,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Weight Entry'),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Weight'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 2,
+                ),
               ),
             ],
           ],
