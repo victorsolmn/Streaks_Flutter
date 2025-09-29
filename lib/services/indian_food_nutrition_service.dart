@@ -102,6 +102,26 @@ class IndianFoodNutritionService {
   // Gemini Vision for Indian food recognition
   GenerativeModel? _model;
 
+  // Helper method to get default nutrition when API fails
+  Map<String, int> _getDefaultNutrition(String? description) {
+    // Provide reasonable defaults based on description
+    if (description != null && description.isNotEmpty) {
+      final lowerDesc = description.toLowerCase();
+
+      // Check for specific meal types
+      if (lowerDesc.contains('breakfast')) {
+        return {'calories': 250, 'protein': 10, 'carbs': 35, 'fat': 8, 'fiber': 3};
+      } else if (lowerDesc.contains('lunch') || lowerDesc.contains('dinner')) {
+        return {'calories': 400, 'protein': 20, 'carbs': 50, 'fat': 15, 'fiber': 5};
+      } else if (lowerDesc.contains('snack')) {
+        return {'calories': 150, 'protein': 5, 'carbs': 20, 'fat': 5, 'fiber': 2};
+      }
+    }
+
+    // Default mixed meal
+    return {'calories': 350, 'protein': 15, 'carbs': 45, 'fat': 12, 'fiber': 5};
+  }
+
   // Try multiple Gemini model versions to find one that works
   void _initializeGeminiModel() {
     // Check API key validity
@@ -115,10 +135,12 @@ class IndianFoodNutritionService {
       return;
     }
     final modelVersions = [
-      'gemini-1.5-flash',     // Most common free tier model
-      'gemini-1.5-pro',       // Pro version if available
-      'gemini-1.0-pro',       // Older stable version
-      'gemini-pro',           // Generic pro version
+      'gemini-2.5-flash',           // Latest stable flash model (2025)
+      'gemini-2.0-flash',           // Stable 2.0 version
+      'gemini-flash-latest',        // Latest flash (alias)
+      'gemini-2.5-pro',             // Latest pro version
+      'gemini-pro-latest',          // Latest pro (alias)
+      'gemini-2.0-flash-lite',      // Lightweight version
     ];
 
     for (final modelVersion in modelVersions) {
@@ -154,9 +176,21 @@ class IndianFoodNutritionService {
       // Check if model is initialized
       if (_model == null) {
         debugPrint('⚠️ Gemini not initialized, using smart fallback');
+
+        // Check why it's not initialized for better error messages
+        if (_geminiApiKey == 'YOUR_GEMINI_API_KEY_HERE' || _geminiApiKey.isEmpty) {
+          debugPrint('❌ ERROR: Gemini API key not configured!');
+          debugPrint('📱 To fix: Add your Gemini API key in lib/config/api_config.dart');
+          return {
+            'success': false,
+            'error': 'Gemini API key not configured. Please add your API key to use AI food scanning.',
+            'fallback': true,
+            'nutrition': _getDefaultNutrition(mealDescription),
+          };
+        }
+
         // Try to analyze using local database with description parsing
-        // For generic image analysis, use default description
-        final description = 'Mixed meal from image';
+        final description = mealDescription ?? 'Mixed meal from image';
         return _analyzeWithLocalDatabase(description);
       }
 
@@ -408,7 +442,7 @@ Return ONLY a JSON object in this exact format (no markdown, no explanation):
         'confidence': 0.7,
       };
     } catch (e) {
-      return _getDefaultNutrition();
+      return _getDefaultNutritionFallback();
     }
   }
 
@@ -661,7 +695,7 @@ Analyze the image now:
   
   // Get nutrition data from database
   Map<String, dynamic> _getNutritionFromDatabase(List<String> foodItems) {
-    if (foodItems.isEmpty) return _getDefaultNutrition();
+    if (foodItems.isEmpty) return _getDefaultNutritionFallback();
     
     debugPrint('\n📊 Looking up nutrition for: $foodItems');
     
@@ -748,7 +782,7 @@ Analyze the image now:
       debugPrint('Spoonacular fallback error: $e');
     }
     
-    return _getDefaultNutrition();
+    return _getDefaultNutritionFallback();
   }
   
   // Search by text (when image recognition fails)
@@ -860,7 +894,7 @@ Analyze the image now:
       debugPrint('Gemini search error: $e');
     }
     
-    return _getDefaultNutrition();
+    return _getDefaultNutritionFallback();
   }
   
   // Smart fallback: Analyze meal using local database
@@ -1112,7 +1146,7 @@ Analyze the image now:
   }
 
   // Get default nutrition when all methods fail
-  Map<String, dynamic> _getDefaultNutrition() {
+  Map<String, dynamic> _getDefaultNutritionFallback() {
     return {
       'success': false,
       'foods': [],

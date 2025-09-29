@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import '../providers/nutrition_provider.dart';
 
 class NutritionAIService {
-  static const String _apiKey = 'YOUR_API_KEY';
+  static const String _apiKey = 'YOUR_GOOGLE_VISION_API_KEY';  // Not currently used - using Gemini instead
   static const String _apiUrl = 'https://vision.googleapis.com/v1/images:annotate';
   
   static Future<NutritionEntry?> analyzeFoodWithDetails(
