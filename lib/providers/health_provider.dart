@@ -6,8 +6,7 @@ import '../models/health_metric_model.dart';
 import '../services/unified_health_service.dart';
 import '../services/realtime_sync_service.dart';
 import '../services/supabase_service.dart';
-import '../services/calorie_tracking_service.dart';
-import '../models/daily_calorie_total.dart';
+// Note: CalorieTrackingService removed - no longer needed without smartwatch integration
 
 class HealthProvider with ChangeNotifier {
   Map<MetricType, HealthMetric> _metrics = {};
@@ -16,7 +15,7 @@ class HealthProvider with ChangeNotifier {
   final UnifiedHealthService _healthService = UnifiedHealthService();
   final RealtimeSyncService _syncService = RealtimeSyncService();
   final SupabaseService _supabaseService = SupabaseService();
-  final CalorieTrackingService _calorieService = CalorieTrackingService();
+  // Note: CalorieTrackingService removed
   SharedPreferences? _prefs;
   HealthDataSource _currentDataSource = HealthDataSource.unavailable;
   
@@ -95,8 +94,7 @@ class HealthProvider with ChangeNotifier {
     // Initialize unified health service
     await _healthService.initialize();
 
-    // Initialize calorie tracking service
-    await _calorieService.initialize();
+    // Note: CalorieTrackingService removed - no longer needed
 
     // Set up callback for data updates
     _healthService.setDataUpdateCallback((data) {
@@ -492,13 +490,10 @@ class HealthProvider with ChangeNotifier {
       final today = DateTime.now();
       final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
       
-      // Load today's health metrics from Supabase
-      final healthData = await _supabaseService.getHealthMetrics(
-        userId: userId,
-        date: todayStr,
-      );
+      // Note: Health metrics loading disabled - app now nutrition-only
+      final healthData = null; // Health metrics no longer supported
 
-      if (healthData != null) {
+      if (false) { // Disabled - health metrics no longer supported
         // Update local data with Supabase data
         _todaySteps = (healthData['steps'] ?? 0).toDouble();
         _todayCaloriesBurned = (healthData['calories_burned'] ?? 0).toDouble();
@@ -602,22 +597,9 @@ class HealthProvider with ChangeNotifier {
       final today = DateTime.now();
       final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-      debugPrint('📤 Saving to Supabase - Steps: $_todaySteps, Calories: $_todayCaloriesBurned, HR: $_todayHeartRate');
-
-      await _supabaseService.saveHealthMetrics(
-        userId: userId,
-        date: todayStr,
-        metrics: {
-          'steps': _todaySteps > 0 ? _todaySteps.toInt() : 0,
-          'heart_rate': _todayHeartRate > 0 ? _todayHeartRate.toInt() : 0,
-          'sleep_hours': _todaySleep > 0 ? _todaySleep : 0,
-          'calories_burned': _todayCaloriesBurned > 0 ? _todayCaloriesBurned.toInt() : 0,
-          'distance': _todayDistance > 0 ? _todayDistance : 0,
-          'active_minutes': _todayWorkouts > 0 ? _todayWorkouts * 30 : 0, // Approximate
-        },
-      );
-
-      debugPrint('✅ Health data synced to Supabase successfully');
+      // Note: Health metrics sync disabled - app now nutrition-only
+      debugPrint('ℹ️ Health metrics sync skipped - app focuses on nutrition tracking');
+      return; // Skip health metrics sync
     } catch (e) {
       debugPrint('❌ Error saving health data to Supabase: $e');
     }

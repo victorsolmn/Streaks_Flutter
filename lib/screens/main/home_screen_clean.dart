@@ -108,9 +108,8 @@ class _HomeScreenCleanState extends State<HomeScreenClean>
     final nutritionProvider = Provider.of<NutritionProvider>(context, listen: false);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
-    // Sync all metrics to streak provider
+    // Sync nutrition metrics to streak provider (health provider removed)
     await streakProvider.syncMetricsFromProviders(
-      healthProvider,
       nutritionProvider,
       userProvider,
     );

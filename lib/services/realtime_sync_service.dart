@@ -153,37 +153,10 @@ class RealtimeSyncService {
     }
   }
   
-  /// Sync health metrics
+  /// Note: Health metrics sync disabled - app now nutrition-only
   Future<void> _syncHealthMetrics() async {
-    try {
-      final userId = _supabase.currentUser?.id;
-      if (userId == null) return;
-      
-      final prefs = await SharedPreferences.getInstance();
-      
-      // Get today's health data
-      final today = DateTime.now().toIso8601String().split('T')[0];
-      final steps = prefs.getInt('today_steps') ?? 0;
-      final heartRate = prefs.getInt('today_heart_rate');
-      final sleepHours = prefs.getDouble('today_sleep');
-      final caloriesBurned = prefs.getInt('today_calories_burned');
-      
-      await _supabase.saveHealthMetrics(
-        userId: userId,
-        date: today,
-        metrics: {
-          'steps': steps,
-          'heart_rate': heartRate,
-          'sleep_hours': sleepHours,
-          'calories_burned': caloriesBurned,
-        },
-      );
-      
-      debugPrint('🏃 Synced health metrics: $steps steps');
-    } catch (e) {
-      debugPrint('Error syncing health metrics: $e');
-      _addToOfflineQueue('health', {'error': e.toString()});
-    }
+    // Health metrics sync disabled - app focuses on nutrition tracking only
+    return;
   }
   
   /// Sync user profile

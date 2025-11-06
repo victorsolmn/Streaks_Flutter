@@ -558,55 +558,8 @@ class SupabaseService {
   }
 
 
-  // Health Metrics Methods
-  Future<void> saveHealthMetrics({
-    required String userId,
-    required String date,
-    required Map<String, dynamic> metrics,
-  }) async {
-    try {
-      // Only include heart_rate if it's valid (> 0)
-      final data = {
-        'user_id': userId,
-        'date': date,
-        'steps': metrics['steps'] ?? 0,
-      };
-
-      // Add optional fields only if they have valid values
-      if (metrics['heart_rate'] != null && metrics['heart_rate'] > 0) {
-        data['heart_rate'] = metrics['heart_rate'];
-      }
-      if (metrics['sleep_hours'] != null && metrics['sleep_hours'] > 0) {
-        data['sleep_hours'] = metrics['sleep_hours'];
-      }
-      if (metrics['calories_burned'] != null && metrics['calories_burned'] > 0) {
-        data['calories_burned'] = metrics['calories_burned'];
-      }
-
-      await _supabase.from('health_metrics').upsert(data, onConflict: 'user_id,date');
-    } catch (e) {
-      throw Exception('Failed to save health metrics: $e');
-    }
-  }
-
-  Future<Map<String, dynamic>?> getHealthMetrics({
-    required String userId,
-    required String date,
-  }) async {
-    try {
-      final response = await _supabase
-          .from('health_metrics')
-          .select()
-          .eq('user_id', userId)
-          .eq('date', date)
-          .maybeSingle();
-      
-      return response;
-    } catch (e) {
-      print('Error fetching health metrics: $e');
-      return null;
-    }
-  }
+  // Note: Health Metrics methods removed - app now focuses on nutrition tracking only
+  // Health device integration has been removed from the app
 
   // Streak Methods
   Future<void> updateStreak({
@@ -660,19 +613,12 @@ class SupabaseService {
         .order('date', ascending: false);
   }
 
-  Stream<List<Map<String, dynamic>>> subscribeToHealthMetrics(String userId) {
-    return _supabase
-        .from('health_metrics')
-        .stream(primaryKey: ['id'])
-        .eq('user_id', userId)
-        .order('date', ascending: false);
-  }
+  // Note: subscribeToHealthMetrics removed - health tracking no longer supported
 
   // Batch operations
   Future<void> syncOfflineData({
     required String userId,
     required List<Map<String, dynamic>> nutritionEntries,
-    required List<Map<String, dynamic>> healthMetrics,
   }) async {
     try {
       // Batch insert nutrition entries
@@ -686,16 +632,7 @@ class SupabaseService {
         );
       }
 
-      // Batch insert health metrics
-      if (healthMetrics.isNotEmpty) {
-        await _supabase.from('health_metrics').upsert(
-          healthMetrics.map((metric) => {
-            'user_id': userId,
-            ...metric,
-          }).toList(),
-          onConflict: 'user_id,date',
-        );
-      }
+      // Note: Health metrics sync removed - app now nutrition-only
     } catch (e) {
       throw Exception('Failed to sync offline data: $e');
     }
